@@ -11,7 +11,7 @@ A news website. The public-facing part is a news feed, digests, and analytics. A
 | `frontend/` | Public website | React 19 + TypeScript + Vite + Tailwind CSS + shadcn/ui |
 | `backend/` | API server | Go |
 
-**Important:** `frontend/` contains a broken `.git` (a skeleton without objects/refs — a non-functional leftover from scaffolding). In practice, everything is versioned by the root repository. A separate repository for the frontend is an open question for the project owner.
+**Git:** a single repository — `git@github.com:MaxAixs/mandat.git` (branch `main`). Frontend and backend are versioned together; there is no separate frontend repository.
 
 ## Rules for Agents
 
