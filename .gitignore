@@ -1,0 +1,13 @@
+# IDE
+.idea/
+.vscode/
+
+# OpenCode local data
+.opencode/
+
+# Dependencies / build output (generic safety net; frontend/.gitignore covers the rest)
+node_modules/
+dist/
+
+# OS
+.DS_Store

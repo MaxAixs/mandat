@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 11% 10%;
+    --foreground: 45 20% 94%;
+    --card: 220 12% 13%;
+    --card-foreground: 45 20% 94%;
+    --popover: 220 12% 13%;
+    --popover-foreground: 45 20% 94%;
+    --primary: 349 66% 35%;
+    --primary-foreground: 45 20% 94%;
+    --secondary: 220 10% 16%;
+    --secondary-foreground: 45 20% 94%;
+    --muted: 220 10% 16%;
+    --muted-foreground: 220 4% 55%;
+    --accent: 349 66% 40%;
+    --accent-foreground: 45 20% 94%;
+    --destructive: 349 66% 40%;
+    --destructive-foreground: 45 20% 94%;
+    --border: 220 8% 23%;
+    --input: 220 8% 23%;
+    --ring: 349 66% 40%;
+    --radius: 0rem;
+
+    --mandat-bg: #17191C;
+    --mandat-surface: #1E2126;
+    --mandat-surface-2: #24282F;
+    --mandat-line: #33373F;
+    --mandat-red: #8E1B2D;
+    --mandat-red-bright: #B3233A;
+    --mandat-text: #F2F0EA;
+    --mandat-muted: #8A8D91;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    background-color: var(--mandat-bg);
+    color: var(--mandat-text);
+  }
+
+  h1, h2, h3, h4, h5, h6, .oswald {
+    font-family: 'Oswald', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
