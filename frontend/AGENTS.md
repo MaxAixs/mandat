@@ -29,12 +29,13 @@ Before finishing any task: `npm run lint` and `npm run build` must pass without 
 src/
   pages/       Pages (routes). Currently: Home.tsx
   sections/    Landing/page sections: Header, Hero, News, Digest, Analytics, Insight, Ticker, Footer
+  components/    Shared components (NewsCard.tsx)
   components/ui/  shadcn/ui components (40+ of them) — do NOT edit manually
   hooks/       Custom hooks (use-mobile.ts)
   lib/         Utilities: utils.ts (cn() for merging classes)
-  types/       Shared TypeScript types (domain model: Article, Digest, etc.)
-  constants/   Site constants: navigation, social links, API base URL
-  api/         Client for the backend API (will appear along with the Go server)
+  types/       Shared TypeScript types (domain model: Article, StatItem, NavLink)
+  constants/   Site constants: NAV_LINKS, FOOTER_LINKS, SITE_NAME
+  api/         Backend client; mock.ts holds mock content until the Go API is ready
   assets/      Static assets imported from code (images, fonts)
   App.tsx      Root component (router)
   main.tsx     Entry point
@@ -53,7 +54,8 @@ src/
 - **Components**: `PascalCase.tsx`, one component per file. Hooks: `use-*.ts` in `src/hooks/`.
 - **Styling — Tailwind classes only**. Custom CSS is a last resort (in `App.css` or `index.css`).
 - Merge classes using `cn()` from `@/lib/utils`.
-- Theming is done via CSS variables in `src/index.css`; do not hardcode colors.
+- **Theme colors — via the `mandat-*` Tailwind classes** (`bg-mandat-surface`, `text-mandat-muted`, `border-mandat-line`, `bg-mandat-red`, `text-mandat-red-bright`, ...). They map to CSS variables in `src/index.css` (see `tailwind.config.js`). Never hardcode hex colors in components.
+- **Content does not live in components.** Mock data comes from `@/api/mock`, navigation/links from `@/constants`, types from `@/types`. When the backend lands, only the API layer changes.
 
 ## Working with shadcn/ui
 

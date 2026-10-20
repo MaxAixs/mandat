@@ -38,6 +38,16 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        mandat: {
+          bg: "var(--mandat-bg)",
+          surface: "var(--mandat-surface)",
+          "surface-2": "var(--mandat-surface-2)",
+          line: "var(--mandat-line)",
+          red: "var(--mandat-red)",
+          "red-bright": "var(--mandat-red-bright)",
+          text: "var(--mandat-text)",
+          muted: "var(--mandat-muted)",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

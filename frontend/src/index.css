@@ -49,4 +49,11 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+
+  /* Ticker marquee animation (used by src/sections/Ticker.tsx) */
+  @keyframes scroll {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
