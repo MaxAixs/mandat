@@ -28,7 +28,7 @@ Before finishing any task: `npm run lint` and `npm run build` must pass without 
 ```
 src/
   pages/       Pages (routes). Currently: Home.tsx
-  sections/    Landing/page sections: Header, Hero, News, Digest, Analytics, Insight, Ticker, Footer
+  sections/    Landing/page sections: Header, Hero, News, Digest, Telegram, Analytics, Insight, Ticker, Footer
   components/    Shared components (NewsCard.tsx)
   components/ui/  shadcn/ui components (40+ of them) — do NOT edit manually
   hooks/       Custom hooks (use-mobile.ts)

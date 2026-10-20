@@ -2,9 +2,9 @@ import Header from '@/sections/Header'
 import Hero from '@/sections/Hero'
 import Ticker from '@/sections/Ticker'
 import News from '@/sections/News'
-import Analytics from '@/sections/Analytics'
 import Insight from '@/sections/Insight'
 import Digest from '@/sections/Digest'
+import Telegram from '@/sections/Telegram'
 import Footer from '@/sections/Footer'
 
 export default function Home() {
@@ -14,9 +14,9 @@ export default function Home() {
       <Hero />
       <Ticker />
       <News />
-      <Analytics />
       <Insight />
       <Digest />
+      <Telegram />
       <Footer />
     </div>
   )

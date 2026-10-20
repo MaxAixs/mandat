@@ -1,4 +1,3 @@
-import { Search } from 'lucide-react'
 import { NAV_LINKS, SITE_NAME, SITE_TAGLINE } from '@/constants'
 
 export default function Header() {
@@ -33,18 +32,6 @@ export default function Header() {
               </a>
             ))}
           </nav>
-
-          <div className="flex items-center gap-4">
-            <button
-              aria-label="Пошук"
-              className="w-10 h-10 grid place-items-center border border-mandat-line text-mandat-muted transition-colors hover:border-mandat-red-bright hover:text-mandat-text bg-transparent cursor-pointer"
-            >
-              <Search size={18} />
-            </button>
-            <button className="font-['Oswald'] text-[14px] tracking-[2px] uppercase px-6 py-2.5 transition-colors cursor-pointer bg-mandat-red text-mandat-text hover:bg-mandat-red-bright">
-              Підписатися
-            </button>
-          </div>
         </div>
       </div>
     </header>

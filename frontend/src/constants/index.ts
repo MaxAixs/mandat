@@ -3,6 +3,13 @@ import type { NavLink } from '@/types'
 export const SITE_NAME = 'МАНДАТ'
 export const SITE_TAGLINE = 'новини · інсайди · аналітика'
 
+/** Telegram channel promoted on the site. */
+export const TELEGRAM_CHANNEL = {
+  name: 'МАНДАТ у Telegram',
+  url: 'https://t.me/mandat',
+  subscribers: '42 728',
+}
+
 /** Header navigation. href = anchor of the target section. */
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '#news' },
