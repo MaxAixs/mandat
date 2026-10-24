@@ -1,0 +1,7 @@
+.env
+.git
+.superpowers
+docs
+README.md
+*.md
+config.yaml
