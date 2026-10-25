@@ -42,6 +42,26 @@ Base path `/api/v1/admin/news`. Authentication is not implemented yet.
 `page` starts at 1, `limit` defaults to 20 and is capped at 100.
 `status` accepts `draft` or `published`.
 
+## Public API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/news?page=&limit=` | Paginated published articles for the public site |
+
+Only articles with status `published` are returned, newest publication first.
+The response contains public article cards without the full text or administrative
+fields. `page` starts at 1, `limit` defaults to 20 and is capped at 100.
+
+## Health checks
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health/live` | Process liveness; does not check dependencies |
+| `GET` | `/health/ready` | Readiness including a PostgreSQL ping with a 2-second timeout |
+
+Both return `200 OK` with `{ "status": "ok" }` on success. Readiness returns
+`503 Service Unavailable` when PostgreSQL is unreachable.
+
 Errors are returned as:
 
 ```json

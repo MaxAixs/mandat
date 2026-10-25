@@ -5,8 +5,9 @@ package errs
 import "errors"
 
 var (
-	ErrNewsNotFound    = errors.New("news not found")
-	ErrInvalidInput    = errors.New("invalid input")
-	ErrConflict        = errors.New("resource conflict")
-	ErrPayloadTooLarge = errors.New("payload too large")
+	ErrNewsNotFound       = errors.New("news not found")
+	ErrInvalidInput       = errors.New("invalid input")
+	ErrConflict           = errors.New("resource conflict")
+	ErrPayloadTooLarge    = errors.New("payload too large")
+	ErrServiceUnavailable = errors.New("service unavailable")
 )

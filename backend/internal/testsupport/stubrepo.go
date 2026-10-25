@@ -12,15 +12,17 @@ import (
 
 // StubRepo is an in-memory implementation of the news repository.
 type StubRepo struct {
-	Items       map[uuid.UUID]*models.News
-	Conflicts   map[string]bool
-	CreateErr   error
-	GetErr      error
-	ListErr     error
-	UpdateErr   error
-	DeleteErr   error
-	CreateCalls int
-	LastFilter  models.ListFilter
+	Items               map[uuid.UUID]*models.News
+	Conflicts           map[string]bool
+	CreateErr           error
+	GetErr              error
+	ListErr             error
+	ListPublishedErr    error
+	UpdateErr           error
+	DeleteErr           error
+	CreateCalls         int
+	LastFilter          models.ListFilter
+	LastPublishedFilter models.ListFilter
 }
 
 // NewStubRepo creates an empty StubRepo.
@@ -97,6 +99,45 @@ func (s *StubRepo) List(_ context.Context, filter models.ListFilter) ([]*models.
 	}
 	sort.Slice(matched, func(i, j int) bool {
 		return matched[i].ID.String() > matched[j].ID.String()
+	})
+
+	offset := (filter.Page - 1) * filter.Limit
+	if offset > len(matched) {
+		offset = len(matched)
+	}
+	end := offset + filter.Limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+
+	return matched[offset:end], nil
+}
+
+// ListPublished returns a page of published articles, newest publication first.
+func (s *StubRepo) ListPublished(_ context.Context, filter models.ListFilter) ([]*models.News, error) {
+	s.LastPublishedFilter = filter
+	if s.ListPublishedErr != nil {
+		return nil, s.ListPublishedErr
+	}
+
+	matched := []*models.News{}
+	for _, item := range s.Items {
+		if item.Status == models.StatusPublished {
+			matched = append(matched, item)
+		}
+	}
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].PublishedAt == nil {
+			return false
+		}
+		if matched[j].PublishedAt == nil {
+			return true
+		}
+		if matched[i].PublishedAt.Equal(*matched[j].PublishedAt) {
+			return matched[i].ID.String() > matched[j].ID.String()
+		}
+
+		return matched[i].PublishedAt.After(*matched[j].PublishedAt)
 	})
 
 	offset := (filter.Page - 1) * filter.Limit

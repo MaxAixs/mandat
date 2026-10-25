@@ -1,0 +1,149 @@
+package handler_test
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
+	"testing"
+
+	"github.com/maxaixs/mandat/backend/internal/service"
+	"github.com/maxaixs/mandat/backend/internal/testsupport"
+	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/handler"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const publishedBody = `{"category":"Аналітика","title":"Опублікована стаття",` +
+	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
+	`"featured":true,"image_url":"https://example.com/cover.jpg"}`
+
+type publicListPayload struct {
+	Items []map[string]any `json:"items"`
+	Page  int              `json:"page"`
+	Limit int              `json:"limit"`
+}
+
+// setupPublicRouter assembles the admin and public news handlers over one router.
+func setupPublicRouter() (http.Handler, *testsupport.StubRepo) {
+	repo := testsupport.NewStubRepo()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	svc := service.NewNewsService(repo, logger)
+
+	httpSrv := httptransport.New(httptransport.HTTPConfig{
+		AllowedOrigins: []string{allowedOrigin},
+	}, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc))
+
+	return httpSrv.Handler(), repo
+}
+
+func decodePublicList(t *testing.T, body []byte) publicListPayload {
+	t.Helper()
+
+	var payload publicListPayload
+	require.NoError(t, json.Unmarshal(body, &payload))
+
+	return payload
+}
+
+func TestPublicList_ReturnsOnlyPublishedArticles(t *testing.T) {
+	router, _ := setupPublicRouter()
+	createArticle(t, router, validBody) // draft
+	publishedSlug := createArticle(t, router, publishedBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1)
+	assert.Equal(t, publishedSlug, payload.Items[0]["slug"])
+	assert.Equal(t, 1, payload.Page)
+	assert.Equal(t, 20, payload.Limit)
+}
+
+func TestPublicList_ReturnsPublicFieldsOnly(t *testing.T) {
+	router, _ := setupPublicRouter()
+	slug := createArticle(t, router, publishedBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1)
+	item := payload.Items[0]
+
+	assert.Equal(t, slug, item["slug"])
+	assert.Equal(t, "Аналітика", item["category"])
+	assert.Equal(t, "Опублікована стаття", item["title"])
+	assert.Equal(t, "Стислий опис", item["description"])
+	assert.Equal(t, "https://example.com/cover.jpg", item["image_url"])
+	assert.Equal(t, true, item["featured"])
+	assert.Equal(t, float64(0), item["views"])
+	assert.NotEmpty(t, item["published_at"])
+
+	for _, field := range []string{"id", "text", "status", "language", "created_at", "updated_at"} {
+		assert.NotContains(t, item, field, "public payload must not expose %q", field)
+	}
+}
+
+func TestPublicList_IgnoresStatusQuery(t *testing.T) {
+	router, _ := setupPublicRouter()
+	createArticle(t, router, validBody) // draft
+	publishedSlug := createArticle(t, router, publishedBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news?status=draft", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "the public list must ignore a client-supplied status filter")
+	assert.Equal(t, publishedSlug, payload.Items[0]["slug"])
+}
+
+func TestPublicList_DraftOnlyReturnsEmptyList(t *testing.T) {
+	router, _ := setupPublicRouter()
+	createArticle(t, router, validBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.NotNil(t, payload.Items, "an empty page must serialize as [] rather than null")
+	assert.Empty(t, payload.Items)
+}
+
+func TestPublicList_InvalidPaginationReturns400(t *testing.T) {
+	router, _ := setupPublicRouter()
+
+	for _, query := range []string{"?page=abc", "?page=0", "?page=-1", "?limit=abc", "?limit=0", "?limit=-1"} {
+		rec := doRequest(t, router, http.MethodGet, "/api/news"+query, "")
+
+		require.Equal(t, http.StatusBadRequest, rec.Code, query)
+		assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message, query)
+	}
+}
+
+func TestPublicList_ClampsLimit(t *testing.T) {
+	router, _ := setupPublicRouter()
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news?limit=1000000", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	assert.Equal(t, 100, payload.Limit)
+}
+
+func TestPublicList_RepoFailureReturnsGeneric500(t *testing.T) {
+	router, repo := setupPublicRouter()
+	repo.ListPublishedErr = errors.New(`pq: relation "news" does not exist`)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	body := decodeError(t, rec.Body.Bytes())
+	assert.Equal(t, http.StatusInternalServerError, body.Error.Status)
+	assert.Equal(t, "Internal server error", body.Error.Message)
+	assert.NotContains(t, rec.Body.String(), "relation",
+		"the response must not leak repository details")
+}

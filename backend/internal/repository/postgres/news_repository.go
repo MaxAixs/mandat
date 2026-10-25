@@ -94,10 +94,43 @@ func (r *NewsRepo) List(ctx context.Context, filter models.ListFilter) ([]*model
 
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
-	listQuery += fmt.Sprintf(`ORDER BY created_at DESC, id DESC LIMIT $%d OFFSET $%d`, limitPos, offsetPos)
+	listQuery += fmt.Sprintf(` ORDER BY created_at DESC, id DESC LIMIT $%d OFFSET $%d`, limitPos, offsetPos)
 	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 
 	rows, err := r.pool.Query(ctx, listQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+	}
+	defer rows.Close()
+
+	var items []*models.News
+	for rows.Next() {
+		news, err := scanNews(rows)
+		if err != nil {
+			return nil, fmt.Errorf("%s: scan: %w", fc, err)
+		}
+		items = append(items, news)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows: %w", fc, err)
+	}
+
+	return items, nil
+}
+
+// ListPublished returns a page of published articles, newest publication first.
+func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error) {
+	const fc = "newsRepo_ListPublished"
+
+	query := `SELECT ` + newsColumns + ` FROM news
+		WHERE status = $1
+		ORDER BY published_at DESC NULLS LAST, id DESC LIMIT $2 OFFSET $3`
+
+	rows, err := r.pool.Query(ctx, query,
+		models.StatusPublished,
+		filter.Limit,
+		(filter.Page-1)*filter.Limit,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
 	}

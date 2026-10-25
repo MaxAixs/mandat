@@ -18,10 +18,11 @@ type ErrResp struct {
 
 // errResps maps sentinel errors onto their client-facing responses.
 var errResps = map[error]ErrResp{
-	errs.ErrNewsNotFound:    {Status: http.StatusNotFound, Message: "News article not found"},
-	errs.ErrInvalidInput:    {Status: http.StatusBadRequest, Message: "Invalid input"},
-	errs.ErrConflict:        {Status: http.StatusConflict, Message: "Resource conflict"},
-	errs.ErrPayloadTooLarge: {Status: http.StatusRequestEntityTooLarge, Message: "Request payload too large"},
+	errs.ErrNewsNotFound:       {Status: http.StatusNotFound, Message: "News article not found"},
+	errs.ErrInvalidInput:       {Status: http.StatusBadRequest, Message: "Invalid input"},
+	errs.ErrConflict:           {Status: http.StatusConflict, Message: "Resource conflict"},
+	errs.ErrPayloadTooLarge:    {Status: http.StatusRequestEntityTooLarge, Message: "Request payload too large"},
+	errs.ErrServiceUnavailable: {Status: http.StatusServiceUnavailable, Message: "Service unavailable"},
 }
 
 // respInternal is the fallback response for unexpected errors.

@@ -13,7 +13,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/models"
 )
 
-// Pagination limits for the admin list.
+// Pagination limits for news lists.
 const (
 	DefaultPageLimit = 20
 	MaxPageLimit     = 100
@@ -45,6 +45,7 @@ type NewsRepository interface {
 	Create(ctx context.Context, news *models.News) error
 	GetBySlug(ctx context.Context, slug string) (*models.News, error)
 	List(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
+	ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
 	Update(ctx context.Context, news *models.News) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -133,6 +134,30 @@ func (s *NewsService) List(ctx context.Context, page int, limit int, status stri
 	items, err := s.repo.List(ctx, filter)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to list news articles", "fc", fc, "error", err)
+
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+
+	return &ListResult{Items: items, Page: page, Limit: limit}, nil
+}
+
+// ListPublished returns a page of published articles for the public site.
+func (s *NewsService) ListPublished(ctx context.Context, page int, limit int) (*ListResult, error) {
+	const fc = "newsService_ListPublished"
+
+	if page < 1 {
+		return nil, fmt.Errorf("%s: %w: page must be at least 1", fc, errs.ErrInvalidInput)
+	}
+	if limit < 1 {
+		return nil, fmt.Errorf("%s: %w: limit must be at least 1", fc, errs.ErrInvalidInput)
+	}
+	if limit > MaxPageLimit {
+		limit = MaxPageLimit
+	}
+
+	items, err := s.repo.ListPublished(ctx, models.ListFilter{Page: page, Limit: limit})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to list published news articles", "fc", fc, "error", err)
 
 		return nil, fmt.Errorf("%s: %w", fc, err)
 	}

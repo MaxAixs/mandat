@@ -54,6 +54,8 @@ func run() error {
 
 	newsService := service.NewNewsService(newsrepo.NewNewsRepo(pool), log)
 	newsHandler := handler.NewNewsHandler(newsService)
+	publicNewsHandler := handler.NewPublicNewsHandler(newsService)
+	healthHandler := handler.NewHealthHandler(service.NewHealthService(pool, log))
 
-	return httptransport.New(cfg.HTTP, newsHandler).Serve(ctx)
+	return httptransport.New(cfg.HTTP, newsHandler, publicNewsHandler, healthHandler).Serve(ctx)
 }

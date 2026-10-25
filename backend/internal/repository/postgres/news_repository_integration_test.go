@@ -198,6 +198,72 @@ func TestNewsRepo_List_PaginationAndFilter(t *testing.T) {
 	assert.Len(t, items, 1)
 }
 
+func TestNewsRepo_ListPublished_ExcludesDraftsAndOrdersByPublishedAt(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	olderPublication := draftNews("published-older")
+	olderPublication.Status = models.StatusPublished
+	olderPublishedAt := base.Add(-2 * time.Hour)
+	olderPublication.PublishedAt = &olderPublishedAt
+	// Deliberately the newest created_at: ordering must follow published_at.
+	olderPublication.CreatedAt = base.Add(2 * time.Hour)
+	olderPublication.UpdatedAt = base.Add(2 * time.Hour)
+
+	newerPublication := draftNews("published-newer")
+	newerPublication.Status = models.StatusPublished
+	newerPublishedAt := base.Add(-1 * time.Hour)
+	newerPublication.PublishedAt = &newerPublishedAt
+	// Deliberately the oldest created_at: created_at ordering would invert the result.
+	newerPublication.CreatedAt = base.Add(-2 * time.Hour)
+	newerPublication.UpdatedAt = base.Add(-2 * time.Hour)
+
+	draft := draftNews("draft-hidden")
+	draft.CreatedAt = base.Add(3 * time.Hour)
+	draft.UpdatedAt = base.Add(3 * time.Hour)
+
+	for _, news := range []*models.News{draft, olderPublication, newerPublication} {
+		require.NoError(t, repo.Create(ctx, news))
+	}
+
+	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, items, 2, "drafts must not appear in the public list")
+	assert.Equal(t, "published-newer", items[0].Slug, "newest publication must come first")
+	assert.Equal(t, "published-older", items[1].Slug)
+}
+
+func TestNewsRepo_ListPublished_Pagination(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	for i, slug := range []string{"first", "second"} {
+		news := draftNews(slug)
+		news.Status = models.StatusPublished
+		publishedAt := base.Add(time.Duration(i) * time.Hour)
+		news.PublishedAt = &publishedAt
+		require.NoError(t, repo.Create(ctx, news))
+	}
+
+	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, "second", firstPage[0].Slug)
+
+	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 2, Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, "first", secondPage[0].Slug)
+
+	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 3, Limit: 1})
+	require.NoError(t, err)
+	assert.Empty(t, emptyPage)
+}
+
 func TestNewsRepo_Update(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()

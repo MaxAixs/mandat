@@ -60,7 +60,7 @@ type News struct {
 	UpdatedAt   time.Time
 }
 
-// ListFilter selects a page of news for the admin list.
+// ListFilter selects a page of news.
 // Nil Status means all statuses. Page starts at 1.
 type ListFilter struct {
 	Status *Status
