@@ -346,6 +346,13 @@ Repositories must return domain-level results and errors, not HTTP responses.
 
 Repository methods should expose operations needed by business logic rather than mirror every database operation mechanically.
 
+### Destructive Database Operations
+
+- Obtain the user's explicit permission for each specific `TRUNCATE`, `DELETE`, `DROP`, data-overwriting migration, volume removal, or equivalent destructive operation before executing it.
+- Inspect tests and cleanup helpers for destructive statements before running them. Running a test suite that truncates or deletes data requires the same explicit permission as executing the SQL directly.
+- State the target database and expected impact when requesting permission. Development and local databases are protected by this rule too.
+- Prefer isolated test databases and non-destructive fixtures, but do not create, migrate, clean, or reset them silently when the operation would destroy existing data.
+
 ## 8. News Management and CRUD
 
 The administrative interface must support creating, reading, updating, and deleting news articles.
@@ -539,6 +546,7 @@ Use a project-appropriate linter if configured. Do not run formatting or automat
 Additional rules:
 
 - Work according to the superpowers methodology: for every task, follow its skills — `brainstorming` before designing features, `writing-plans` for non-trivial work, `executing-plans` with `test-driven-development` during implementation, `verification-before-completion` before declaring done, and `requesting-code-review` for the final review. Do not skip stages or move to the next one before the current is complete.
+- Model routing inside those stages: the primary session (Kimi K3.1 Pro) owns brainstorming, plans, code, coordination, and fixes; tests are written by the `test-author` subagent (DeepSeek) and review is done by the `reviewer` subagent (DeepSeek), which writes `.superpowers/reviews/*.txt`. After the review, the primary agent reads that file and fixes the findings; fixes to tests go back to `test-author`. Never edit test files (`*_test.go`, `*.test.ts(x)`, `*.spec.ts(x)`, `testdata/`) directly — the permission rules block it.
 - Use the project's skills (golang-* from `.opencode/skills`) to improve code quality during development: style, error handling, testing, security, performance. Rely on them first, before general knowledge.
 - Do not rewrite unrelated code.
 - Do not silently change existing API contracts.
