@@ -11,12 +11,14 @@ Go, Gin, PostgreSQL (pgx), goose migrations, slog, Docker Compose.
 
 ```bash
 cp config.example.yaml config.yaml   # local app settings; true for the dev DB
+cp .env.example .env                 # dev DB password, git-ignored
 docker compose up -d db              # PostgreSQL on :5432
-DB_PASSWORD=mandat go run ./cmd      # API on :8080
+set -a; . ./.env; set +a             # export DB_PASSWORD
+go run ./cmd                         # API on :8080
 ```
 
-`config.yaml` is git-ignored — it never holds secrets. The database password
-always comes from the `DB_PASSWORD` environment variable (priority: env over yaml).
+`config.yaml` is git-ignored. The database password never lives in a yaml: the
+app reads `DB_PASSWORD` from the environment, and Compose reads it from `.env`.
 Migrations are embedded in the binary and applied automatically on startup.
 
 ## Configuration
@@ -80,15 +82,26 @@ Repository integration tests need a real PostgreSQL and skip without
 
 ## Docker
 
+The image bakes `config.example.yaml` (host `localhost`) at `/app/config.yaml`;
+mount another config to point it at a different host. The only secret is
+`DB_PASSWORD`, passed through the environment; Compose reads it from `.env`.
+
+Local stack — PostgreSQL plus the API on `:8080`:
+
+```bash
+cp .env.example .env   # first run only
+docker compose up -d --build
+```
+
+Compose mounts `config.docker.yaml` (host `db`) over the baked config.
+
+Standalone container (the database must be reachable from the container):
+
 ```bash
 docker build -t mandat-backend .
-docker run --rm -p 8080:8080 -e DB_PASSWORD=... mandat-backend
+docker run --rm -p 8080:8080 --env-file .env \
+  -v ./config.docker.yaml:/app/config.yaml:ro mandat-backend
 ```
 
-The image ships `config.example.yaml` as its built-in default config
-(it contains no secrets). Mount your own config to override it:
-
-```bash
-docker run --rm -p 8080:8080 -e DB_PASSWORD=... \
-  -v ./config.yaml:/app/config.yaml mandat-backend
-```
+Mount `config.yaml` instead when the database runs on the host and you use
+host networking.

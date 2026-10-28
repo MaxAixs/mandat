@@ -14,6 +14,9 @@ RUN adduser -D -u 10001 mandat
 
 COPY --from=builder /out/server /app/server
 
+# The binary reads config.yaml relative to its working directory.
+WORKDIR /app
+
 # The example is a complete, secret-free config; it serves as the
 # built-in default and can be overridden with a mounted config.yaml.
 COPY config.example.yaml /app/config.yaml

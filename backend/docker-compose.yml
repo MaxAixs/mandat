@@ -1,10 +1,11 @@
-# Local development environment. Credentials here are dev-only.
+# Local development environment. The database password comes from .env
+# (copy .env.example to .env first).
 services:
   db:
     image: postgres:16
     environment:
       POSTGRES_USER: mandat
-      POSTGRES_PASSWORD: mandat
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is not set, copy .env.example to .env}"
       POSTGRES_DB: mandat
     ports:
       - "5432:5432"
@@ -15,6 +16,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  app:
+    build: .
+    environment:
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is not set, copy .env.example to .env}"
+    volumes:
+      - ./config.docker.yaml:/app/config.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
