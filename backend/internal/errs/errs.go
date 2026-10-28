@@ -2,7 +2,10 @@
 // Callers classify failures with errors.Is against these values.
 package errs
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrNewsNotFound       = errors.New("news not found")
@@ -11,3 +14,24 @@ var (
 	ErrPayloadTooLarge    = errors.New("payload too large")
 	ErrServiceUnavailable = errors.New("service unavailable")
 )
+
+// ValidationError describes a rejected input field.
+// It unwraps to ErrInvalidInput, so errors.Is keeps working for callers
+// that only need the error class.
+type ValidationError struct {
+	Field  string
+	Reason string
+}
+
+// Error implements error.
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("invalid %s: %s", e.Field, e.Reason)
+}
+
+// Unwrap exposes the sentinel error used for classification.
+func (e *ValidationError) Unwrap() error { return ErrInvalidInput }
+
+// NewValidationError builds a field-scoped validation error.
+func NewValidationError(field, reason string) *ValidationError {
+	return &ValidationError{Field: field, Reason: reason}
+}

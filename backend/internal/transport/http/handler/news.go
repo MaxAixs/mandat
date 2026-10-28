@@ -41,7 +41,7 @@ func (h *NewsHandler) Register(r *gin.RouterGroup) {
 	}
 }
 
-// Create handles POST /api/v1/admin/news.
+// Create handles POST /api/admin/news.
 func (h *NewsHandler) Create(c *gin.Context) {
 	var req dto.NewsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -60,7 +60,7 @@ func (h *NewsHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.NewsToResponse(news))
 }
 
-// List handles GET /api/v1/admin/news.
+// List handles GET /api/admin/news.
 func (h *NewsHandler) List(c *gin.Context) {
 	page, err := queryInt(c, "page", 1)
 	if err != nil {
@@ -95,7 +95,7 @@ func (h *NewsHandler) List(c *gin.Context) {
 	})
 }
 
-// GetBySlug handles GET /api/v1/admin/news/:slug.
+// GetBySlug handles GET /api/admin/news/:slug.
 func (h *NewsHandler) GetBySlug(c *gin.Context) {
 	news, err := h.svc.GetBySlug(c.Request.Context(), c.Param("slug"))
 	if err != nil {
@@ -107,7 +107,7 @@ func (h *NewsHandler) GetBySlug(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.NewsToResponse(news))
 }
 
-// Update handles PUT /api/v1/admin/news/:slug.
+// Update handles PUT /api/admin/news/:slug.
 func (h *NewsHandler) Update(c *gin.Context) {
 	var req dto.NewsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -125,7 +125,7 @@ func (h *NewsHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.NewsToResponse(news))
 }
 
-// Delete handles DELETE /api/v1/admin/news/:slug.
+// Delete handles DELETE /api/admin/news/:slug.
 func (h *NewsHandler) Delete(c *gin.Context) {
 	if err := h.svc.Delete(c.Request.Context(), c.Param("slug")); err != nil {
 		WriteError(c, err)

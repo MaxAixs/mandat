@@ -144,7 +144,7 @@ func TestCreate_Validation(t *testing.T) {
 	}
 }
 
-func TestCreate_ReturnsFieldScopedValidationErr(t *testing.T) {
+func TestCreate_ReturnsFieldScopedValidationError(t *testing.T) {
 	svc, _ := newTestService()
 
 	input := validInput()
@@ -154,8 +154,8 @@ func TestCreate_ReturnsFieldScopedValidationErr(t *testing.T) {
 	_, err := svc.Create(context.Background(), input)
 	require.Error(t, err)
 
-	var validationErr *ValidationErr
-	require.True(t, errors.As(err, &validationErr), "expected *ValidationErr, got %v", err)
+	var validationErr *errs.ValidationError
+	require.True(t, errors.As(err, &validationErr), "expected *errs.ValidationError, got %v", err)
 	assert.Equal(t, "text", validationErr.Field)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput))
 }

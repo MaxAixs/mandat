@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/errs"
-	"github.com/maxaixs/mandat/backend/internal/service"
 )
 
 // ErrResp is an application error classified for the client:
@@ -30,7 +29,7 @@ var respInternal = ErrResp{Status: http.StatusInternalServerError, Message: "Int
 
 // errResp classifies an application error into an ErrResp.
 func errResp(err error) ErrResp {
-	var validationErr *service.ValidationErr
+	var validationErr *errs.ValidationError
 	if errors.As(err, &validationErr) {
 		return ErrResp{Status: http.StatusBadRequest, Message: validationErr.Reason}
 	}

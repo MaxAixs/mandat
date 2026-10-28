@@ -27,19 +27,23 @@ Settings live in `config.yaml` (see `config.example.yaml`); one secret only:
 
 | Variable | Required | Description |
 |---|---|---|
-| `DB_PASSWORD` | yes | PostgreSQL password (never put it in the yaml) |
+| `DB_PASSWORD` | yes | PostgreSQL password (never put it in the yaml); Compose reads it from `.env` |
+
+The database host and the rest of the connection settings live in the yaml.
+Compose mounts `config.docker.yaml` (host `db`); local runs use `config.yaml`
+(host `localhost`).
 
 ## Admin API
 
-Base path `/api/v1/admin/news`. Authentication is not implemented yet.
+Base path `/api/admin/news`. Authentication is not implemented yet.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/admin/news` | Create an article |
-| `GET` | `/api/v1/admin/news?page=&limit=&status=` | Paginated list (newest first) |
-| `GET` | `/api/v1/admin/news/:id` | Get one article |
-| `PUT` | `/api/v1/admin/news/:id` | Update an article |
-| `DELETE` | `/api/v1/admin/news/:id` | Delete an article |
+| `POST` | `/api/admin/news` | Create an article |
+| `GET` | `/api/admin/news?page=&limit=&status=` | Paginated list (newest first) |
+| `GET` | `/api/admin/news/:slug` | Get one article |
+| `PUT` | `/api/admin/news/:slug` | Update an article |
+| `DELETE` | `/api/admin/news/:slug` | Delete an article (`200 OK`, empty body) |
 
 `page` starts at 1, `limit` defaults to 20 and is capped at 100.
 `status` accepts `draft` or `published`.
@@ -67,7 +71,7 @@ Both return `200 OK` with `{ "status": "ok" }` on success. Readiness returns
 Errors are returned as:
 
 ```json
-{ "error": { "code": "NEWS_NOT_FOUND", "message": "News article not found" } }
+{ "error": { "status": 404, "message": "News article not found" } }
 ```
 
 ## Tests
