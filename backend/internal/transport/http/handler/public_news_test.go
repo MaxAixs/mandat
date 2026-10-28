@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const publishedBody = `{"category":"Аналітика","title":"Опублікована стаття",` +
+const publishedBody = `{"category":"Міжнародні новини","title":"Опублікована стаття",` +
 	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
 	`"featured":true,"image_url":"https://example.com/cover.jpg"}`
 
@@ -75,7 +75,7 @@ func TestPublicList_ReturnsPublicFieldsOnly(t *testing.T) {
 	item := payload.Items[0]
 
 	assert.Equal(t, slug, item["slug"])
-	assert.Equal(t, "Аналітика", item["category"])
+	assert.Equal(t, "Міжнародні новини", item["category"])
 	assert.Equal(t, "Опублікована стаття", item["title"])
 	assert.Equal(t, "Стислий опис", item["description"])
 	assert.Equal(t, "https://example.com/cover.jpg", item["image_url"])

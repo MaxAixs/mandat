@@ -113,10 +113,10 @@ func TestCreate_MissingTitleReturns400(t *testing.T) {
 func TestCreate_UnknownCategoryReturns400(t *testing.T) {
 	router, _ := setupRouter()
 
-	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Спорт","title":"Тест","text":"Текст"}`)
+	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Політика","title":"Тест","text":"Текст"}`)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Equal(t, `unknown category "Спорт"`, decodeError(t, rec.Body.Bytes()).Error.Message)
+	assert.Equal(t, `unknown category "Політика"`, decodeError(t, rec.Body.Bytes()).Error.Message)
 }
 
 func TestCreate_ConflictReturns409(t *testing.T) {
@@ -212,11 +212,11 @@ func TestUpdate_Returns200WithChangedFields(t *testing.T) {
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodPut, "/api/admin/news/"+slug,
-		`{"category":"Аналітика","title":"Оновлений заголовок","text":"Новий текст","featured":true}`)
+		`{"category":"Міжнародні новини","title":"Оновлений заголовок","text":"Новий текст","featured":true}`)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Оновлений заголовок")
-	assert.Contains(t, rec.Body.String(), "Аналітика")
+	assert.Contains(t, rec.Body.String(), "Міжнародні новини")
 }
 
 func TestUpdate_NotFoundReturns404(t *testing.T) {

@@ -25,10 +25,10 @@ type Category string
 
 const (
 	CategoryNews          Category = "Новини"
-	CategoryAnalytics     Category = "Аналітика"
-	CategoryInsides       Category = "Інсайди"
-	CategoryImportant     Category = "Важливо"
-	CategoryInvestigation Category = "Розслідування"
+	CategoryAnalytics     Category = "Міжнародні новини"
+	CategoryInsides       Category = "Спорт"
+	CategoryImportant     Category = "Інтерв'ю"
+	CategoryInvestigation Category = "Про нас"
 )
 
 // Valid reports whether c is one of the fixed rubrics.

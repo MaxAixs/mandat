@@ -126,7 +126,7 @@ func TestCreate_Validation(t *testing.T) {
 		mutate func(input *NewsInput)
 	}{
 		{"empty title", func(in *NewsInput) { in.Title = "" }},
-		{"unknown category", func(in *NewsInput) { in.Category = "Спорт" }},
+		{"unknown category", func(in *NewsInput) { in.Category = "Політика" }},
 		{"unknown status", func(in *NewsInput) { in.Status = "archived" }},
 		{"published without text", func(in *NewsInput) { in.Status = string(models.StatusPublished); in.Text = "" }},
 	}
