@@ -228,13 +228,13 @@ func TestUpdate_NotFoundReturns404(t *testing.T) {
 	assert.Equal(t, "News article not found", decodeError(t, rec.Body.Bytes()).Error.Message)
 }
 
-func TestDelete_Returns204(t *testing.T) {
+func TestDelete_Returns200(t *testing.T) {
 	router, repo := setupRouter()
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodDelete, "/api/admin/news/"+slug, "")
 
-	require.Equal(t, http.StatusNoContent, rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Empty(t, repo.Items)
 }
 
