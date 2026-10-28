@@ -46,6 +46,13 @@ func (s *StubRepo) Create(_ context.Context, news *models.News) error {
 	if news.ID == uuid.Nil {
 		news.ID = uuid.New()
 	}
+	if news.Status == models.StatusPublished && news.Featured {
+		for _, item := range s.Items {
+			if item.Status == models.StatusPublished {
+				item.Featured = false
+			}
+		}
+	}
 	stored := *news
 	s.Items[news.ID] = &stored
 
@@ -159,6 +166,13 @@ func (s *StubRepo) Update(_ context.Context, news *models.News) error {
 	}
 	if _, ok := s.Items[news.ID]; !ok {
 		return errs.ErrNewsNotFound
+	}
+	if news.Status == models.StatusPublished && news.Featured {
+		for _, item := range s.Items {
+			if item.Status == models.StatusPublished {
+				item.Featured = false
+			}
+		}
 	}
 
 	stored := *news

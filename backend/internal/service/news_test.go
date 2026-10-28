@@ -74,6 +74,17 @@ func validInput() NewsInput {
 	}
 }
 
+func publishedFeaturedItems(repo *testsupport.StubRepo) []*models.News {
+	var items []*models.News
+	for _, item := range repo.Items {
+		if item.Status == models.StatusPublished && item.Featured {
+			items = append(items, item)
+		}
+	}
+
+	return items
+}
+
 func TestCreate_GeneratesSlugAndDefaults(t *testing.T) {
 	svc, repo := newTestService()
 
@@ -180,6 +191,50 @@ func TestCreate_PublishSetsPublishedAt(t *testing.T) {
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
 	require.NotNil(t, created.PublishedAt)
+}
+
+func TestCreate_PublishedFeaturedReplacesPrevious(t *testing.T) {
+	svc, repo := newTestService()
+
+	previousInput := validInput()
+	previousInput.Title = "Перша стаття"
+	previousInput.Status = string(models.StatusPublished)
+	previousInput.Featured = true
+	_, err := svc.Create(context.Background(), previousInput)
+	require.NoError(t, err)
+
+	replacementInput := validInput()
+	replacementInput.Title = "Друга стаття"
+	replacementInput.Status = string(models.StatusPublished)
+	replacementInput.Featured = true
+	replacement, err := svc.Create(context.Background(), replacementInput)
+	require.NoError(t, err)
+
+	featured := publishedFeaturedItems(repo)
+	require.Len(t, featured, 1, "exactly one published article may remain featured")
+	assert.Equal(t, replacement.ID, featured[0].ID)
+}
+
+func TestCreate_FeaturedDraftDoesNotReplacePublished(t *testing.T) {
+	svc, repo := newTestService()
+
+	publishedInput := validInput()
+	publishedInput.Title = "Перша стаття"
+	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.Featured = true
+	published, err := svc.Create(context.Background(), publishedInput)
+	require.NoError(t, err)
+
+	draftInput := validInput()
+	draftInput.Title = "Чернетка статті"
+	draftInput.Featured = true
+	draft, err := svc.Create(context.Background(), draftInput)
+	require.NoError(t, err)
+
+	featured := publishedFeaturedItems(repo)
+	require.Len(t, featured, 1, "a featured draft must not displace the published featured article")
+	assert.Equal(t, published.ID, featured[0].ID)
+	assert.True(t, repo.Items[draft.ID].Featured, "featured intent must be retained on the draft")
 }
 
 func TestCreate_RejectsBlankTitle(t *testing.T) {
@@ -331,6 +386,32 @@ func TestUpdate_FirstPublicationSetsPublishedAt(t *testing.T) {
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
 	require.NotNil(t, updated.PublishedAt, "first publication must set published_at")
+}
+
+func TestUpdate_PublishedFeaturedReplacesPrevious(t *testing.T) {
+	svc, repo := newTestService()
+
+	previousInput := validInput()
+	previousInput.Title = "Перша стаття"
+	previousInput.Status = string(models.StatusPublished)
+	previousInput.Featured = true
+	_, err := svc.Create(context.Background(), previousInput)
+	require.NoError(t, err)
+
+	targetInput := validInput()
+	targetInput.Title = "Друга стаття"
+	targetInput.Status = string(models.StatusPublished)
+	target, err := svc.Create(context.Background(), targetInput)
+	require.NoError(t, err)
+
+	updateInput := targetInput
+	updateInput.Featured = true
+	updated, err := svc.Update(context.Background(), target.Slug, updateInput)
+	require.NoError(t, err)
+
+	featured := publishedFeaturedItems(repo)
+	require.Len(t, featured, 1, "exactly one published article may remain featured")
+	assert.Equal(t, updated.ID, featured[0].ID)
 }
 
 func TestUpdate_AppliesEditableFields(t *testing.T) {

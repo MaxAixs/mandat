@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -11,11 +12,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
 	newsrepo "github.com/maxaixs/mandat/backend/internal/repository/postgres"
 	"github.com/maxaixs/mandat/backend/migrations"
 	pgdb "github.com/maxaixs/mandat/backend/pkg/database/postgres"
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +60,7 @@ func testDBConfig(t *testing.T) pgdb.DBConfig {
 	}
 }
 
-func setupRepo(t *testing.T) *newsrepo.NewsRepo {
+func setupPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dbCfg := testDBConfig(t)
 
@@ -70,7 +74,13 @@ func setupRepo(t *testing.T) *newsrepo.NewsRepo {
 	_, err = pool.Exec(ctx, "TRUNCATE news")
 	require.NoError(t, err)
 
-	return newsrepo.NewNewsRepo(pool)
+	return pool
+}
+
+func setupRepo(t *testing.T) *newsrepo.NewsRepo {
+	t.Helper()
+
+	return newsrepo.NewNewsRepo(setupPool(t))
 }
 
 func draftNews(slug string) *models.News {
@@ -87,6 +97,46 @@ func draftNews(slug string) *models.News {
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
+}
+
+func newsFixture(slug string, status models.Status, timestamp time.Time) *models.News {
+	news := draftNews(slug)
+	news.Status = status
+	news.CreatedAt = timestamp
+	news.UpdatedAt = timestamp
+	if status == models.StatusPublished {
+		news.PublishedAt = &timestamp
+	}
+
+	return news
+}
+
+func publishedNews(slug string, publishedAt time.Time) *models.News {
+	return newsFixture(slug, models.StatusPublished, publishedAt)
+}
+
+func publishedFeaturedIDs(t *testing.T, repo *newsrepo.NewsRepo) []uuid.UUID {
+	t.Helper()
+
+	items, err := repo.ListPublished(context.Background(), models.ListFilter{Page: 1, Limit: 100})
+	require.NoError(t, err)
+
+	var ids []uuid.UUID
+	for _, item := range items {
+		if item.Featured {
+			ids = append(ids, item.ID)
+		}
+	}
+
+	return ids
+}
+
+func requireSinglePublishedFeatured(t *testing.T, repo *newsrepo.NewsRepo, wantID uuid.UUID) {
+	t.Helper()
+
+	ids := publishedFeaturedIDs(t, repo)
+	require.Len(t, ids, 1, "exactly one published article may remain featured")
+	assert.Equal(t, wantID, ids[0])
 }
 
 func TestNewsRepo_CreateAndGetByID(t *testing.T) {
@@ -131,6 +181,104 @@ func TestNewsRepo_Create_DuplicateSlug(t *testing.T) {
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrConflict), "expected ErrConflict, got %v", err)
+}
+
+func TestNewsRepo_Create_PublishedFeaturedReplacesPrevious(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+
+	previous := publishedNews("previous-featured", base)
+	previous.Featured = true
+	require.NoError(t, repo.Create(ctx, previous))
+
+	replacement := publishedNews("replacement-featured", base.Add(time.Hour))
+	replacement.Featured = true
+	require.NoError(t, repo.Create(ctx, replacement))
+
+	requireSinglePublishedFeatured(t, repo, replacement.ID)
+}
+
+func TestNewsRepo_Create_ConcurrentPublishedFeatured(t *testing.T) {
+	repo := setupRepo(t)
+	base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+
+	first := publishedNews("concurrent-featured-a", base)
+	first.Featured = true
+	second := publishedNews("concurrent-featured-b", base.Add(time.Minute))
+	second.Featured = true
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, news := range []*models.News{first, second} {
+		go func(news *models.News) {
+			<-start
+			results <- repo.Create(ctx, news)
+		}(news)
+	}
+	close(start)
+
+	var createErrors []error
+	for i := 0; i < 2; i++ {
+		createErrors = append(createErrors, <-results)
+	}
+	for i, err := range createErrors {
+		require.NoError(t, err, "concurrent published-featured create %d", i+1)
+	}
+
+	ids := publishedFeaturedIDs(t, repo)
+	require.Len(t, ids, 1, "concurrent transfers must leave exactly one published-featured row")
+	assert.Contains(t, []uuid.UUID{first.ID, second.ID}, ids[0])
+}
+
+func TestNewsRepo_PublishedFeatured_DuplicateSlugRollsBack(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(context.Context, *newsrepo.NewsRepo, *models.News, string) error
+	}{
+		{
+			name: "create",
+			run: func(ctx context.Context, repo *newsrepo.NewsRepo, candidate *models.News, conflictSlug string) error {
+				attempted := publishedNews(conflictSlug, *candidate.PublishedAt)
+				attempted.Featured = true
+				return repo.Create(ctx, attempted)
+			},
+		},
+		{
+			name: "update",
+			run: func(ctx context.Context, repo *newsrepo.NewsRepo, candidate *models.News, conflictSlug string) error {
+				candidate.Slug = conflictSlug
+				candidate.Featured = true
+				return repo.Update(ctx, candidate)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+			base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+
+			previous := publishedNews("previous-featured", base)
+			previous.Featured = true
+			require.NoError(t, repo.Create(ctx, previous))
+
+			conflict := newsFixture("occupied-slug", models.StatusDraft, base.Add(time.Hour))
+			require.NoError(t, repo.Create(ctx, conflict))
+
+			candidate := publishedNews("candidate-slug", base.Add(2*time.Hour))
+			require.NoError(t, repo.Create(ctx, candidate))
+
+			err := tt.run(ctx, repo, candidate, conflict.Slug)
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, errs.ErrConflict), "expected ErrConflict, got %v", err)
+			requireSinglePublishedFeatured(t, repo, previous.ID)
+		})
+	}
 }
 
 func TestNewsRepo_Create_HostileStringsRoundTrip(t *testing.T) {
@@ -264,6 +412,52 @@ func TestNewsRepo_ListPublished_Pagination(t *testing.T) {
 	assert.Empty(t, emptyPage)
 }
 
+func TestNewsRepo_ListPublished_OldFeaturedLeadsFirstPage(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+
+	featured := publishedNews("old-featured", base.Add(-time.Hour))
+	featured.Featured = true
+	require.NoError(t, repo.Create(ctx, featured))
+
+	for i := 1; i <= 21; i++ {
+		news := publishedNews(fmt.Sprintf("regular-%02d", i), base.Add(time.Duration(i)*time.Minute))
+		require.NoError(t, repo.Create(ctx, news))
+	}
+
+	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, items, 20)
+
+	actualSlugs := make([]string, 0, len(items))
+	for _, item := range items {
+		actualSlugs = append(actualSlugs, item.Slug)
+	}
+	assert.Equal(t, []string{
+		"old-featured",
+		"regular-21",
+		"regular-20",
+		"regular-19",
+		"regular-18",
+		"regular-17",
+		"regular-16",
+		"regular-15",
+		"regular-14",
+		"regular-13",
+		"regular-12",
+		"regular-11",
+		"regular-10",
+		"regular-09",
+		"regular-08",
+		"regular-07",
+		"regular-06",
+		"regular-05",
+		"regular-04",
+		"regular-03",
+	}, actualSlugs, "featured must lead page one and all remaining items must stay chronological")
+}
+
 func TestNewsRepo_Update(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -288,6 +482,52 @@ func TestNewsRepo_Update(t *testing.T) {
 	require.NotNil(t, got.PublishedAt)
 	assert.WithinDuration(t, createdAt, got.CreatedAt, time.Second, "CreatedAt must not change")
 	assert.True(t, got.UpdatedAt.After(createdAt), "UpdatedAt must advance")
+}
+
+func TestNewsRepo_Update_PublishedFeaturedReplacesPrevious(t *testing.T) {
+	tests := []struct {
+		name            string
+		initialStatus   models.Status
+		initialFeatured bool
+	}{
+		{
+			name:          "published article becomes featured",
+			initialStatus: models.StatusPublished,
+		},
+		{
+			name:            "featured draft is published",
+			initialStatus:   models.StatusDraft,
+			initialFeatured: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+			base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+
+			previous := publishedNews("previous-featured", base)
+			previous.Featured = true
+			require.NoError(t, repo.Create(ctx, previous))
+
+			target := newsFixture("update-featured-target", tt.initialStatus, base.Add(time.Hour))
+			target.Featured = tt.initialFeatured
+			require.NoError(t, repo.Create(ctx, target))
+			requireSinglePublishedFeatured(t, repo, previous.ID)
+
+			target.Status = models.StatusPublished
+			target.Featured = true
+			target.UpdatedAt = base.Add(2 * time.Hour)
+			if target.PublishedAt == nil {
+				publishedAt := base.Add(2 * time.Hour)
+				target.PublishedAt = &publishedAt
+			}
+			require.NoError(t, repo.Update(ctx, target))
+
+			requireSinglePublishedFeatured(t, repo, target.ID)
+		})
+	}
 }
 
 func TestNewsRepo_Update_PersistsUpdatedAt(t *testing.T) {
@@ -343,4 +583,79 @@ func TestNewsRepo_Delete_NotFound(t *testing.T) {
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrNewsNotFound), "expected ErrNewsNotFound, got %v", err)
+}
+
+func TestNewsRepo_Migration_DeduplicatesPublishedFeatured(t *testing.T) {
+	pool := setupPool(t)
+	ctx := context.Background()
+
+	t.Cleanup(func() {
+		cleanupCtx := context.Background()
+		if err := pgdb.Migrate(cleanupCtx, pool, migrations.FS); err != nil {
+			t.Errorf("restore migrated state: %v", err)
+			return
+		}
+		_, err := pool.Exec(cleanupCtx, "TRUNCATE news")
+		assert.NoError(t, err, "clean up migration fixtures")
+	})
+
+	migrationDB := stdlib.OpenDBFromPool(pool)
+	t.Cleanup(func() { _ = migrationDB.Close() })
+
+	goose.SetBaseFS(migrations.FS)
+	require.NoError(t, goose.SetDialect("postgres"))
+	require.NoError(t, goose.DownToContext(ctx, migrationDB, ".", 1))
+
+	base := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+	latestPublication := base.Add(2 * time.Hour)
+	latestCreation := base.Add(2 * time.Hour)
+	winnerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	legacyRows := []struct {
+		id          uuid.UUID
+		slug        string
+		publishedAt time.Time
+		createdAt   time.Time
+	}{
+		{
+			id:          uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			slug:        "legacy-older-publication",
+			publishedAt: base,
+			createdAt:   base.Add(3 * time.Hour),
+		},
+		{
+			id:          uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			slug:        "legacy-latest-older-creation",
+			publishedAt: latestPublication,
+			createdAt:   base.Add(time.Hour),
+		},
+		{
+			id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			slug:        "legacy-latest-tie-low-id",
+			publishedAt: latestPublication,
+			createdAt:   latestCreation,
+		},
+		{
+			id:          winnerID,
+			slug:        "legacy-latest-tie-high-id",
+			publishedAt: latestPublication,
+			createdAt:   latestCreation,
+		},
+	}
+
+	for _, row := range legacyRows {
+		_, err := pool.Exec(ctx, `INSERT INTO news
+			(id, slug, category, title, status, featured, published_at, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7, $7)`,
+			row.id, row.slug, models.CategoryNews, "Legacy duplicate", models.StatusPublished,
+			row.publishedAt, row.createdAt,
+		)
+		require.NoError(t, err, "insert legacy duplicate %s", row.slug)
+	}
+
+	require.NoError(t, goose.UpContext(ctx, migrationDB, "."))
+
+	repo := newsrepo.NewNewsRepo(pool)
+	ids := publishedFeaturedIDs(t, repo)
+	require.Len(t, ids, 1, "migration must deduplicate published-featured rows")
+	assert.Equal(t, winnerID, ids[0], "latest publication, creation time, and ID must determine the retained row")
 }
