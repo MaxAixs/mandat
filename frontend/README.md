@@ -1,4 +1,18 @@
-# React + TypeScript + Vite
+# Mandat frontend
+
+React + TypeScript + Vite SPA for the public news site and administration panel.
+
+## Backend API
+
+The application expects the Go backend at `http://localhost:8080`.
+
+- The home page loads published articles from `GET /api/news`.
+- The administration panel uses `/api/admin/news`.
+
+Start the backend before running `npm run dev`. Network failures and an empty
+published feed are shown directly on the home page.
+
+## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

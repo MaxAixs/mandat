@@ -6,15 +6,16 @@ export const SITE_TAGLINE = 'новини · інсайди · аналітик�
 /** Telegram channel promoted on the site. */
 export const TELEGRAM_CHANNEL = {
   name: 'МАНДАТ у Telegram',
-  url: 'https://t.me/mandat',
+  url: 'https://t.me/mandat_ua',
   subscribers: '42 728',
 }
 
 /** Header navigation. href = anchor of the target section. */
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '#news' },
-  { label: 'Аналітика', href: '#analytics' },
-  { label: 'Інсайди', href: '#insight' },
+  { label: 'Міжнародні новини', href: '#' },
+  { label: 'Спорт', href: '#' },
+  { label: 'Інтерв\'ю', href: '#' },
   { label: 'Про нас', href: '#about' },
 ]
 
