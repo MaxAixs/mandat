@@ -104,3 +104,64 @@ func TestListPublished_RepoFailurePropagatesAndLogs(t *testing.T) {
 	assert.True(t, handler.hasFC("newsService_ListPublished"),
 		"expected a log record carrying the fc identifier")
 }
+
+// publishedDetailService is the contract the public article page needs.
+// Asserting it keeps these tests compiling until the method exists.
+type publishedDetailService interface {
+	GetPublishedBySlug(ctx context.Context, slug string) (*models.News, error)
+}
+
+// requirePublishedDetail returns svc as a publishedDetailService.
+func requirePublishedDetail(t *testing.T, svc *NewsService) publishedDetailService {
+	t.Helper()
+
+	detail, ok := any(svc).(publishedDetailService)
+	require.True(t, ok, "NewsService must implement GetPublishedBySlug(ctx, slug)")
+
+	return detail
+}
+
+func TestGetPublishedBySlug_ReturnsPublishedArticle(t *testing.T) {
+	svc, _, _ := newPublicTestService()
+	published := createPublished(t, svc, "Опублікована стаття")
+	detail := requirePublishedDetail(t, svc)
+
+	got, err := detail.GetPublishedBySlug(context.Background(), published.Slug)
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, published.Slug, got.Slug)
+	assert.Equal(t, models.StatusPublished, got.Status)
+	assert.Equal(t, published.Text, got.Text)
+}
+
+func TestGetPublishedBySlug_RejectsDraft(t *testing.T) {
+	svc, _, _ := newPublicTestService()
+	draft, err := svc.Create(context.Background(), validInput())
+	require.NoError(t, err)
+	require.Equal(t, models.StatusDraft, draft.Status)
+	detail := requirePublishedDetail(t, svc)
+
+	got, err := detail.GetPublishedBySlug(context.Background(), draft.Slug)
+
+	require.Error(t, err)
+	assert.Nil(t, got, "a draft must not be returned to the public site")
+	assert.True(t, errors.Is(err, errs.ErrNewsNotFound), "expected ErrNewsNotFound, got %v", err)
+}
+
+func TestGetPublishedBySlug_WrapsRepositoryError(t *testing.T) {
+	cause := errors.New("db is down")
+	svc, repo, handler := newPublicTestService()
+	repo.GetErr = cause
+	detail := requirePublishedDetail(t, svc)
+
+	got, err := detail.GetPublishedBySlug(context.Background(), "any-article")
+
+	require.Error(t, err)
+	assert.Nil(t, got)
+	assert.True(t, errors.Is(err, cause), "the repository cause must be preserved, got %v", err)
+	assert.False(t, errors.Is(err, errs.ErrNewsNotFound),
+		"an infrastructure failure must not be reported as a missing article")
+	assert.True(t, handler.hasFC("newsService_GetPublishedBySlug"),
+		"expected a log record carrying the fc identifier")
+}

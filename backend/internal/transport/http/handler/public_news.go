@@ -22,6 +22,19 @@ func NewPublicNewsHandler(svc *service.NewsService) *PublicNewsHandler {
 func (h *PublicNewsHandler) Register(r *gin.RouterGroup) {
 	news := r.Group("/api" + newsPath)
 	news.GET("", h.List)
+	news.GET("/:slug", h.GetBySlug)
+}
+
+// GetBySlug handles GET /api/news/:slug and returns one published article.
+func (h *PublicNewsHandler) GetBySlug(c *gin.Context) {
+	news, err := h.svc.GetPublishedBySlug(c.Request.Context(), c.Param("slug"))
+	if err != nil {
+		WriteError(c, err)
+
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.NewsToPublicDetailResponse(news))
 }
 
 // List handles GET /api/news and returns only published articles.

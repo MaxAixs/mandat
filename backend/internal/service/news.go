@@ -108,6 +108,23 @@ func (s *NewsService) GetBySlug(ctx context.Context, slug string) (*models.News,
 	return news, nil
 }
 
+// GetPublishedBySlug returns one published article or errs.ErrNewsNotFound.
+func (s *NewsService) GetPublishedBySlug(ctx context.Context, slug string) (*models.News, error) {
+	const fc = "newsService_GetPublishedBySlug"
+
+	news, err := s.repo.GetBySlug(ctx, slug)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to get published news article", "fc", fc, "error", err)
+
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+	if news.Status != models.StatusPublished {
+		return nil, fmt.Errorf("%s: %w", fc, errs.ErrNewsNotFound)
+	}
+
+	return news, nil
+}
+
 // List returns a page of articles, optionally filtered by status.
 func (s *NewsService) List(ctx context.Context, page int, limit int, status string) (*ListResult, error) {
 	const fc = "newsService_List"

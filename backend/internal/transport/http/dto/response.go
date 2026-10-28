@@ -44,6 +44,19 @@ type PublicNewsResponse struct {
 	PublishedAt *time.Time `json:"published_at"`
 }
 
+// PublicNewsDetailResponse is a published article returned by the public API.
+type PublicNewsDetailResponse struct {
+	Slug        string     `json:"slug"`
+	Category    string     `json:"category"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Text        string     `json:"text"`
+	ImageUrl    string     `json:"image_url"`
+	Featured    bool       `json:"featured"`
+	Views       int64      `json:"views"`
+	PublishedAt *time.Time `json:"published_at"`
+}
+
 // PublicNewsListResponse is a page of published article cards.
 type PublicNewsListResponse struct {
 	Items []*PublicNewsResponse `json:"items"`
@@ -67,6 +80,25 @@ func NewsToPublicResponse(news *models.News) *PublicNewsResponse {
 		Category:    string(news.Category),
 		Title:       news.Title,
 		Description: news.Description,
+		ImageUrl:    news.ImageUrl,
+		Featured:    news.Featured,
+		Views:       news.Views,
+		PublishedAt: news.PublishedAt,
+	}
+}
+
+// NewsToPublicDetailResponse maps a domain article onto its public detail payload.
+func NewsToPublicDetailResponse(news *models.News) *PublicNewsDetailResponse {
+	if news == nil {
+		return nil
+	}
+
+	return &PublicNewsDetailResponse{
+		Slug:        news.Slug,
+		Category:    string(news.Category),
+		Title:       news.Title,
+		Description: news.Description,
+		Text:        news.Text,
 		ImageUrl:    news.ImageUrl,
 		Featured:    news.Featured,
 		Views:       news.Views,
