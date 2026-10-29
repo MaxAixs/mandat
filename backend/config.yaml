@@ -1,0 +1,31 @@
+# The single application configuration. Docker Compose is the supported way to
+# run the service, so the hosts below are Compose service names. Secrets never
+# live here: they come from the environment (see .env.example).
+
+log_level: info          # debug | info | warn | error
+
+http:
+  port: 8080
+  startup_timeout: 15s
+  read_header_timeout: 5s
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 60s
+  shutdown_timeout: 10s
+  session_ttl: 12h
+  secure_cookies: false # Set to true behind production HTTPS.
+  allowed_origins:
+    - http://localhost:5173
+    - http://localhost:3000
+
+db:
+  host: db
+  port: 5432
+  user: mandat
+  database: mandat
+  sslmode: disable     # DB_PASSWORD comes from the environment
+
+redis:                # admin sessions; the local Compose Redis has no password
+  addr: redis:6379
+  db: 0
+  dial_timeout: 5s

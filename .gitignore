@@ -8,10 +8,8 @@
 # Superpowers working files: plans ledgers and review reports
 .superpowers/
 
-# Local environment overrides (secrets) and local app config
+# Local environment overrides (secrets)
 .env
-config.yaml
-backend/config.yaml
 
 # Dependencies / build output (generic safety net; frontend/.gitignore covers the rest)
 node_modules/

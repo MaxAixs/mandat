@@ -17,9 +17,9 @@ COPY --from=builder /out/server /app/server
 # The binary reads config.yaml relative to its working directory.
 WORKDIR /app
 
-# The example is a complete, secret-free config; it serves as the
-# built-in default and can be overridden with a mounted config.yaml.
-COPY config.example.yaml /app/config.yaml
+# The single tracked config; it is secret-free and targets the
+# Docker Compose service names.
+COPY config.yaml /app/config.yaml
 
 USER mandat
 

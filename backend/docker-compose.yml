@@ -21,13 +21,24 @@ services:
     build: .
     environment:
       DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is not set, copy .env.example to .env}"
-    volumes:
-      - ./config.docker.yaml:/app/config.yaml:ro
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Admin sessions only: no volume, a restart just logs everyone out.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   pgdata:

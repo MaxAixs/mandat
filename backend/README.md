@@ -5,37 +5,67 @@ administrative API for managing news articles.
 
 ## Stack
 
-Go, Gin, PostgreSQL (pgx), goose migrations, slog, Docker Compose.
+Go, Gin, PostgreSQL (pgx), Redis (sessions), goose migrations, slog, Docker Compose.
 
 ## Local development
 
+Docker Compose is the supported way to run the application:
+
 ```bash
-cp config.example.yaml config.yaml   # local app settings; true for the dev DB
-cp .env.example .env                 # dev DB password, git-ignored
-docker compose up -d db              # PostgreSQL on :5432
-set -a; . ./.env; set +a             # export DB_PASSWORD
-go run ./cmd                         # API on :8080
+cp .env.example .env   # first run only: dev DB password, git-ignored
+docker compose up -d --build
 ```
 
-`config.yaml` is git-ignored. The database password never lives in a yaml: the
-app reads `DB_PASSWORD` from the environment, and Compose reads it from `.env`.
+The API listens on `:8080`, PostgreSQL on `:5432`, Redis on `:6379`.
 Migrations are embedded in the binary and applied automatically on startup.
+
+`go test ./...` can be run from the host; unit tests need nothing, repository
+integration tests need PostgreSQL on `localhost:5432` (see Tests).
 
 ## Configuration
 
-Settings live in `config.yaml` (see `config.example.yaml`); one secret only:
+There is exactly one config file, `config.yaml`, and it is tracked in git. It
+contains no secrets and uses the Compose service names (`db`, `redis:6379`),
+because the service is expected to run inside Compose. Changing those hosts
+means rebuilding the image.
+
+Secrets come from `.env` (git-ignored) through the environment:
 
 | Variable | Required | Description |
 |---|---|---|
 | `DB_PASSWORD` | yes | PostgreSQL password (never put it in the yaml); Compose reads it from `.env` |
+| `REDIS_PASSWORD` | no | Only for deployments running the app directly against a password-protected Redis; the local Compose stack has none and does not forward it |
 
-The database host and the rest of the connection settings live in the yaml.
-Compose mounts `config.docker.yaml` (host `db`); local runs use `config.yaml`
-(host `localhost`).
+## Authentication
+
+Staff accounts are provisioned only through SQL. Store a bcrypt hash (cost 12 or
+higher), never a plaintext password:
+
+```sql
+INSERT INTO admin_users (login, password_hash, role)
+VALUES ('editor', '<BCRYPT_HASH>', 'moderator');
+```
+
+Allowed roles are `admin` and `moderator`; both currently manage news.
+Authentication uses an opaque random token in the `mandat_admin_session` cookie.
+Only its SHA-256 hash is stored, in Redis (`admin:session:<hash>` keys with a TTL
+matching the session expiry); staff accounts stay in PostgreSQL, so role changes
+apply without re-login. Sessions last 12 hours and logout revokes them
+immediately. Restarting Redis logs everyone out; the legacy `admin_sessions`
+PostgreSQL table is no longer read or written. The cookie is `HttpOnly` and
+`SameSite=Lax`; set `http.secure_cookies: true` behind production HTTPS. Login is
+limited to ten attempts per client IP per five minutes.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Login with `{ "login", "password" }` and set the session cookie |
+| `POST` | `/api/auth/logout` | Revoke the current session and clear the cookie (`204`) |
+| `GET` | `/api/auth/me` | Return the current user's `id`, `login`, and `role` |
 
 ## Admin API
 
-Base path `/api/admin/news`. Authentication is not implemented yet.
+Base path `/api/admin/news`. Every endpoint requires a valid admin or
+moderator session cookie. Cross-origin frontend requests must include credentials.
 
 | Method | Path | Description |
 |---|---|---|
@@ -53,6 +83,15 @@ Base path `/api/admin/news`. Authentication is not implemented yet.
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/news?page=&limit=` | Paginated published articles for the public site |
+| `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
+| `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |
+
+View recording accepts at most one view per anonymous visitor per article per
+hour. The `mandat_viewer` cookie contains only a random UUID, lasts one year, and
+is `HttpOnly` and `SameSite=Lax`; no IP address or browser fingerprint is stored.
+The article-detail GET sets this cookie before the frontend records a view, so
+simultaneous tracking requests share the same visitor ID. Cooldown enforcement
+and counter increments are atomic in PostgreSQL.
 
 Only articles with status `published` are returned, newest publication first.
 The response contains public article cards without the full text or administrative
@@ -78,34 +117,31 @@ Errors are returned as:
 
 ```bash
 go test ./...                                        # unit tests only
-DATABASE_URL=postgres://mandat:mandat@localhost:5432/mandat?sslmode=disable go test ./...
 ```
 
 Repository integration tests need a real PostgreSQL and skip without
-`DATABASE_URL`.
+`DATABASE_URL`. They run migrations and **truncate `news`**, so never point
+`DATABASE_URL` at a database with articles you want to keep. Use a separate
+database:
+
+```bash
+docker compose up -d db                                # the db service must be running
+docker compose exec db createdb -U mandat mandat_test  # first time only
+DATABASE_URL=postgres://mandat:mandat@localhost:5432/mandat_test?sslmode=disable go test ./...
+```
 
 ## Docker
 
-The image bakes `config.example.yaml` (host `localhost`) at `/app/config.yaml`;
-mount another config to point it at a different host. The only secret is
-`DB_PASSWORD`, passed through the environment; Compose reads it from `.env`.
+The image bakes `config.yaml` (Compose service names `db` and `redis:6379`) at
+`/app/config.yaml`. The only required secret is `DB_PASSWORD`, passed through
+the environment; Compose reads it from `.env`.
 
-Local stack — PostgreSQL plus the API on `:8080`:
+Local stack — PostgreSQL, Redis, and the API on `:8080`:
 
 ```bash
 cp .env.example .env   # first run only
 docker compose up -d --build
 ```
 
-Compose mounts `config.docker.yaml` (host `db`) over the baked config.
-
-Standalone container (the database must be reachable from the container):
-
-```bash
-docker build -t mandat-backend .
-docker run --rm -p 8080:8080 --env-file .env \
-  -v ./config.docker.yaml:/app/config.yaml:ro mandat-backend
-```
-
-Mount `config.yaml` instead when the database runs on the host and you use
-host networking.
+The image resolves `db` and `redis` by name, so it is meant to run on the
+Compose network; `docker run` on the default bridge cannot reach those services.
