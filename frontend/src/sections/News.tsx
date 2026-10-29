@@ -51,7 +51,7 @@ export default function News({ articles, loading, error, onRetry }: NewsProps) {
             Опублікованих новин поки немає.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 lg:grid-cols-3">
             {articles.map((article) => (
               <NewsCard key={article.id} article={article} />
             ))}

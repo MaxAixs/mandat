@@ -40,12 +40,19 @@ async function request<T>(baseUrl: string, path: string, init?: RequestInit): Pr
   let response: Response
 
   try {
-    response = await fetch(`${baseUrl}${path}`, init)
+    response = await fetch(`${baseUrl}${path}`, {
+      credentials: 'include',
+      ...init,
+    })
   } catch {
     throw new Error('Не вдалося з’єднатися з сервером. Перевірте, чи запущено backend.')
   }
 
   if (!response.ok) {
+    if (response.status === 401 && baseUrl === NEWS_API_URL && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('mandat:unauthorized'))
+    }
+
     const errorPayload = (await response.json().catch(() => null)) as ApiErrorPayload | null
     throw new Error(errorPayload?.error?.message ?? `Помилка сервера (${response.status}).`)
   }
@@ -83,6 +90,16 @@ export function listPublicNews(page = 1, limit = 20): Promise<PublicNewsListResp
 
 export function getPublicNews(slug: string): Promise<PublicNewsDetail> {
   return request<PublicNewsDetail>(PUBLIC_NEWS_API_URL, `/${encodeURIComponent(slug)}`)
+}
+
+export async function recordPublicNewsView(slug: string): Promise<number> {
+  const response = await request<{ views: number }>(
+    PUBLIC_NEWS_API_URL,
+    `/${encodeURIComponent(slug)}/view`,
+    { method: 'POST' },
+  )
+
+  return response.views
 }
 
 export function createNews(payload: NewsFormValues): Promise<AdminNews> {

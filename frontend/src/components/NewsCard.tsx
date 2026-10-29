@@ -10,7 +10,7 @@ export default function NewsCard({ article }: { article: Article }) {
       to={`/news/${encodeURIComponent(article.id)}`}
       aria-label={`Читати новину: ${article.title}`}
       className={`flex no-underline text-mandat-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mandat-red-bright ${
-        featured ? 'lg:col-span-2 lg:row-span-2' : ''
+        featured ? 'lg:col-span-2' : ''
       }`}
     >
       <article className="flex w-full flex-1 flex-col border border-mandat-line bg-mandat-surface transition-all duration-200 hover:-translate-y-1 hover:border-mandat-red-bright">
@@ -48,7 +48,7 @@ export default function NewsCard({ article }: { article: Article }) {
             {article.title}
           </h3>
           <p className={`text-mandat-muted mt-2.5 ${featured ? 'text-[15px]' : 'text-[14px]'}`}>{article.excerpt}</p>
-          <div className="flex gap-4 pt-3.5 border-t border-mandat-line text-mandat-muted text-[12.5px] tracking-wider uppercase mt-auto">
+          <div className="mt-6 flex gap-4 border-t border-mandat-line pt-3.5 text-[12.5px] uppercase tracking-wider text-mandat-muted">
             <span className="text-mandat-red-bright">◉ {article.views}</span>
             <span>{article.publishedAt}</span>
             {article.comments && <span>{article.comments}</span>}

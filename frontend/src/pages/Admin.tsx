@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   LoaderCircle,
+  LogOut,
   Newspaper,
   Plus,
   RefreshCw,
@@ -24,6 +25,7 @@ import {
   updateNews,
 } from '@/api/news'
 import NewsEditorDialog from '@/components/admin/NewsEditorDialog'
+import useAuth from '@/hooks/use-auth'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +73,8 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
 type StatusFilter = 'all' | NewsStatus
 
 export default function Admin() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [articles, setArticles] = useState<AdminNews[]>([])
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -185,6 +189,11 @@ export default function Admin() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout().catch(() => undefined)
+    navigate('/admin/login', { replace: true })
+  }
+
   const stats = [
     { label: 'Новин на сторінці', value: articles.length.toString(), icon: Newspaper },
     { label: 'Опубліковано на сторінці', value: publishedCount.toString(), icon: FileText },
@@ -241,12 +250,24 @@ export default function Admin() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <div className="text-sm font-medium">Редактор</div>
-                <div className="text-xs text-mandat-muted">Адміністратор</div>
+                <div className="text-sm font-medium">{user?.login}</div>
+                <div className="text-xs text-mandat-muted">
+                  {user?.role === 'admin' ? 'Адміністратор' : 'Модератор'}
+                </div>
               </div>
-              <div className="flex size-9 items-center justify-center rounded-full border border-mandat-red/50 bg-mandat-red/15 text-xs font-semibold text-mandat-red-bright">
-                РЕ
+              <div className="flex size-9 items-center justify-center rounded-full border border-mandat-red/50 bg-mandat-red/15 text-xs font-semibold uppercase text-mandat-red-bright">
+                {user?.login.slice(0, 2)}
               </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Вийти"
+                aria-label="Вийти з адмінпанелі"
+                onClick={() => void handleLogout()}
+                className="rounded-none text-mandat-muted hover:bg-mandat-red/15 hover:text-mandat-red-bright"
+              >
+                <LogOut className="size-4" />
+              </Button>
             </div>
           </header>
 

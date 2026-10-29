@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { getPublicNewsArticle } from '@/api'
-import { getNewsErrorMessage } from '@/api/news'
+import { formatViews, getPublicNewsArticle } from '@/api'
+import { getNewsErrorMessage, recordPublicNewsView } from '@/api/news'
 import type { ArticleDetail } from '@/types'
 
 export default function usePublicArticle(slug: string | undefined) {
@@ -26,7 +26,21 @@ export default function usePublicArticle(slug: string | undefined) {
 
     try {
       const result = await getPublicNewsArticle(slug)
-      if (currentRequest === requestId.current) setArticle(result)
+      if (currentRequest === requestId.current) {
+        setArticle(result)
+
+        void recordPublicNewsView(slug)
+          .then((views) => {
+            if (currentRequest !== requestId.current) return
+
+            setArticle((current) =>
+              current?.id === result.id
+                ? { ...current, views: formatViews(views) }
+                : current,
+            )
+          })
+          .catch(() => undefined)
+      }
     } catch (loadError) {
       if (currentRequest === requestId.current) {
         setArticle(null)

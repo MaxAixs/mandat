@@ -10,36 +10,37 @@ import type { ArticleDetail } from '@/types'
 export function ArticleContent({ article }: { article: ArticleDetail }) {
   return (
     <article className="w-full pb-8 md:pb-12">
-      <div className="relative h-[240px] w-full overflow-hidden border-y border-mandat-line bg-mandat-surface-2 sm:aspect-[21/9] sm:h-auto">
-        {article.imageUrl ? (
-          <img
-            src={article.imageUrl}
-            alt={article.title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <>
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `
-                  linear-gradient(160deg, rgba(23,25,28,0.2), rgba(23,25,28,0.85)),
-                  repeating-linear-gradient(45deg, #262a31 0 14px, #1d2025 14px 28px)
-                `,
-              }}
+      <div className="mx-auto w-full max-w-[900px] px-6">
+        <div className="relative mt-6 h-[280px] w-full overflow-hidden border-y border-mandat-line bg-mandat-surface-2 sm:h-[340px] md:mt-8 md:h-[380px]">
+          {article.imageUrl ? (
+            <img
+              src={article.imageUrl}
+              alt={article.title}
+              className="h-full w-full object-cover"
             />
-            <div
-              className="absolute inset-0"
-              style={{ background: 'radial-gradient(circle at 80% 20%, rgba(179,35,58,0.35), transparent 55%)' }}
-            />
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `
+                    linear-gradient(160deg, rgba(23,25,28,0.2), rgba(23,25,28,0.85)),
+                    repeating-linear-gradient(45deg, #262a31 0 14px, #1d2025 14px 28px)
+                  `,
+                }}
+              />
+              <div
+                className="absolute inset-0"
+                style={{ background: 'radial-gradient(circle at 80% 20%, rgba(179,35,58,0.35), transparent 55%)' }}
+              />
+            </>
+          )}
+        </div>
 
-      <div className="mx-auto mt-8 w-full max-w-[900px] px-6 md:mt-10">
-        <h1 className="text-[32px] font-semibold leading-tight tracking-wide md:text-[48px]">
+        <h1 className="mt-6 text-[32px] font-semibold leading-tight tracking-wide md:mt-8 md:text-[48px]">
           {article.title}
         </h1>
+
         <div className="mt-5 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-b border-mandat-line pb-6 text-[13px] uppercase tracking-wider text-mandat-muted">
           <span className="inline-flex items-center gap-2">
             <CalendarDays className="size-4" aria-hidden="true" />

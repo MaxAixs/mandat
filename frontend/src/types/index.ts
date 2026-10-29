@@ -54,6 +54,16 @@ export interface NavLink {
   href: string
 }
 
+/** Staff role returned by the authentication API. */
+export type StaffRole = 'admin' | 'moderator'
+
+/** Authenticated staff identity. */
+export interface AuthUser {
+  id: string
+  login: string
+  role: StaffRole
+}
+
 /** Publication state used by the Go admin API. */
 export type NewsStatus = 'draft' | 'published'
 

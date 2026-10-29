@@ -12,6 +12,23 @@ The application expects the Go backend at `http://localhost:8080`.
 Start the backend before running `npm run dev`. Network failures and an empty
 published feed are shown directly on the home page.
 
+## Public article views
+
+After an article loads, the client calls `POST /api/news/:slug/view` with
+credentials and displays the server-returned total. Tracking runs in the
+background: a failure leaves the loaded article and its previous count visible.
+The backend enforces the one-hour visitor cooldown; the client never increments
+the counter or stores a visitor identifier itself.
+
+## Admin authentication
+
+`/admin` is available only after signing in at `/admin/login` with a staff
+account provisioned through SQL. Administrator and moderator roles currently
+share news-management permissions. Sessions use the backend's `HttpOnly` cookie;
+all auth and admin API calls send `credentials: 'include'`. The header shows the
+current login and role and provides logout. An expired session redirects back to
+the login screen.
+
 ## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

@@ -33,13 +33,17 @@ function formatDate(value: string | null, formatter: Intl.DateTimeFormat): strin
   return Number.isNaN(date.getTime()) ? '' : formatter.format(date)
 }
 
+export function formatViews(views: number): string {
+  return viewsFormatter.format(views)
+}
+
 function toArticle(news: PublicNews): Article {
   return {
     id: news.slug,
     category: news.category,
     title: news.title,
     excerpt: news.description,
-    views: viewsFormatter.format(news.views),
+    views: formatViews(news.views),
     publishedAt: formatDate(news.published_at, publishedAtFormatter),
     featured: news.featured,
     imageUrl: news.image_url || undefined,

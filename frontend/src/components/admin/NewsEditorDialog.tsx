@@ -22,7 +22,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { validateNewsPayload, type NewsValidationErrors } from '@/lib/news-validation'
-import type { AdminNews, Category, NewsFormValues, NewsStatus } from '@/types'
+import type { AdminNews, Category, NewsFormValues } from '@/types'
 
 const categories: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас']
 
@@ -32,7 +32,7 @@ const emptyNews: NewsFormValues = {
   description: '',
   text: '',
   language: 'uk',
-  status: 'draft',
+  status: 'published',
   featured: false,
   image_url: '',
 }
@@ -57,7 +57,7 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
           description: article.description,
           text: article.text,
           language: article.language,
-          status: article.status,
+          status: 'published',
           featured: article.featured,
           image_url: article.image_url,
         }
@@ -100,7 +100,7 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
             {article ? 'Редагувати новину' : 'Додати новину'}
           </DialogTitle>
           <DialogDescription className="text-mandat-muted">
-            Заповніть інформацію та оберіть статус публікації.
+            Заповніть інформацію про матеріал. Після збереження новина буде опублікована.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,19 +136,6 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
                 </SelectContent>
               </Select>
               {errors.category && <p className="text-xs text-mandat-red-bright">{errors.category}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="news-status" className="text-xs tracking-wide text-mandat-muted">СТАТУС</Label>
-              <Select value={values.status} onValueChange={(value) => update('status', value as NewsStatus)}>
-                <SelectTrigger id="news-status" className={`${inputClassName} w-full`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border-mandat-line bg-mandat-surface text-mandat-text">
-                  <SelectItem value="draft">Чернетка</SelectItem>
-                  <SelectItem value="published">Опубліковано</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2 md:col-span-2">
