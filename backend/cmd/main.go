@@ -10,13 +10,17 @@ import (
 	"syscall"
 
 	"github.com/maxaixs/mandat/backend/internal/config"
+	"github.com/maxaixs/mandat/backend/internal/models"
 	newsrepo "github.com/maxaixs/mandat/backend/internal/repository/postgres"
+	redisrepo "github.com/maxaixs/mandat/backend/internal/repository/redis"
 	"github.com/maxaixs/mandat/backend/internal/service"
 	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/handler"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
 	"github.com/maxaixs/mandat/backend/migrations"
 	pgdb "github.com/maxaixs/mandat/backend/pkg/database/postgres"
 	"github.com/maxaixs/mandat/backend/pkg/logger"
+	redisclient "github.com/maxaixs/mandat/backend/pkg/redis"
 )
 
 const configFile = "config.yaml"
@@ -52,10 +56,39 @@ func run() error {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 
+	redisClient, err := redisclient.NewClient(startupCtx, cfg.Redis)
+	if err != nil {
+		return fmt.Errorf("connect to redis: %w", err)
+	}
+	defer redisClient.Close()
+
 	newsService := service.NewNewsService(newsrepo.NewNewsRepo(pool), log)
-	newsHandler := handler.NewNewsHandler(newsService)
-	publicNewsHandler := handler.NewPublicNewsHandler(newsService)
+	authRepo := newsrepo.NewAuthRepo(pool)
+	sessionStore := redisrepo.NewSessionStore(redisClient)
+	authService := service.NewAuthService(authRepo, sessionStore, log, cfg.HTTP.SessionTTL)
+	authHandler := handler.NewAuthHandler(
+		authService,
+		cfg.HTTP.SecureCookies,
+		middleware.RequireAuth(authService),
+		middleware.NewLoginRateLimiter().Middleware(),
+	)
+	newsHandler := handler.NewNewsHandler(
+		newsService,
+		middleware.RequireAuth(authService),
+		middleware.RequireRoles(models.RoleAdmin, models.RoleModerator),
+	)
+	viewerMiddleware := middleware.EnsureViewer(cfg.HTTP.SecureCookies)
+	publicNewsHandler := handler.NewPublicNewsHandler(newsService, viewerMiddleware)
+	viewService := service.NewViewService(newsrepo.NewViewRepo(pool), log)
+	viewHandler := handler.NewViewHandler(viewService, viewerMiddleware)
 	healthHandler := handler.NewHealthHandler(service.NewHealthService(pool, log))
 
-	return httptransport.New(cfg.HTTP, newsHandler, publicNewsHandler, healthHandler).Serve(ctx)
+	return httptransport.New(
+		cfg.HTTP,
+		authHandler,
+		newsHandler,
+		publicNewsHandler,
+		viewHandler,
+		healthHandler,
+	).Serve(ctx)
 }

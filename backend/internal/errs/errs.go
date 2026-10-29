@@ -13,6 +13,9 @@ var (
 	ErrConflict           = errors.New("resource conflict")
 	ErrPayloadTooLarge    = errors.New("payload too large")
 	ErrServiceUnavailable = errors.New("service unavailable")
+	ErrUnauthorized       = errors.New("unauthorized")
+	ErrForbidden          = errors.New("forbidden")
+	ErrTooManyRequests    = errors.New("too many requests")
 )
 
 // ValidationError describes a rejected input field.

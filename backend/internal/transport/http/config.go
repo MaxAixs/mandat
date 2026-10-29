@@ -13,4 +13,6 @@ type HTTPConfig struct {
 	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
 	ShutdownTimeout   time.Duration `mapstructure:"shutdown_timeout"`
 	AllowedOrigins    []string      `mapstructure:"allowed_origins"`
+	SecureCookies     bool          `mapstructure:"secure_cookies"`
+	SessionTTL        time.Duration `mapstructure:"session_ttl"`
 }

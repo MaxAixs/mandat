@@ -18,6 +18,7 @@ func CORS(origins []string) gin.HandlerFunc {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
 	})
 }

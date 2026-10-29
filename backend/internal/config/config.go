@@ -11,16 +11,21 @@ import (
 
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/pkg/database/postgres"
+	"github.com/maxaixs/mandat/backend/pkg/redis"
 	"github.com/spf13/viper"
 )
 
-const passwordEnvVar = "DB_PASSWORD"
+const (
+	passwordEnvVar      = "DB_PASSWORD"
+	redisPasswordEnvVar = "REDIS_PASSWORD"
+)
 
 // Config is the full application configuration.
 type Config struct {
 	LogLevel string                   `mapstructure:"log_level"`
 	HTTP     httptransport.HTTPConfig `mapstructure:"http"`
 	DB       postgres.DBConfig        `mapstructure:"db"`
+	Redis    redis.Config             `mapstructure:"redis"`
 }
 
 // Load reads the YAML file at path and validates it.
@@ -40,6 +45,7 @@ func Load(path string, getenv func(string) string) (*Config, error) {
 	}
 
 	cfg.DB.Password = getenv(passwordEnvVar)
+	cfg.Redis.Password = getenv(redisPasswordEnvVar)
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -57,8 +63,13 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("http.write_timeout", 10*time.Second)
 	v.SetDefault("http.idle_timeout", 60*time.Second)
 	v.SetDefault("http.shutdown_timeout", 10*time.Second)
+	v.SetDefault("http.secure_cookies", false)
+	v.SetDefault("http.session_ttl", 12*time.Hour)
 	v.SetDefault("db.port", 5432)
 	v.SetDefault("db.sslmode", "disable")
+	v.SetDefault("redis.addr", "localhost:6379")
+	v.SetDefault("redis.db", 0)
+	v.SetDefault("redis.dial_timeout", 5*time.Second)
 }
 
 // validate fails fast on missing required settings.

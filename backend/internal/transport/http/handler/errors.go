@@ -22,6 +22,9 @@ var errResps = map[error]ErrResp{
 	errs.ErrConflict:           {Status: http.StatusConflict, Message: "Resource conflict"},
 	errs.ErrPayloadTooLarge:    {Status: http.StatusRequestEntityTooLarge, Message: "Request payload too large"},
 	errs.ErrServiceUnavailable: {Status: http.StatusServiceUnavailable, Message: "Service unavailable"},
+	errs.ErrUnauthorized:       {Status: http.StatusUnauthorized, Message: "Invalid login or password"},
+	errs.ErrForbidden:          {Status: http.StatusForbidden, Message: "Insufficient permissions"},
+	errs.ErrTooManyRequests:    {Status: http.StatusTooManyRequests, Message: "Too many login attempts"},
 }
 
 // respInternal is the fallback response for unexpected errors.
