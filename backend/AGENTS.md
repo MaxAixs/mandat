@@ -128,7 +128,10 @@ Follow idiomatic Go and the official Go Code Review Comments and Effective Go gu
 
 ### Function parameter formatting
 
-If a function has more than four parameters, place each parameter on a separate line.
+Place each parameter on a separate line when either condition holds:
+
+- the function has more than four parameters;
+- the single-line declaration would exceed 120 columns.
 
 This rule applies to function declarations, method declarations, and function literals.
 
@@ -155,7 +158,28 @@ func (s *NewsService) Create(ctx context.Context, title string, content string, 
 }
 ```
 
-For four or fewer parameters, use standard Go formatting and prioritize readability.
+For four or fewer parameters that fit within 120 columns, use standard Go formatting.
+
+Incorrect — four parameters, but the line exceeds 120 columns:
+
+```go
+func (s *NewsService) Publish(ctx context.Context, newsID int64, publishedAt time.Time, editorID int64) error {
+    return nil
+}
+```
+
+Correct:
+
+```go
+func (s *NewsService) Publish(
+    ctx context.Context,
+    newsID int64,
+    publishedAt time.Time,
+    editorID int64,
+) error {
+    return nil
+}
+```
 
 Do not introduce parameter structs solely to avoid this formatting rule. Use a parameter struct when the values form a meaningful input object or when it improves the API.
 

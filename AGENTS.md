@@ -33,6 +33,12 @@ The superpowers workflow is unchanged; only the model performing each role diffe
 - Do not touch `backend/` if the task concerns the frontend, and vice versa — the parts of the project have different lifecycles.
 - Do not commit build artifacts and temporary files (`dist/`, `node_modules/`, `*.tar.gz`, `*.zip`).
 
+### Git commits
+
+- Commit only on an explicit command; never commit or push on your own initiative. This applies to `frontend/` exactly as to `backend/`.
+- Follow the same message conventions for both parts: start every message with `[+]` (new functionality or files), `[*]` (refactoring or behavior-preserving changes), or `[-]` (deleting code or files).
+- When a change touches both parts, make two separate commits — one for `frontend/`, one for `backend/` — each with its own type prefix.
+
 ## Database Safety
 
 - Never delete, truncate, drop, overwrite, or otherwise destroy database data or schema objects without the user's explicit permission for that specific operation.
