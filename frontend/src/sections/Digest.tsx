@@ -20,7 +20,7 @@ export default function Digest() {
             />
             <button
               type="submit"
-              className="w-full sm:w-auto font-['Oswald'] tracking-[2px] uppercase text-[14px] px-8 py-3.5 transition-colors cursor-pointer bg-mandat-red-bright text-mandat-text border-none hover:bg-mandat-red"
+              className="w-full sm:w-auto font-display tracking-[2px] uppercase text-[14px] px-8 py-3.5 transition-colors cursor-pointer bg-mandat-red-bright text-mandat-text border-none hover:bg-mandat-red"
             >
               Підписатися
             </button>

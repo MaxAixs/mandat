@@ -10,9 +10,9 @@ export const TELEGRAM_CHANNEL = {
   subscribers: '42 728',
 }
 
-/** Header navigation. href = anchor of the target section. */
+/** Header navigation. */
 export const NAV_LINKS: NavLink[] = [
-  { label: 'Новини', href: '#news' },
+  { label: 'Новини', href: '/' },
   { label: 'Міжнародні новини', href: '#' },
   { label: 'Спорт', href: '#' },
   { label: 'Інтерв\'ю', href: '#' },

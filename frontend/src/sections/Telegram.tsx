@@ -22,7 +22,7 @@ export default function Telegram() {
           href={TELEGRAM_CHANNEL.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-['Oswald'] text-[15px] tracking-[2px] uppercase px-10 py-3.5 bg-mandat-red-bright text-mandat-text transition-colors hover:bg-mandat-red no-underline"
+          className="font-display text-[15px] tracking-[2px] uppercase px-10 py-3.5 bg-mandat-red-bright text-mandat-text transition-colors hover:bg-mandat-red no-underline"
         >
           Підписатися
         </a>

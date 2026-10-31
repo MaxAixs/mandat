@@ -8,6 +8,7 @@ const emptyNews: HomeNewsData = {
   articles: [],
   latestNews: [],
   tickerItems: [],
+  mainEvent: null,
 }
 
 export default function usePublicNews() {

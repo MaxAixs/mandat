@@ -76,6 +76,7 @@ export interface NewsFormValues {
   language: string
   status: NewsStatus
   featured: boolean
+  main_event: boolean
   image_url: string
 }
 

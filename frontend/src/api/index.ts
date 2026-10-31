@@ -6,6 +6,7 @@ export interface HomeNewsData {
   articles: Article[]
   latestNews: LatestNewsItem[]
   tickerItems: string[]
+  mainEvent: Article | null
 }
 
 const publishedAtFormatter = new Intl.DateTimeFormat('uk-UA', {
@@ -80,10 +81,15 @@ export async function getHomeNews(): Promise<HomeNewsData> {
   const chronologicalItems = [...response.items].sort(
     (first, second) => publicationTimestamp(second.published_at) - publicationTimestamp(first.published_at),
   )
+  const mainEvent = response.items.find((news) => news.main_event)
+  const featuredFirstItems = [...response.items].sort(
+    (first, second) => Number(second.featured) - Number(first.featured),
+  )
 
   return {
-    articles: response.items.map(toArticle),
+    articles: featuredFirstItems.map(toArticle),
     latestNews: chronologicalItems.map(toLatestNewsItem),
     tickerItems: chronologicalItems.slice(0, 5).map((news) => news.title),
+    mainEvent: mainEvent ? toArticle(mainEvent) : null,
   }
 }

@@ -8,7 +8,7 @@ export default function Footer() {
           <div>
             <a href="#" className="flex items-center gap-3 no-underline text-mandat-text">
               <span className="inline-block w-[12px] h-[34px] bg-mandat-red-bright" />
-              <span className="font-['Oswald'] text-[22px] font-bold tracking-[2px]">{SITE_NAME}</span>
+              <span className="font-display text-[18px] font-bold tracking-[1.5px]">{SITE_NAME}</span>
             </a>
             <p className="text-mandat-muted text-[14px] mt-4 max-w-[280px]">
               Про владу, рішення, гроші та вплив. {SITE_TAGLINE}.
@@ -16,7 +16,7 @@ export default function Footer() {
           </div>
           {FOOTER_LINKS.map((column) => (
             <div key={column.title}>
-              <h4 className="font-['Oswald'] text-[14px] tracking-[2px] uppercase mb-4">{column.title}</h4>
+              <h4 className="font-display text-[14px] tracking-[2px] uppercase mb-4">{column.title}</h4>
               <ul className="grid gap-2.5 list-none p-0">
                 {column.links.map((link) => (
                   <li key={link.label}>

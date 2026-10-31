@@ -16,6 +16,7 @@ export interface PublicNews {
   description: string
   image_url: string
   featured: boolean
+  main_event: boolean
   views: number
   published_at: string | null
 }

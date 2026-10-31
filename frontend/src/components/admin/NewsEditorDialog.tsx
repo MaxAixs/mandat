@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Image, LoaderCircle, Star } from 'lucide-react'
+import { CalendarDays, Image, LoaderCircle, Star } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -34,6 +34,7 @@ const emptyNews: NewsFormValues = {
   language: 'uk',
   status: 'published',
   featured: false,
+  main_event: false,
   image_url: '',
 }
 
@@ -59,6 +60,7 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
           language: article.language,
           status: 'published',
           featured: article.featured,
+          main_event: article.main_event,
           image_url: article.image_url,
         }
       : emptyNews,
@@ -207,6 +209,19 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
                 id="news-featured"
                 checked={values.featured}
                 onCheckedChange={(checked) => update('featured', checked)}
+                className="data-[state=checked]:bg-mandat-red-bright data-[state=unchecked]:bg-mandat-line"
+              />
+            </div>
+
+            <div className="flex items-center justify-between border border-mandat-line bg-mandat-bg px-4">
+              <Label htmlFor="news-main-event" className="flex cursor-pointer items-center gap-2 text-sm">
+                <CalendarDays className="size-4 text-mandat-red-bright" />
+                Головна подія дня
+              </Label>
+              <Switch
+                id="news-main-event"
+                checked={values.main_event}
+                onCheckedChange={(checked) => update('main_event', checked)}
                 className="data-[state=checked]:bg-mandat-red-bright data-[state=unchecked]:bg-mandat-line"
               />
             </div>

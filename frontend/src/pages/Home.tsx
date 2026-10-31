@@ -8,12 +8,12 @@ import Footer from '@/sections/Footer'
 import usePublicNews from '@/hooks/use-public-news'
 
 export default function Home() {
-  const { articles, latestNews, tickerItems, loading, error, retry } = usePublicNews()
+  const { articles, latestNews, tickerItems, mainEvent, loading, error, retry } = usePublicNews()
 
   return (
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
       <Header />
-      <Hero />
+      <Hero mainEvent={mainEvent} />
       <Ticker headlines={tickerItems} />
       <News articles={articles} loading={loading} error={error} onRetry={retry} />
       <LatestNews items={latestNews} />

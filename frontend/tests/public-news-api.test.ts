@@ -43,6 +43,18 @@ type ExpectedHomeApi = HomeApi & {
   getPublicNewsArticle?: (slug: string) => Promise<ArticleDetailPayload>
 }
 
+// HomeNewsData.mainEvent is specified but not implemented yet. Declaring the
+// expected shape locally keeps this suite compiling so the failure stays behavioral.
+type HomeNewsWithMainEvent = Awaited<ReturnType<HomeApi['getHomeNews']>> & {
+  mainEvent: Article | null
+}
+
+function asHomeNewsWithMainEvent(
+  result: Awaited<ReturnType<HomeApi['getHomeNews']>>,
+): HomeNewsWithMainEvent {
+  return result as HomeNewsWithMainEvent
+}
+
 let getHomeNews: HomeApi['getHomeNews']
 let getPublicNews: ExpectedNewsApi['getPublicNews']
 let getPublicNewsArticle: ExpectedHomeApi['getPublicNewsArticle']
@@ -70,6 +82,7 @@ function makeItem(overrides: Partial<PublicNews> = {}): PublicNews {
     description: 'Короткий опис',
     image_url: '',
     featured: false,
+    main_event: false,
     views: 0,
     published_at: null,
     ...overrides,
@@ -280,12 +293,122 @@ test('getHomeNews limits the ticker to five newest headlines', async () => {
   ])
 })
 
-test('getHomeNews returns empty sections for an empty feed', async () => {
+test('getHomeNews returns empty sections and no main event for an empty feed', async () => {
   mockResponse({ items: [], page: 1, limit: 20 })
 
   const result = await getHomeNews()
 
-  assert.deepEqual(result, { articles: [], latestNews: [], tickerItems: [] })
+  assert.deepEqual(result, {
+    articles: [],
+    latestNews: [],
+    tickerItems: [],
+    mainEvent: null,
+  })
+})
+
+test('getHomeNews maps only the main_event article into mainEvent', async () => {
+  const featuredNewer = makeItem({
+    slug: 'featured-newer',
+    category: 'Міжнародні новини',
+    title: 'Новіша важлива новина',
+    description: 'Опис важливої новини',
+    image_url: 'https://cdn.example.com/featured.jpg',
+    featured: true,
+    main_event: false,
+    views: 900,
+    published_at: localIsoDate(25, 18, 0),
+  })
+  const selectedMainEvent = makeItem({
+    slug: 'main-event',
+    category: 'Новини',
+    title: 'Головна подія дня',
+    description: 'Стислий опис головної події',
+    image_url: 'https://cdn.example.com/main-event.jpg',
+    featured: false,
+    main_event: true,
+    views: 0,
+    published_at: localIsoDate(23, 8, 10),
+  })
+  const regular = makeItem({
+    slug: 'regular',
+    category: 'Спорт',
+    title: 'Звичайна новина',
+    description: 'Опис звичайної новини',
+    main_event: false,
+    published_at: localIsoDate(24, 12, 30),
+  })
+  mockResponse({
+    items: [featuredNewer, selectedMainEvent, regular],
+    page: 1,
+    limit: 20,
+  })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+  const mainEvent = result.mainEvent
+
+  assert.ok(mainEvent, 'expected getHomeNews to map the item with main_event=true into mainEvent')
+  assert.deepEqual(mainEvent, {
+    id: 'main-event',
+    category: 'Новини',
+    title: 'Головна подія дня',
+    excerpt: 'Стислий опис головної події',
+    views: '0',
+    publishedAt: '23.10.2026, 08:10',
+    featured: false,
+    imageUrl: 'https://cdn.example.com/main-event.jpg',
+  })
+  assert.notEqual(
+    mainEvent.id,
+    'featured-newer',
+    'a featured article must not become the main event by itself',
+  )
+
+  // The main event is still part of every existing feed and does not reorder them.
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['featured-newer', 'main-event', 'regular'],
+  )
+  assert.deepEqual(
+    result.latestNews.map((item) => item.id),
+    ['featured-newer', 'regular', 'main-event'],
+  )
+  assert.deepEqual(result.tickerItems, [
+    'Новіша важлива новина',
+    'Звичайна новина',
+    'Головна подія дня',
+  ])
+})
+
+test('getHomeNews returns null mainEvent when no article is selected', async () => {
+  const items = [
+    makeItem({
+      slug: 'featured-only',
+      title: 'Лише на головній',
+      featured: true,
+      main_event: false,
+      published_at: localIsoDate(25, 9, 0),
+    }),
+    makeItem({
+      slug: 'regular-only',
+      title: 'Без головної події',
+      main_event: false,
+      published_at: localIsoDate(24, 9, 0),
+    }),
+  ]
+  mockResponse({ items, page: 1, limit: 20 })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.equal(result.mainEvent, null, 'expected mainEvent to be null without a selected article')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['featured-only', 'regular-only'],
+  )
+  assert.deepEqual(
+    result.latestNews.map((item) => item.id),
+    ['featured-only', 'regular-only'],
+  )
+  assert.deepEqual(result.tickerItems, ['Лише на головній', 'Без головної події'])
 })
 
 test('getHomeNews formats missing or invalid publication dates as empty strings', async () => {

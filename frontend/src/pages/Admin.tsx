@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import {
   ArrowLeft,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   FileEdit,
@@ -123,7 +124,6 @@ export default function Admin() {
   }, [articles, query])
 
   const publishedCount = articles.filter((article) => article.status === 'published').length
-  const draftCount = articles.length - publishedCount
   const featuredCount = articles.filter((article) => article.featured).length
   const hasNextPage = articles.length === PAGE_SIZE
 
@@ -197,7 +197,6 @@ export default function Admin() {
   const stats = [
     { label: 'Новин на сторінці', value: articles.length.toString(), icon: Newspaper },
     { label: 'Опубліковано на сторінці', value: publishedCount.toString(), icon: FileText },
-    { label: 'Чернетки на сторінці', value: draftCount.toString(), icon: FileEdit },
   ]
 
   return (
@@ -205,11 +204,11 @@ export default function Admin() {
       <div className="flex min-h-screen">
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-mandat-line bg-mandat-surface/40 lg:flex">
           <div className="flex h-20 items-center gap-3 border-b border-mandat-line px-6">
-            <div className="flex size-9 items-center justify-center bg-mandat-red oswald text-xl font-bold text-white">
+            <div className="flex size-9 items-center justify-center bg-mandat-red font-display text-xl font-bold text-white">
               М
             </div>
             <div>
-              <div className="oswald text-xl font-semibold leading-none tracking-[0.14em]">МАНДАТ</div>
+              <div className="font-display text-xl font-semibold leading-none tracking-[0.14em]">МАНДАТ</div>
               <div className="mt-1 text-[9px] tracking-[0.25em] text-mandat-muted">АДМІНПАНЕЛЬ</div>
             </div>
           </div>
@@ -239,8 +238,8 @@ export default function Admin() {
         <div className="min-w-0 flex-1">
           <header className="flex h-20 items-center justify-between border-b border-mandat-line bg-mandat-surface/50 px-4 md:px-8">
             <div className="flex items-center gap-3 lg:hidden">
-              <div className="flex size-8 items-center justify-center bg-mandat-red oswald font-bold text-white">М</div>
-              <span className="oswald text-lg tracking-widest">МАНДАТ</span>
+              <div className="flex size-8 items-center justify-center bg-mandat-red font-display font-bold text-white">М</div>
+              <span className="font-display text-lg tracking-widest">МАНДАТ</span>
             </div>
             <div className="hidden items-center gap-2 text-sm text-mandat-muted lg:flex">
               <LayoutDashboard className="size-4" />
@@ -291,7 +290,7 @@ export default function Admin() {
               </Button>
             </div>
 
-            <section aria-label="Статистика" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <section aria-label="Статистика" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {stats.map(({ label, value, icon: Icon }, index) => (
                 <div
                   key={label}
@@ -301,7 +300,7 @@ export default function Admin() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="text-xs text-mandat-muted md:text-sm">{label}</div>
-                      <div className="mt-2 oswald text-2xl font-medium tracking-wide md:text-3xl">{value}</div>
+                      <div className="mt-2 font-display text-2xl font-medium tracking-wide md:text-3xl">{value}</div>
                     </div>
                     <div className="flex size-9 items-center justify-center border border-mandat-line bg-mandat-bg text-mandat-muted">
                       <Icon className="size-4" />
@@ -376,6 +375,14 @@ export default function Admin() {
                             </div>
                             {article.featured && (
                               <Star className="mt-0.5 size-3.5 shrink-0 fill-mandat-red-bright text-mandat-red-bright" />
+                            )}
+                            {article.main_event && (
+                              <CalendarDays
+                                className="mt-0.5 size-3.5 shrink-0 text-mandat-red-bright"
+                                role="img"
+                                aria-label="Подія дня"
+                                title="Подія дня"
+                              />
                             )}
                           </div>
                         </TableCell>

@@ -37,7 +37,7 @@ export function ArticleContent({ article }: { article: ArticleDetail }) {
           )}
         </div>
 
-        <h1 className="mt-6 text-[32px] font-semibold leading-tight tracking-wide md:mt-8 md:text-[48px]">
+        <h1 className="mt-6 text-center text-[30px] font-semibold leading-tight tracking-[0.01em] text-balance md:mt-8 md:text-[40px]">
           {article.title}
         </h1>
 

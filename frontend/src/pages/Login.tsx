@@ -44,7 +44,7 @@ export default function Login() {
     <main className="flex min-h-screen items-center justify-center bg-mandat-bg px-4 py-10 text-mandat-text">
       <div className="w-full max-w-md border border-mandat-line bg-mandat-surface p-6 shadow-2xl shadow-black/30 md:p-8">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center bg-mandat-red oswald text-2xl font-bold text-white">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center bg-mandat-red font-display text-2xl font-bold text-white">
             М
           </div>
           <div className="text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">

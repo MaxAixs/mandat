@@ -21,10 +21,10 @@ export default function Insight() {
               }}
             />
             <div className="absolute top-6 left-6 right-6 bottom-6 border border-[rgba(179,35,58,0.4)]" />
-            <span className="absolute top-3.5 left-3.5 font-['Oswald'] text-[12px] tracking-[2px] uppercase text-mandat-red-bright">
+            <span className="absolute top-3.5 left-3.5 font-display text-[12px] tracking-[2px] uppercase text-mandat-red-bright">
               Мандат / Розслідування
             </span>
-            <span className="absolute bottom-3.5 right-3.5 font-['Oswald'] text-[12px] tracking-[2px] uppercase text-mandat-red-bright">
+            <span className="absolute bottom-3.5 right-3.5 font-display text-[12px] tracking-[2px] uppercase text-mandat-red-bright">
               Ексклюзив
             </span>
           </div>
@@ -45,7 +45,7 @@ export default function Insight() {
             </ul>
             <a
               href="#"
-              className="inline-block mt-8 px-9 py-3.5 border border-mandat-red-bright font-['Oswald'] text-[15px] tracking-[2px] uppercase transition-colors hover:bg-mandat-red-bright no-underline text-mandat-text"
+              className="inline-block mt-8 px-9 py-3.5 border border-mandat-red-bright font-display text-[15px] tracking-[2px] uppercase transition-colors hover:bg-mandat-red-bright no-underline text-mandat-text"
             >
               Читати розслідування
             </a>

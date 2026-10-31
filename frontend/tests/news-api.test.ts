@@ -6,8 +6,10 @@ import {
   deleteNews,
   getNewsErrorMessage,
   listNews,
+  listPublicNews,
   updateNews,
 } from '../src/api/news'
+import type { PublicNews, PublicNewsListResponse } from '../src/api/news'
 import { validateNewsPayload } from '../src/lib/news-validation'
 import type { NewsFormValues } from '../src/types'
 
@@ -21,7 +23,20 @@ const payload: NewsFormValues = {
   language: 'uk',
   status: 'draft',
   featured: false,
+  main_event: true,
   image_url: '',
+}
+
+const publicNewsItem: PublicNews = {
+  slug: 'main-event-news',
+  category: 'Новини',
+  title: 'Головна подія дня',
+  description: 'Короткий опис головної події',
+  image_url: 'https://cdn.example.com/main-event.jpg',
+  featured: false,
+  main_event: true,
+  views: 120,
+  published_at: '2026-10-25T11:35:00Z',
 }
 
 afterEach(() => {
@@ -69,6 +84,12 @@ test('createNews sends a POST JSON payload', async () => {
   assert.equal(request?.init?.method, 'POST')
   assert.deepEqual(request?.init?.headers, { 'Content-Type': 'application/json' })
   assert.equal(request?.init?.body, JSON.stringify(payload))
+
+  const body = JSON.parse(String(request?.init?.body)) as Record<string, unknown>
+  const mainEvent: boolean = payload.main_event
+  assert.equal(mainEvent, true, 'NewsFormValues must require main_event')
+  assert.equal(body.main_event, true, 'the create payload must serialise main_event')
+  assert.ok('main_event' in body, 'the create payload must contain the main_event key')
 })
 
 test('updateNews encodes the slug and sends PUT', async () => {
@@ -85,6 +106,23 @@ test('updateNews encodes the slug and sends PUT', async () => {
     'http://localhost:8080/api/admin/news/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B0%2F1',
   )
   assert.equal(request?.init?.method, 'PUT')
+
+  const body = JSON.parse(String(request?.init?.body)) as Record<string, unknown>
+  assert.equal(body.main_event, true, 'the update payload must serialise main_event')
+  assert.ok('main_event' in body, 'the update payload must contain the main_event key')
+})
+
+test('listPublicNews preserves the required main_event flag', async () => {
+  const responseBody: PublicNewsListResponse = { items: [publicNewsItem], page: 1, limit: 20 }
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify(responseBody), { status: 200 })
+
+  const result = await listPublicNews()
+
+  const mainEvent: boolean = publicNewsItem.main_event
+  assert.equal(mainEvent, true, 'PublicNews must require main_event')
+  assert.equal(result.items[0].main_event, true)
+  assert.ok('main_event' in result.items[0], 'the public contract must expose main_event')
 })
 
 test('deleteNews sends DELETE and accepts an empty response', async () => {

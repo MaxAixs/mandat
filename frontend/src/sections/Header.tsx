@@ -10,31 +10,31 @@ export default function Header() {
       style={{ background: 'rgba(23,25,28,0.92)', backdropFilter: 'blur(12px)' }}
     >
       <div className="w-full px-8">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center h-[72px]">
-          <Link to="/" className="flex items-center gap-4 no-underline text-mandat-text justify-self-start">
+        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 lg:gap-x-6 h-[72px]">
+          <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-start">
             <span className="inline-block w-[16px] h-[44px] bg-mandat-red-bright" />
-            <span className="font-['Oswald'] text-[34px] font-bold tracking-[3px] leading-none">
+            <span className="font-display text-[21px] lg:text-[24px] font-bold tracking-[1px] lg:tracking-[1.5px] leading-none">
               {SITE_NAME}
             </span>
           </Link>
 
-          <nav className="hidden md:flex gap-14 justify-self-center">
+          <nav className="hidden md:flex min-w-0 gap-3 lg:gap-6 justify-self-center">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="relative font-['Oswald'] text-[20px] tracking-[3px] uppercase py-2.5 group text-mandat-text"
+                className="relative font-display text-[13px] lg:text-[16px] font-medium tracking-[1px] uppercase whitespace-nowrap py-2.5 group text-mandat-text"
               >
                 {link.label}
                 <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-mandat-red-bright transition-all duration-250 group-hover:w-full" />
               </a>
             ))}
           </nav>
-          <div className="hidden md:flex justify-self-end items-center gap-2.5">
+          <div className="hidden md:flex min-w-0 justify-self-end items-center gap-2.5">
             <input
               type="search"
               placeholder="Пошук новин…"
-              className="w-[220px] h-10 px-4 text-[13px] text-mandat-text bg-mandat-bg outline-none border border-mandat-line focus:border-mandat-red-bright transition-colors"
+              className="hidden xl:block w-[220px] h-10 px-4 text-[13px] text-mandat-text bg-mandat-bg outline-none border border-mandat-line focus:border-mandat-red-bright transition-colors"
             />
             <a
               href="#news"
