@@ -46,10 +46,17 @@ func (s *StubRepo) Create(_ context.Context, news *models.News) error {
 	if news.ID == uuid.Nil {
 		news.ID = uuid.New()
 	}
-	if news.Status == models.StatusPublished && news.Featured {
+	selectsFlags := news.Featured || news.MainEvent
+	if news.Status == models.StatusPublished && selectsFlags {
 		for _, item := range s.Items {
-			if item.Status == models.StatusPublished {
+			if item.Status != models.StatusPublished {
+				continue
+			}
+			if news.Featured {
 				item.Featured = false
+			}
+			if news.MainEvent {
+				item.MainEvent = false
 			}
 		}
 	}
@@ -134,6 +141,12 @@ func (s *StubRepo) ListPublished(_ context.Context, filter models.ListFilter) ([
 		}
 	}
 	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].MainEvent != matched[j].MainEvent {
+			return matched[i].MainEvent
+		}
+		if matched[i].Featured != matched[j].Featured {
+			return matched[i].Featured
+		}
 		if matched[i].PublishedAt == nil {
 			return false
 		}
@@ -167,10 +180,17 @@ func (s *StubRepo) Update(_ context.Context, news *models.News) error {
 	if _, ok := s.Items[news.ID]; !ok {
 		return errs.ErrNewsNotFound
 	}
-	if news.Status == models.StatusPublished && news.Featured {
+	selectsFlags := news.Featured || news.MainEvent
+	if news.Status == models.StatusPublished && selectsFlags {
 		for _, item := range s.Items {
-			if item.Status == models.StatusPublished {
+			if item.Status != models.StatusPublished {
+				continue
+			}
+			if news.Featured {
 				item.Featured = false
+			}
+			if news.MainEvent {
+				item.MainEvent = false
 			}
 		}
 	}

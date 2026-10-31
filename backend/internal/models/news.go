@@ -54,6 +54,7 @@ type News struct {
 	Status      Status
 	Views       int64
 	Featured    bool
+	MainEvent   bool
 	ImageUrl    string
 	PublishedAt *time.Time
 	CreatedAt   time.Time

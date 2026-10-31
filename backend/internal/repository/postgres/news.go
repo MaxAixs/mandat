@@ -19,7 +19,7 @@ const uniqueViolation = "23505"
 
 // newsColumns is the canonical column list shared by SELECT queries.
 const newsColumns = `id, slug, category, title, description, text, language,
-	status, views, featured, image_url, published_at, created_at, updated_at`
+	status, views, featured, main_event, image_url, published_at, created_at, updated_at`
 
 // NewsRepo persists news articles in PostgreSQL.
 type NewsRepo struct {
@@ -40,8 +40,9 @@ func (r *NewsRepo) Create(ctx context.Context, news *models.News) error {
 	const fc = "newsRepo_Create"
 
 	var err error
-	if news.Status == models.StatusPublished && news.Featured {
-		err = r.withPublishedFeaturedLock(ctx, func(tx pgx.Tx) error {
+	selectsFlags := news.Featured || news.MainEvent
+	if news.Status == models.StatusPublished && selectsFlags {
+		err = r.withPublishedFlagsLock(ctx, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
 			return insertNews(ctx, tx, news)
 		})
 	} else {
@@ -59,13 +60,13 @@ func insertNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 	query := `INSERT INTO news
 		(id, slug, category, title, description, text, language, status,
-		featured, image_url, published_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+		featured, main_event, image_url, published_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 
 	_, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description,
-		news.Text, news.Language, news.Status, news.Featured, news.ImageUrl,
-		news.PublishedAt, news.CreatedAt, news.UpdatedAt,
+		news.Text, news.Language, news.Status, news.Featured, news.MainEvent,
+		news.ImageUrl, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, err)
@@ -146,7 +147,7 @@ func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) 
 
 	query := `SELECT ` + newsColumns + ` FROM news
 		WHERE status = $1
-		ORDER BY featured DESC, published_at DESC NULLS LAST, id DESC LIMIT $2 OFFSET $3`
+		ORDER BY main_event DESC, featured DESC, published_at DESC NULLS LAST, id DESC LIMIT $2 OFFSET $3`
 
 	rows, err := r.pool.Query(ctx, query,
 		models.StatusPublished,
@@ -178,8 +179,9 @@ func (r *NewsRepo) Update(ctx context.Context, news *models.News) error {
 	const fc = "newsRepo_Update"
 
 	var err error
-	if news.Status == models.StatusPublished && news.Featured {
-		err = r.withPublishedFeaturedLock(ctx, func(tx pgx.Tx) error {
+	selectsFlags := news.Featured || news.MainEvent
+	if news.Status == models.StatusPublished && selectsFlags {
+		err = r.withPublishedFlagsLock(ctx, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
 			return updateNews(ctx, tx, news)
 		})
 	} else {
@@ -197,14 +199,14 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 	query := `UPDATE news SET
 		slug = $2, category = $3, title = $4, description = $5, text = $6,
-		language = $7, status = $8, featured = $9, image_url = $10,
-		published_at = $11, updated_at = $12
+		language = $7, status = $8, featured = $9, main_event = $10, image_url = $11,
+		published_at = $12, updated_at = $13
 		WHERE id = $1`
 
 	tag, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
-		news.Language, news.Status, news.Featured, news.ImageUrl, news.PublishedAt,
-		news.UpdatedAt,
+		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageUrl,
+		news.PublishedAt, news.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, err)
@@ -216,8 +218,13 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 	return nil
 }
 
-func (r *NewsRepo) withPublishedFeaturedLock(ctx context.Context, write func(pgx.Tx) error) (err error) {
-	const fc = "newsRepo_withPublishedFeaturedLock"
+func (r *NewsRepo) withPublishedFlagsLock(
+	ctx context.Context,
+	featured bool,
+	mainEvent bool,
+	write func(pgx.Tx) error,
+) (err error) {
+	const fc = "newsRepo_withPublishedFlagsLock"
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -233,9 +240,17 @@ func (r *NewsRepo) withPublishedFeaturedLock(ctx context.Context, write func(pgx
 	if _, err = tx.Exec(ctx, `LOCK TABLE news IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return fmt.Errorf("%s: lock: %w", fc, err)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE news SET featured = FALSE
-		WHERE status = 'published' AND featured = TRUE`); err != nil {
-		return fmt.Errorf("%s: clear featured: %w", fc, err)
+	if featured {
+		if _, err = tx.Exec(ctx, `UPDATE news SET featured = FALSE
+			WHERE status = 'published' AND featured = TRUE`); err != nil {
+			return fmt.Errorf("%s: clear featured: %w", fc, err)
+		}
+	}
+	if mainEvent {
+		if _, err = tx.Exec(ctx, `UPDATE news SET main_event = FALSE
+			WHERE status = 'published' AND main_event = TRUE`); err != nil {
+			return fmt.Errorf("%s: clear main event: %w", fc, err)
+		}
 	}
 	if err = write(tx); err != nil {
 		return fmt.Errorf("%s: write: %w", fc, err)
@@ -273,7 +288,7 @@ func scanNews(row scanner) (*models.News, error) {
 	err := row.Scan(
 		&news.ID, &news.Slug, &news.Category, &news.Title, &news.Description,
 		&news.Text, &news.Language, &news.Status, &news.Views, &news.Featured,
-		&news.ImageUrl, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
+		&news.MainEvent, &news.ImageUrl, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

@@ -139,6 +139,30 @@ func requireSinglePublishedFeatured(t *testing.T, repo *newsrepo.NewsRepo, wantI
 	assert.Equal(t, wantID, ids[0])
 }
 
+func publishedMainEventIDs(t *testing.T, repo *newsrepo.NewsRepo) []uuid.UUID {
+	t.Helper()
+
+	items, err := repo.ListPublished(context.Background(), models.ListFilter{Page: 1, Limit: 100})
+	require.NoError(t, err)
+
+	var ids []uuid.UUID
+	for _, item := range items {
+		if item.MainEvent {
+			ids = append(ids, item.ID)
+		}
+	}
+
+	return ids
+}
+
+func requireSinglePublishedMainEvent(t *testing.T, repo *newsrepo.NewsRepo, wantID uuid.UUID) {
+	t.Helper()
+
+	ids := publishedMainEventIDs(t, repo)
+	require.Len(t, ids, 1, "exactly one published article may remain the main event")
+	assert.Equal(t, wantID, ids[0])
+}
+
 func TestNewsRepo_CreateAndGetByID(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -172,6 +196,31 @@ func TestNewsRepo_CreateAndGetByID(t *testing.T) {
 	assert.Nil(t, got.PublishedAt)
 }
 
+func TestNewsRepo_MainEventRoundTrip(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	news := draftNews("main-event-round-trip")
+	news.MainEvent = true
+	require.NoError(t, repo.Create(ctx, news))
+
+	got, err := repo.GetByID(ctx, news.ID)
+	require.NoError(t, err)
+	assert.True(t, got.MainEvent, "create must persist main_event")
+
+	news.MainEvent = false
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetByID(ctx, news.ID)
+	require.NoError(t, err)
+	assert.False(t, got.MainEvent, "update must persist clearing main_event")
+
+	news.MainEvent = true
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetByID(ctx, news.ID)
+	require.NoError(t, err)
+	assert.True(t, got.MainEvent, "update must persist setting main_event")
+}
+
 func TestNewsRepo_Create_DuplicateSlug(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -197,6 +246,22 @@ func TestNewsRepo_Create_PublishedFeaturedReplacesPrevious(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, replacement))
 
 	requireSinglePublishedFeatured(t, repo, replacement.ID)
+}
+
+func TestNewsRepo_Create_PublishedMainEventReplacesPrevious(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+	previous := publishedNews("previous-main-event", base)
+	previous.MainEvent = true
+	require.NoError(t, repo.Create(ctx, previous))
+
+	replacement := publishedNews("replacement-main-event", base.Add(time.Hour))
+	replacement.MainEvent = true
+	require.NoError(t, repo.Create(ctx, replacement))
+
+	requireSinglePublishedMainEvent(t, repo, replacement.ID)
 }
 
 func TestNewsRepo_Create_ConcurrentPublishedFeatured(t *testing.T) {
@@ -232,6 +297,63 @@ func TestNewsRepo_Create_ConcurrentPublishedFeatured(t *testing.T) {
 	ids := publishedFeaturedIDs(t, repo)
 	require.Len(t, ids, 1, "concurrent transfers must leave exactly one published-featured row")
 	assert.Contains(t, []uuid.UUID{first.ID, second.ID}, ids[0])
+}
+
+func requireConcurrentMainEventWrites(
+	t *testing.T,
+	repo *newsrepo.NewsRepo,
+	write func(context.Context, *models.News) error,
+	items ...*models.News,
+) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := make(chan struct{})
+	results := make(chan error, len(items))
+	for _, news := range items {
+		go func(news *models.News) {
+			<-start
+			results <- write(ctx, news)
+		}(news)
+	}
+	close(start)
+
+	for i := range items {
+		require.NoError(t, <-results, "concurrent published main-event write %d", i+1)
+	}
+
+	ids := publishedMainEventIDs(t, repo)
+	require.Len(t, ids, 1, "concurrent transfers must leave exactly one published main-event row")
+	assert.Contains(t, []uuid.UUID{items[0].ID, items[1].ID}, ids[0])
+}
+
+func TestNewsRepo_Create_ConcurrentPublishedMainEvent(t *testing.T) {
+	repo := setupRepo(t)
+	base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+	first := publishedNews("concurrent-main-event-create-a", base)
+	first.MainEvent = true
+	second := publishedNews("concurrent-main-event-create-b", base.Add(time.Minute))
+	second.MainEvent = true
+
+	requireConcurrentMainEventWrites(t, repo, repo.Create, first, second)
+}
+
+func TestNewsRepo_Update_ConcurrentPublishedMainEvent(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+	first := publishedNews("concurrent-main-event-update-a", base)
+	second := publishedNews("concurrent-main-event-update-b", base.Add(time.Minute))
+	require.NoError(t, repo.Create(ctx, first))
+	require.NoError(t, repo.Create(ctx, second))
+
+	first.MainEvent = true
+	second.MainEvent = true
+	requireConcurrentMainEventWrites(t, repo, repo.Update, first, second)
 }
 
 func TestNewsRepo_PublishedFeatured_DuplicateSlugRollsBack(t *testing.T) {
@@ -277,6 +399,53 @@ func TestNewsRepo_PublishedFeatured_DuplicateSlugRollsBack(t *testing.T) {
 			require.Error(t, err)
 			assert.True(t, errors.Is(err, errs.ErrConflict), "expected ErrConflict, got %v", err)
 			requireSinglePublishedFeatured(t, repo, previous.ID)
+		})
+	}
+}
+
+func TestNewsRepo_PublishedMainEvent_DuplicateSlugRollsBack(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(context.Context, *newsrepo.NewsRepo, *models.News, string) error
+	}{
+		{
+			name: "create",
+			run: func(ctx context.Context, repo *newsrepo.NewsRepo, candidate *models.News, conflictSlug string) error {
+				attempted := publishedNews(conflictSlug, *candidate.PublishedAt)
+				attempted.MainEvent = true
+				return repo.Create(ctx, attempted)
+			},
+		},
+		{
+			name: "update",
+			run: func(ctx context.Context, repo *newsrepo.NewsRepo, candidate *models.News, conflictSlug string) error {
+				candidate.Slug = conflictSlug
+				candidate.MainEvent = true
+				return repo.Update(ctx, candidate)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+			base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+			previous := publishedNews("previous-main-event", base)
+			previous.MainEvent = true
+			require.NoError(t, repo.Create(ctx, previous))
+
+			conflict := newsFixture("occupied-main-event-slug", models.StatusDraft, base.Add(time.Hour))
+			require.NoError(t, repo.Create(ctx, conflict))
+
+			candidate := publishedNews("candidate-main-event-slug", base.Add(2*time.Hour))
+			require.NoError(t, repo.Create(ctx, candidate))
+
+			err := tt.run(ctx, repo, candidate, conflict.Slug)
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, errs.ErrConflict), "expected ErrConflict, got %v", err)
+			requireSinglePublishedMainEvent(t, repo, previous.ID)
 		})
 	}
 }
@@ -458,6 +627,56 @@ func TestNewsRepo_ListPublished_OldFeaturedLeadsFirstPage(t *testing.T) {
 	}, actualSlugs, "featured must lead page one and all remaining items must stay chronological")
 }
 
+func TestNewsRepo_ListPublished_OldMainEventLeadsFirstPage(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+	mainEvent := publishedNews("old-main-event", base.Add(-time.Hour))
+	mainEvent.MainEvent = true
+	require.NoError(t, repo.Create(ctx, mainEvent))
+
+	featured := publishedNews("newer-featured", base)
+	featured.Featured = true
+	require.NoError(t, repo.Create(ctx, featured))
+
+	for i := 1; i <= 21; i++ {
+		news := publishedNews(fmt.Sprintf("main-event-regular-%02d", i), base.Add(time.Duration(i)*time.Minute))
+		require.NoError(t, repo.Create(ctx, news))
+	}
+
+	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, items, 20)
+
+	actualSlugs := make([]string, 0, len(items))
+	for _, item := range items {
+		actualSlugs = append(actualSlugs, item.Slug)
+	}
+	assert.Equal(t, []string{
+		"old-main-event",
+		"newer-featured",
+		"main-event-regular-21",
+		"main-event-regular-20",
+		"main-event-regular-19",
+		"main-event-regular-18",
+		"main-event-regular-17",
+		"main-event-regular-16",
+		"main-event-regular-15",
+		"main-event-regular-14",
+		"main-event-regular-13",
+		"main-event-regular-12",
+		"main-event-regular-11",
+		"main-event-regular-10",
+		"main-event-regular-09",
+		"main-event-regular-08",
+		"main-event-regular-07",
+		"main-event-regular-06",
+		"main-event-regular-05",
+		"main-event-regular-04",
+	}, actualSlugs, "main event must lead page one, ahead of featured and newer chronological items")
+}
+
 func TestNewsRepo_Update(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -526,6 +745,52 @@ func TestNewsRepo_Update_PublishedFeaturedReplacesPrevious(t *testing.T) {
 			require.NoError(t, repo.Update(ctx, target))
 
 			requireSinglePublishedFeatured(t, repo, target.ID)
+		})
+	}
+}
+
+func TestNewsRepo_Update_PublishedMainEventReplacesPrevious(t *testing.T) {
+	tests := []struct {
+		name             string
+		initialStatus    models.Status
+		initialMainEvent bool
+	}{
+		{
+			name:          "published article becomes the main event",
+			initialStatus: models.StatusPublished,
+		},
+		{
+			name:             "main-event draft is published",
+			initialStatus:    models.StatusDraft,
+			initialMainEvent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+			base := time.Date(2026, time.October, 30, 12, 0, 0, 0, time.UTC)
+
+			previous := publishedNews("previous-main-event", base)
+			previous.MainEvent = true
+			require.NoError(t, repo.Create(ctx, previous))
+
+			target := newsFixture("update-main-event-target", tt.initialStatus, base.Add(time.Hour))
+			target.MainEvent = tt.initialMainEvent
+			require.NoError(t, repo.Create(ctx, target))
+			requireSinglePublishedMainEvent(t, repo, previous.ID)
+
+			target.Status = models.StatusPublished
+			target.MainEvent = true
+			target.UpdatedAt = base.Add(2 * time.Hour)
+			if target.PublishedAt == nil {
+				publishedAt := base.Add(2 * time.Hour)
+				target.PublishedAt = &publishedAt
+			}
+			require.NoError(t, repo.Update(ctx, target))
+
+			requireSinglePublishedMainEvent(t, repo, target.ID)
 		})
 	}
 }

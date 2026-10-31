@@ -85,6 +85,17 @@ func publishedFeaturedItems(repo *testsupport.StubRepo) []*models.News {
 	return items
 }
 
+func publishedMainEventItems(repo *testsupport.StubRepo) []*models.News {
+	var items []*models.News
+	for _, item := range repo.Items {
+		if item.Status == models.StatusPublished && item.MainEvent {
+			items = append(items, item)
+		}
+	}
+
+	return items
+}
+
 func TestCreate_GeneratesSlugAndDefaults(t *testing.T) {
 	svc, repo := newTestService()
 
@@ -191,6 +202,63 @@ func TestCreate_PublishSetsPublishedAt(t *testing.T) {
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
 	require.NotNil(t, created.PublishedAt)
+}
+
+func TestCreate_PersistsMainEvent(t *testing.T) {
+	svc, repo := newTestService()
+
+	input := validInput()
+	input.MainEvent = true
+	created, err := svc.Create(context.Background(), input)
+	require.NoError(t, err)
+
+	assert.True(t, created.MainEvent)
+	require.Contains(t, repo.Items, created.ID)
+	assert.True(t, repo.Items[created.ID].MainEvent)
+}
+
+func TestCreate_PublishedMainEventReplacesPrevious(t *testing.T) {
+	svc, repo := newTestService()
+
+	previousInput := validInput()
+	previousInput.Title = "Перша головна подія"
+	previousInput.Status = string(models.StatusPublished)
+	previousInput.MainEvent = true
+	_, err := svc.Create(context.Background(), previousInput)
+	require.NoError(t, err)
+
+	replacementInput := validInput()
+	replacementInput.Title = "Друга головна подія"
+	replacementInput.Status = string(models.StatusPublished)
+	replacementInput.MainEvent = true
+	replacement, err := svc.Create(context.Background(), replacementInput)
+	require.NoError(t, err)
+
+	mainEvents := publishedMainEventItems(repo)
+	require.Len(t, mainEvents, 1, "exactly one published article may remain the main event")
+	assert.Equal(t, replacement.ID, mainEvents[0].ID)
+}
+
+func TestCreate_MainEventDraftDoesNotReplacePublished(t *testing.T) {
+	svc, repo := newTestService()
+
+	publishedInput := validInput()
+	publishedInput.Title = "Опублікована головна подія"
+	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.MainEvent = true
+	published, err := svc.Create(context.Background(), publishedInput)
+	require.NoError(t, err)
+
+	draftInput := validInput()
+	draftInput.Title = "Чернетка головної події"
+	draftInput.MainEvent = true
+	draft, err := svc.Create(context.Background(), draftInput)
+	require.NoError(t, err)
+
+	mainEvents := publishedMainEventItems(repo)
+	require.Len(t, mainEvents, 1, "a main-event draft must not displace the published main event")
+	assert.Equal(t, published.ID, mainEvents[0].ID)
+	assert.True(t, repo.Items[draft.ID].MainEvent, "main-event intent must be retained on the draft")
 }
 
 func TestCreate_PublishedFeaturedReplacesPrevious(t *testing.T) {
@@ -386,6 +454,74 @@ func TestUpdate_FirstPublicationSetsPublishedAt(t *testing.T) {
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
 	require.NotNil(t, updated.PublishedAt, "first publication must set published_at")
+}
+
+func TestUpdate_PersistsMainEvent(t *testing.T) {
+	svc, repo := newTestService()
+
+	created, err := svc.Create(context.Background(), validInput())
+	require.NoError(t, err)
+
+	update := validInput()
+	update.MainEvent = true
+	updated, err := svc.Update(context.Background(), created.Slug, update)
+	require.NoError(t, err)
+
+	assert.True(t, updated.MainEvent)
+	assert.True(t, repo.Items[created.ID].MainEvent)
+}
+
+func TestUpdate_PublishedMainEventReplacesPrevious(t *testing.T) {
+	svc, repo := newTestService()
+
+	previousInput := validInput()
+	previousInput.Title = "Перша головна подія"
+	previousInput.Status = string(models.StatusPublished)
+	previousInput.MainEvent = true
+	_, err := svc.Create(context.Background(), previousInput)
+	require.NoError(t, err)
+
+	targetInput := validInput()
+	targetInput.Title = "Друга головна подія"
+	targetInput.Status = string(models.StatusPublished)
+	target, err := svc.Create(context.Background(), targetInput)
+	require.NoError(t, err)
+
+	updateInput := targetInput
+	updateInput.MainEvent = true
+	updated, err := svc.Update(context.Background(), target.Slug, updateInput)
+	require.NoError(t, err)
+
+	mainEvents := publishedMainEventItems(repo)
+	require.Len(t, mainEvents, 1, "exactly one published article may remain the main event")
+	assert.Equal(t, updated.ID, mainEvents[0].ID)
+}
+
+func TestUpdate_MainEventDraftDoesNotReplacePublished(t *testing.T) {
+	svc, repo := newTestService()
+
+	publishedInput := validInput()
+	publishedInput.Title = "Опублікована головна подія"
+	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.MainEvent = true
+	published, err := svc.Create(context.Background(), publishedInput)
+	require.NoError(t, err)
+
+	draftInput := validInput()
+	draftInput.Title = "Чернетка головної події"
+	draft, err := svc.Create(context.Background(), draftInput)
+	require.NoError(t, err)
+
+	updateInput := draftInput
+	updateInput.MainEvent = true
+	updated, err := svc.Update(context.Background(), draft.Slug, updateInput)
+	require.NoError(t, err)
+
+	mainEvents := publishedMainEventItems(repo)
+	require.Len(t, mainEvents, 1, "a main-event draft must not displace the published main event")
+	assert.Equal(t, published.ID, mainEvents[0].ID)
+	assert.True(t, updated.MainEvent, "main-event intent must be retained on the draft")
+	assert.True(t, repo.Items[draft.ID].MainEvent)
 }
 
 func TestUpdate_PublishedFeaturedReplacesPrevious(t *testing.T) {

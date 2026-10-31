@@ -20,6 +20,10 @@ const publishedBody = `{"category":"Міжнародні новини","title":"
 	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
 	`"featured":true,"image_url":"https://example.com/cover.jpg"}`
 
+const publishedMainEventBody = `{"category":"Міжнародні новини","title":"Головна подія дня",` +
+	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
+	`"main_event":true,"image_url":"https://example.com/main-event.jpg"}`
+
 type publicListPayload struct {
 	Items []map[string]any `json:"items"`
 	Page  int              `json:"page"`
@@ -86,6 +90,19 @@ func TestPublicList_ReturnsPublicFieldsOnly(t *testing.T) {
 	for _, field := range []string{"id", "text", "status", "language", "created_at", "updated_at"} {
 		assert.NotContains(t, item, field, "public payload must not expose %q", field)
 	}
+}
+
+func TestPublicList_ReturnsMainEvent(t *testing.T) {
+	router, _ := setupPublicRouter()
+	slug := createArticle(t, router, publishedMainEventBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1)
+	assert.Equal(t, slug, payload.Items[0]["slug"])
+	assert.Equal(t, true, payload.Items[0]["main_event"])
 }
 
 func TestPublicList_IgnoresStatusQuery(t *testing.T) {
@@ -155,7 +172,7 @@ const publishedDetailBody = `{"category":"Міжнародні новини","ti
 // publicDetailFields is the exact field set of a public detail payload.
 var publicDetailFields = []string{
 	"slug", "category", "title", "description", "image_url",
-	"featured", "views", "published_at", "text",
+	"featured", "main_event", "views", "published_at", "text",
 }
 
 func decodePublicDetail(t *testing.T, body []byte) map[string]any {
@@ -194,6 +211,18 @@ func TestPublicDetail_ReturnsPublishedArticle(t *testing.T) {
 	for _, field := range []string{"id", "status", "language", "created_at", "updated_at"} {
 		assert.NotContains(t, detail, field, "public detail must not expose %q", field)
 	}
+}
+
+func TestPublicDetail_ReturnsMainEvent(t *testing.T) {
+	router, _ := setupPublicRouter()
+	slug := createArticle(t, router, publishedMainEventBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news/"+slug, "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	detail := decodePublicDetail(t, rec.Body.Bytes())
+	assert.Equal(t, slug, detail["slug"])
+	assert.Equal(t, true, detail["main_event"])
 }
 
 func TestPublicDetail_DraftAndMissingReturn404(t *testing.T) {

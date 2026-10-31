@@ -76,6 +76,8 @@ func doRequest(t *testing.T, router http.Handler, method, path, body string) *ht
 
 const validBody = `{"category":"Новини","title":"Уряд схвалив новий бюджет","text":"Повний текст"}`
 
+const mainEventBody = `{"category":"Новини","title":"Головна подія дня","text":"Повний текст","main_event":true}`
+
 func TestCreate_Returns201WithArticle(t *testing.T) {
 	router, repo := setupRouter()
 
@@ -90,6 +92,21 @@ func TestCreate_Returns201WithArticle(t *testing.T) {
 	assert.Equal(t, "", article["language"])
 	assert.NotEmpty(t, article["id"])
 	assert.NotEmpty(t, article["created_at"])
+}
+
+func TestCreate_MapsMainEventJSON(t *testing.T) {
+	router, repo := setupRouter()
+
+	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", mainEventBody)
+
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var article map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &article))
+	assert.Equal(t, true, article["main_event"])
+	require.Len(t, repo.Items, 1)
+	for _, item := range repo.Items {
+		assert.True(t, item.MainEvent, "the request flag must reach the stored article")
+	}
 }
 
 func TestCreate_InvalidJSONReturns400(t *testing.T) {
@@ -163,6 +180,21 @@ func TestList_ReturnsEnvelope(t *testing.T) {
 	assert.Equal(t, 20, payload.Limit)
 }
 
+func TestList_ReturnsMainEvent(t *testing.T) {
+	router, _ := setupRouter()
+	createArticle(t, router, mainEventBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var payload struct {
+		Items []map[string]any `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.Len(t, payload.Items, 1)
+	assert.Equal(t, true, payload.Items[0]["main_event"])
+}
+
 func TestList_InvalidPaginationReturns400(t *testing.T) {
 	router, _ := setupRouter()
 
@@ -196,6 +228,18 @@ func TestGetBySlug_Returns200(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "Уряд схвалив новий бюджет")
 }
 
+func TestGetBySlug_ReturnsMainEvent(t *testing.T) {
+	router, _ := setupRouter()
+	slug := createArticle(t, router, mainEventBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news/"+slug, "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var article map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &article))
+	assert.Equal(t, true, article["main_event"])
+}
+
 func TestGetBySlug_NotFoundReturns404(t *testing.T) {
 	router, _ := setupRouter()
 
@@ -217,6 +261,22 @@ func TestUpdate_Returns200WithChangedFields(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Оновлений заголовок")
 	assert.Contains(t, rec.Body.String(), "Міжнародні новини")
+}
+
+func TestUpdate_MapsMainEventJSON(t *testing.T) {
+	router, repo := setupRouter()
+	slug := createArticle(t, router, validBody)
+
+	rec := doRequest(t, router, http.MethodPut, "/api/admin/news/"+slug, mainEventBody)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var article map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &article))
+	assert.Equal(t, true, article["main_event"])
+	require.Len(t, repo.Items, 1)
+	for _, item := range repo.Items {
+		assert.True(t, item.MainEvent, "the request flag must reach the stored article")
+	}
 }
 
 func TestUpdate_NotFoundReturns404(t *testing.T) {

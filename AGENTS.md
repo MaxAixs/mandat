@@ -37,6 +37,7 @@ The superpowers workflow is unchanged; only the model performing each role diffe
 
 - Commit only on an explicit command; never commit or push on your own initiative. This applies to `frontend/` exactly as to `backend/`.
 - Follow the same message conventions for both parts: start every message with `[+]` (new functionality or files), `[*]` (refactoring or behavior-preserving changes), or `[-]` (deleting code or files).
+- Do not add a `frontend:` / `backend:` scope to the message — the changed files already show which part is meant, e.g. `[+] admin login and session context`.
 - When a change touches both parts, make two separate commits — one for `frontend/`, one for `backend/` — each with its own type prefix.
 
 ## Database Safety

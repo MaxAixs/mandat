@@ -13,6 +13,7 @@ type NewsRequest struct {
 	Language    string `json:"language"`
 	Status      string `json:"status"`
 	Featured    bool   `json:"featured"`
+	MainEvent   bool   `json:"main_event"`
 	ImageUrl    string `json:"image_url"`
 }
 
@@ -26,6 +27,7 @@ func (r NewsRequest) ToInput() service.NewsInput {
 		Language:    r.Language,
 		Status:      r.Status,
 		Featured:    r.Featured,
+		MainEvent:   r.MainEvent,
 		ImageUrl:    r.ImageUrl,
 	}
 }

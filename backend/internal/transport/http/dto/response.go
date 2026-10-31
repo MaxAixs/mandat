@@ -19,6 +19,7 @@ type NewsResponse struct {
 	Status      string     `json:"status"`
 	Views       int64      `json:"views"`
 	Featured    bool       `json:"featured"`
+	MainEvent   bool       `json:"main_event"`
 	ImageUrl    string     `json:"image_url"`
 	PublishedAt *time.Time `json:"published_at"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -40,8 +41,16 @@ type PublicNewsResponse struct {
 	Description string     `json:"description"`
 	ImageUrl    string     `json:"image_url"`
 	Featured    bool       `json:"featured"`
+	MainEvent   bool       `json:"main_event"`
 	Views       int64      `json:"views"`
 	PublishedAt *time.Time `json:"published_at"`
+}
+
+// PublicNewsListResponse is a page of published article cards.
+type PublicNewsListResponse struct {
+	Items []*PublicNewsResponse `json:"items"`
+	Page  int                   `json:"page"`
+	Limit int                   `json:"limit"`
 }
 
 // PublicNewsDetailResponse is a published article returned by the public API.
@@ -53,15 +62,9 @@ type PublicNewsDetailResponse struct {
 	Text        string     `json:"text"`
 	ImageUrl    string     `json:"image_url"`
 	Featured    bool       `json:"featured"`
+	MainEvent   bool       `json:"main_event"`
 	Views       int64      `json:"views"`
 	PublishedAt *time.Time `json:"published_at"`
-}
-
-// PublicNewsListResponse is a page of published article cards.
-type PublicNewsListResponse struct {
-	Items []*PublicNewsResponse `json:"items"`
-	Page  int                   `json:"page"`
-	Limit int                   `json:"limit"`
 }
 
 // HealthResponse is the successful response of a health probe.
@@ -82,6 +85,7 @@ func NewsToPublicResponse(news *models.News) *PublicNewsResponse {
 		Description: news.Description,
 		ImageUrl:    news.ImageUrl,
 		Featured:    news.Featured,
+		MainEvent:   news.MainEvent,
 		Views:       news.Views,
 		PublishedAt: news.PublishedAt,
 	}
@@ -101,6 +105,7 @@ func NewsToPublicDetailResponse(news *models.News) *PublicNewsDetailResponse {
 		Text:        news.Text,
 		ImageUrl:    news.ImageUrl,
 		Featured:    news.Featured,
+		MainEvent:   news.MainEvent,
 		Views:       news.Views,
 		PublishedAt: news.PublishedAt,
 	}
@@ -123,6 +128,7 @@ func NewsToResponse(news *models.News) *NewsResponse {
 		Status:      string(news.Status),
 		Views:       news.Views,
 		Featured:    news.Featured,
+		MainEvent:   news.MainEvent,
 		ImageUrl:    news.ImageUrl,
 		PublishedAt: news.PublishedAt,
 		CreatedAt:   news.CreatedAt,

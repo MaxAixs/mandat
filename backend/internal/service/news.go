@@ -30,6 +30,7 @@ type NewsInput struct {
 	Language    string
 	Status      string
 	Featured    bool
+	MainEvent   bool
 	ImageUrl    string
 }
 
@@ -261,6 +262,7 @@ func buildNews(input NewsInput) *models.News {
 		Language:    input.Language,
 		Status:      status,
 		Featured:    input.Featured,
+		MainEvent:   input.MainEvent,
 		ImageUrl:    input.ImageUrl,
 		CreatedAt:   now,
 		UpdatedAt:   now,
