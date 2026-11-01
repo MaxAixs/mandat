@@ -924,3 +924,74 @@ func TestNewsRepo_Migration_DeduplicatesPublishedFeatured(t *testing.T) {
 	require.Len(t, ids, 1, "migration must deduplicate published-featured rows")
 	assert.Equal(t, winnerID, ids[0], "latest publication, creation time, and ID must determine the retained row")
 }
+
+func TestNewsRepo_ListPublished_CategoryFilterAppliesBeforePagination(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	sport := publishedNews("sport-older", base)
+	sport.Category = models.CategoryInsides
+	require.NoError(t, repo.Create(ctx, sport))
+
+	// More unrelated articles than a page holds, all newer than the Sport item.
+	for i := 1; i <= 25; i++ {
+		newer := publishedNews(fmt.Sprintf("international-newer-%02d", i), base.Add(time.Duration(i)*time.Hour))
+		newer.Category = models.CategoryAnalytics
+		require.NoError(t, repo.Create(ctx, newer))
+	}
+
+	sportCategory := models.CategoryInsides
+	items, err := repo.ListPublished(ctx, models.ListFilter{
+		Category: &sportCategory,
+		Page:     1,
+		Limit:    20,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 1, "category filtering must happen before LIMIT/OFFSET")
+	assert.Equal(t, "sport-older", items[0].Slug)
+	assert.Equal(t, models.CategoryInsides, items[0].Category)
+
+	unfiltered, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, unfiltered, 20)
+	for _, item := range unfiltered {
+		assert.NotEqual(t, models.CategoryInsides, item.Category,
+			"the older Sport article must not appear among newer unrelated articles")
+	}
+}
+
+func TestNewsRepo_ListPublished_CategoryFilterPaginatesMatchingRows(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	sportSlugs := []string{"sport-1", "sport-2", "sport-3"}
+	for i, slug := range sportSlugs {
+		news := publishedNews(slug, base.Add(time.Duration(i)*time.Hour))
+		news.Category = models.CategoryInsides
+		require.NoError(t, repo.Create(ctx, news))
+	}
+	for i := 1; i <= 5; i++ {
+		unrelated := publishedNews(fmt.Sprintf("unrelated-%02d", i), base.Add(time.Duration(i+10)*time.Hour))
+		unrelated.Category = models.CategoryAnalytics
+		require.NoError(t, repo.Create(ctx, unrelated))
+	}
+
+	sportCategory := models.CategoryInsides
+
+	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 2})
+	require.NoError(t, err)
+	require.Len(t, firstPage, 2)
+	assert.Equal(t, "sport-3", firstPage[0].Slug)
+	assert.Equal(t, "sport-2", firstPage[1].Slug)
+
+	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 2, Limit: 2})
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, "sport-1", secondPage[0].Slug)
+
+	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 3, Limit: 2})
+	require.NoError(t, err)
+	assert.Empty(t, emptyPage)
+}

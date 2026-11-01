@@ -136,9 +136,13 @@ func (s *StubRepo) ListPublished(_ context.Context, filter models.ListFilter) ([
 
 	matched := []*models.News{}
 	for _, item := range s.Items {
-		if item.Status == models.StatusPublished {
-			matched = append(matched, item)
+		if item.Status != models.StatusPublished {
+			continue
 		}
+		if filter.Category != nil && item.Category != *filter.Category {
+			continue
+		}
+		matched = append(matched, item)
 	}
 	sort.Slice(matched, func(i, j int) bool {
 		if matched[i].MainEvent != matched[j].MainEvent {

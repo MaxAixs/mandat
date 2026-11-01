@@ -44,7 +44,7 @@ func TestListPublished_ReturnsOnlyPublishedArticles(t *testing.T) {
 
 	published := createPublished(t, svc, "Перша публікація")
 
-	result, err := svc.ListPublished(ctx, 1, 10)
+	result, err := svc.ListPublished(ctx, 1, 10, "")
 	require.NoError(t, err)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, published.Slug, result.Items[0].Slug)
@@ -69,7 +69,7 @@ func TestListPublished_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, repo := newTestService()
 
-			_, err := svc.ListPublished(context.Background(), tt.page, tt.limit)
+			_, err := svc.ListPublished(context.Background(), tt.page, tt.limit, "")
 
 			require.Error(t, err)
 			assert.True(t, errors.Is(err, errs.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)
@@ -82,7 +82,7 @@ func TestListPublished_Validation(t *testing.T) {
 func TestListPublished_ClampsLimitToMax(t *testing.T) {
 	svc, repo := newTestService()
 
-	result, err := svc.ListPublished(context.Background(), 3, 100000)
+	result, err := svc.ListPublished(context.Background(), 3, 100000, "")
 	require.NoError(t, err)
 
 	assert.Equal(t, MaxPageLimit, result.Limit)
@@ -97,7 +97,7 @@ func TestListPublished_RepoFailurePropagatesAndLogs(t *testing.T) {
 	svc, repo, handler := newPublicTestService()
 	repo.ListPublishedErr = cause
 
-	_, err := svc.ListPublished(context.Background(), 1, 10)
+	_, err := svc.ListPublished(context.Background(), 1, 10, "")
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, cause), "the repository cause must be preserved, got %v", err)

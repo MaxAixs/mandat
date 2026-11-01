@@ -161,7 +161,7 @@ func (s *NewsService) List(ctx context.Context, page int, limit int, status stri
 }
 
 // ListPublished returns a page of published articles for the public site.
-func (s *NewsService) ListPublished(ctx context.Context, page int, limit int) (*ListResult, error) {
+func (s *NewsService) ListPublished(ctx context.Context, page int, limit int, category string) (*ListResult, error) {
 	const fc = "newsService_ListPublished"
 
 	if page < 1 {
@@ -174,7 +174,16 @@ func (s *NewsService) ListPublished(ctx context.Context, page int, limit int) (*
 		limit = MaxPageLimit
 	}
 
-	items, err := s.repo.ListPublished(ctx, models.ListFilter{Page: page, Limit: limit})
+	filter := models.ListFilter{Page: page, Limit: limit}
+	if category != "" {
+		parsed := models.Category(category)
+		if !parsed.Valid() {
+			return nil, fmt.Errorf("%s: %w: unknown category %q", fc, errs.ErrInvalidInput, category)
+		}
+		filter.Category = &parsed
+	}
+
+	items, err := s.repo.ListPublished(ctx, filter)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to list published news articles", "fc", fc, "error", err)
 

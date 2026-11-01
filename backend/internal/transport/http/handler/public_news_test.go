@@ -6,8 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/testsupport"
 	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
@@ -23,6 +27,13 @@ const publishedBody = `{"category":"Міжнародні новини","title":"
 const publishedMainEventBody = `{"category":"Міжнародні новини","title":"Головна подія дня",` +
 	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
 	`"main_event":true,"image_url":"https://example.com/main-event.jpg"}`
+
+const publishedSportBody = `{"category":"Спорт","title":"Спортивна стаття",` +
+	`"description":"Стислий опис","text":"Повний текст","status":"published",` +
+	`"image_url":"https://example.com/sport.jpg"}`
+
+const draftSportBody = `{"category":"Спорт","title":"Спортивна чернетка",` +
+	`"description":"Стислий опис","text":"Повний текст"}`
 
 type publicListPayload struct {
 	Items []map[string]any `json:"items"`
@@ -149,6 +160,130 @@ func TestPublicList_ClampsLimit(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	payload := decodePublicList(t, rec.Body.Bytes())
 	assert.Equal(t, 100, payload.Limit)
+}
+
+func TestPublicList_CategoryFilterReturnsOnlyMatchingPublishedArticles(t *testing.T) {
+	router, _ := setupPublicRouter()
+	sportSlug := createArticle(t, router, publishedSportBody)
+	createArticle(t, router, publishedBody) // international
+	createArticle(t, router, draftSportBody)
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news?category="+url.QueryEscape(string(models.CategoryInsides)), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "only published articles of the requested category must be listed")
+	assert.Equal(t, sportSlug, payload.Items[0]["slug"])
+	assert.Equal(t, string(models.CategoryInsides), payload.Items[0]["category"])
+}
+
+func TestPublicList_CategoryFilterMatchesExactRubric(t *testing.T) {
+	router, _ := setupPublicRouter()
+	createArticle(t, router, publishedSportBody)
+	internationalSlug := createArticle(t, router, publishedBody)
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news?category="+url.QueryEscape(string(models.CategoryAnalytics)), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1)
+	assert.Equal(t, internationalSlug, payload.Items[0]["slug"])
+	assert.Equal(t, string(models.CategoryAnalytics), payload.Items[0]["category"])
+}
+
+func TestPublicList_WithoutCategoryRemainsUnfiltered(t *testing.T) {
+	router, _ := setupPublicRouter()
+	sportSlug := createArticle(t, router, publishedSportBody)
+	internationalSlug := createArticle(t, router, publishedBody)
+	createArticle(t, router, draftSportBody)
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 2, "the general feed must keep returning every published article")
+
+	slugs := map[string]bool{}
+	for _, item := range payload.Items {
+		slug, ok := item["slug"].(string)
+		require.True(t, ok)
+		slugs[slug] = true
+	}
+	assert.True(t, slugs[sportSlug])
+	assert.True(t, slugs[internationalSlug])
+}
+
+func TestPublicList_UnknownCategoryReturns400(t *testing.T) {
+	tests := []struct {
+		name     string
+		category string
+	}{
+		{"unknown rubric", "Політика"},
+		{"lowercase sport", "спорт"},
+		{"trailing space", "Спорт "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, _ := setupPublicRouter()
+
+			rec := doRequest(t, router, http.MethodGet,
+				"/api/news?category="+url.QueryEscape(tt.category), "")
+
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message)
+		})
+	}
+}
+
+// storePublished inserts a deterministic published article directly into the stub.
+func storePublished(
+	t *testing.T,
+	repo *testsupport.StubRepo,
+	slug string,
+	category models.Category,
+	publishedAt time.Time,
+) {
+	t.Helper()
+
+	id := uuid.New()
+	repo.Items[id] = &models.News{
+		ID:          id,
+		Slug:        slug,
+		Category:    category,
+		Title:       slug,
+		Description: "Стислий опис",
+		Text:        "Повний текст",
+		Status:      models.StatusPublished,
+		PublishedAt: &publishedAt,
+		CreatedAt:   publishedAt,
+		UpdatedAt:   publishedAt,
+	}
+}
+
+func TestPublicList_CategoryFilterAppliesBeforePagination(t *testing.T) {
+	router, repo := setupPublicRouter()
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	storePublished(t, repo, "sport-older", models.CategoryInsides, base)
+	storePublished(t, repo, "international-newer", models.CategoryAnalytics, base.Add(time.Hour))
+
+	unfiltered := doRequest(t, router, http.MethodGet, "/api/news?limit=1", "")
+	require.Equal(t, http.StatusOK, unfiltered.Code, unfiltered.Body.String())
+	unfilteredPayload := decodePublicList(t, unfiltered.Body.Bytes())
+	require.Len(t, unfilteredPayload.Items, 1)
+	assert.Equal(t, "international-newer", unfilteredPayload.Items[0]["slug"],
+		"the newer unrelated article must lead the unfiltered first page")
+
+	filtered := doRequest(t, router, http.MethodGet,
+		"/api/news?limit=1&category="+url.QueryEscape(string(models.CategoryInsides)), "")
+	require.Equal(t, http.StatusOK, filtered.Code, filtered.Body.String())
+	filteredPayload := decodePublicList(t, filtered.Body.Bytes())
+	require.Len(t, filteredPayload.Items, 1,
+		"the older matching article must survive the first filtered page")
+	assert.Equal(t, "sport-older", filteredPayload.Items[0]["slug"])
 }
 
 func TestPublicList_RepoFailureReturnsGeneric500(t *testing.T) {

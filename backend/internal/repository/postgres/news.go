@@ -145,15 +145,23 @@ func (r *NewsRepo) List(ctx context.Context, filter models.ListFilter) ([]*model
 func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error) {
 	const fc = "newsRepo_ListPublished"
 
-	query := `SELECT ` + newsColumns + ` FROM news
-		WHERE status = $1
-		ORDER BY main_event DESC, featured DESC, published_at DESC NULLS LAST, id DESC LIMIT $2 OFFSET $3`
+	query := `SELECT ` + newsColumns + ` FROM news WHERE status = $1`
+	args := []any{models.StatusPublished}
+	if filter.Category != nil {
+		args = append(args, *filter.Category)
+		query += fmt.Sprintf(` AND category = $%d`, len(args))
+	}
 
-	rows, err := r.pool.Query(ctx, query,
-		models.StatusPublished,
-		filter.Limit,
-		(filter.Page-1)*filter.Limit,
+	limitPos := len(args) + 1
+	offsetPos := len(args) + 2
+	query += fmt.Sprintf(
+		` ORDER BY main_event DESC, featured DESC, published_at DESC NULLS LAST, id DESC LIMIT $%d OFFSET $%d`,
+		limitPos,
+		offsetPos,
 	)
+	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
 	}

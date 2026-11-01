@@ -62,9 +62,10 @@ type News struct {
 }
 
 // ListFilter selects a page of news.
-// Nil Status means all statuses. Page starts at 1.
+// Nil Status and Category mean all statuses and categories. Page starts at 1.
 type ListFilter struct {
-	Status *Status
-	Page   int
-	Limit  int
+	Status   *Status
+	Category *Category
+	Page     int
+	Limit    int
 }

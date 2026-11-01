@@ -13,7 +13,7 @@ import (
 // PublicNewsService is the published-news behavior used by PublicNewsHandler.
 type PublicNewsService interface {
 	GetPublishedBySlug(ctx context.Context, slug string) (*models.News, error)
-	ListPublished(ctx context.Context, page int, limit int) (*service.ListResult, error)
+	ListPublished(ctx context.Context, page int, limit int, category string) (*service.ListResult, error)
 }
 
 // PublicNewsHandler exposes published news to the public site.
@@ -67,7 +67,7 @@ func (h *PublicNewsHandler) List(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.ListPublished(c.Request.Context(), page, limit)
+	result, err := h.svc.ListPublished(c.Request.Context(), page, limit, c.Query("category"))
 	if err != nil {
 		WriteError(c, err)
 
