@@ -377,12 +377,13 @@ export default function Admin() {
                               <Star className="mt-0.5 size-3.5 shrink-0 fill-mandat-red-bright text-mandat-red-bright" />
                             )}
                             {article.main_event && (
-                              <CalendarDays
-                                className="mt-0.5 size-3.5 shrink-0 text-mandat-red-bright"
-                                role="img"
-                                aria-label="Подія дня"
-                                title="Подія дня"
-                              />
+                              <span className="mt-0.5 shrink-0" title="Подія дня">
+                                <CalendarDays
+                                  className="size-3.5 text-mandat-red-bright"
+                                  role="img"
+                                  aria-label="Подія дня"
+                                />
+                              </span>
                             )}
                           </div>
                         </TableCell>
