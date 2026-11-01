@@ -7,12 +7,15 @@ import Home from './pages/Home'
 import Admin from './pages/Admin'
 import Login from './pages/Login'
 import Article from './pages/Article'
+import CategoryPage from './pages/Category'
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/sport" element={<CategoryPage category="Спорт" />} />
+        <Route path="/international" element={<CategoryPage category="Міжнародні новини" />} />
         <Route path="/news/:slug" element={<Article />} />
         <Route path="/admin/login" element={<Login />} />
         <Route

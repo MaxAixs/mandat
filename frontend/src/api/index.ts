@@ -1,6 +1,12 @@
 import { getPublicNews, listPublicNews } from '@/api/news'
 import type { PublicNews } from '@/api/news'
-import type { Article, ArticleDetail, LatestNewsItem } from '@/types'
+import type { Article, ArticleDetail, Category, LatestNewsItem } from '@/types'
+
+export interface CategoryNewsData {
+  articles: Article[]
+  page: number
+  limit: number
+}
 
 export interface HomeNewsData {
   articles: Article[]
@@ -73,6 +79,17 @@ export async function getPublicNewsArticle(slug: string): Promise<ArticleDetail>
   const news = await getPublicNews(slug)
 
   return { ...toArticle(news), text: news.text }
+}
+
+// getCategoryNews loads one page of a single public rubric.
+export async function getCategoryNews(
+  category: Category,
+  page = 1,
+  limit = 20,
+): Promise<CategoryNewsData> {
+  const response = await listPublicNews(page, limit, category)
+
+  return { articles: response.items.map(toArticle), page: response.page, limit: response.limit }
 }
 
 // getHomeNews loads and maps all news-driven content used on the home page.

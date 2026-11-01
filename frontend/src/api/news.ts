@@ -80,11 +80,12 @@ export function listNews(page = 1, limit = 20, status?: NewsStatus): Promise<New
   return request<NewsListResponse>(NEWS_API_URL, `?${query.toString()}`)
 }
 
-export function listPublicNews(page = 1, limit = 20): Promise<PublicNewsListResponse> {
+export function listPublicNews(page = 1, limit = 20, category?: Category): Promise<PublicNewsListResponse> {
   const query = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
   })
+  if (category) query.set('category', category)
 
   return request<PublicNewsListResponse>(PUBLIC_NEWS_API_URL, `?${query.toString()}`)
 }

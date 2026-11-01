@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "/tmp/opencode/mandat-category-news-tests"
+  },
+  "include": [
+    "../public-news-api.test.ts",
+    "../category-news-api.test.ts",
+    "../category-news-hook.test.ts",
+    "../../src/**/*.ts"
+  ]
+}

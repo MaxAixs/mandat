@@ -13,8 +13,8 @@ export const TELEGRAM_CHANNEL = {
 /** Header navigation. */
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '/' },
-  { label: 'Міжнародні новини', href: '#' },
-  { label: 'Спорт', href: '#' },
+  { label: 'Міжнародні новини', href: '/international' },
+  { label: 'Спорт', href: '/sport' },
   { label: 'Інтерв\'ю', href: '#' },
   { label: 'Про нас', href: '#about' },
 ]

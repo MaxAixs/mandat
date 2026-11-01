@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-category-pages-tests"
+  },
+  "include": [
+    "../category-pages.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/App.tsx"
+  ]
+}
