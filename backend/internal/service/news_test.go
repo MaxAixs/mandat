@@ -68,7 +68,7 @@ func newTestService() (*NewsService, *testsupport.StubRepo) {
 
 func validInput() NewsInput {
 	return NewsInput{
-		Category: string(models.CategoryNews),
+		Category: models.CategoryNews,
 		Title:    "Уряд схвалив новий бюджет",
 		Text:     "Повний текст статті",
 	}
@@ -148,9 +148,9 @@ func TestCreate_Validation(t *testing.T) {
 		mutate func(input *NewsInput)
 	}{
 		{"empty title", func(in *NewsInput) { in.Title = "" }},
-		{"unknown category", func(in *NewsInput) { in.Category = "Політика" }},
-		{"unknown status", func(in *NewsInput) { in.Status = "archived" }},
-		{"published without text", func(in *NewsInput) { in.Status = string(models.StatusPublished); in.Text = "" }},
+		{"unknown category", func(in *NewsInput) { in.Category = models.Category("Політика") }},
+		{"unknown status", func(in *NewsInput) { in.Status = models.Status("archived") }},
+		{"published without text", func(in *NewsInput) { in.Status = models.StatusPublished; in.Text = "" }},
 	}
 
 	for _, tt := range tests {
@@ -170,7 +170,7 @@ func TestCreate_ReturnsFieldScopedValidationError(t *testing.T) {
 	svc, _ := newTestService()
 
 	input := validInput()
-	input.Status = string(models.StatusPublished)
+	input.Status = models.StatusPublished
 	input.Text = ""
 
 	_, err := svc.Create(context.Background(), input)
@@ -197,7 +197,7 @@ func TestCreate_PublishSetsPublishedAt(t *testing.T) {
 	svc, _ := newTestService()
 
 	input := validInput()
-	input.Status = string(models.StatusPublished)
+	input.Status = models.StatusPublished
 
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
@@ -222,14 +222,14 @@ func TestCreate_PublishedMainEventReplacesPrevious(t *testing.T) {
 
 	previousInput := validInput()
 	previousInput.Title = "Перша головна подія"
-	previousInput.Status = string(models.StatusPublished)
+	previousInput.Status = models.StatusPublished
 	previousInput.MainEvent = true
 	_, err := svc.Create(context.Background(), previousInput)
 	require.NoError(t, err)
 
 	replacementInput := validInput()
 	replacementInput.Title = "Друга головна подія"
-	replacementInput.Status = string(models.StatusPublished)
+	replacementInput.Status = models.StatusPublished
 	replacementInput.MainEvent = true
 	replacement, err := svc.Create(context.Background(), replacementInput)
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestCreate_MainEventDraftDoesNotReplacePublished(t *testing.T) {
 
 	publishedInput := validInput()
 	publishedInput.Title = "Опублікована головна подія"
-	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.Status = models.StatusPublished
 	publishedInput.MainEvent = true
 	published, err := svc.Create(context.Background(), publishedInput)
 	require.NoError(t, err)
@@ -266,14 +266,14 @@ func TestCreate_PublishedFeaturedReplacesPrevious(t *testing.T) {
 
 	previousInput := validInput()
 	previousInput.Title = "Перша стаття"
-	previousInput.Status = string(models.StatusPublished)
+	previousInput.Status = models.StatusPublished
 	previousInput.Featured = true
 	_, err := svc.Create(context.Background(), previousInput)
 	require.NoError(t, err)
 
 	replacementInput := validInput()
 	replacementInput.Title = "Друга стаття"
-	replacementInput.Status = string(models.StatusPublished)
+	replacementInput.Status = models.StatusPublished
 	replacementInput.Featured = true
 	replacement, err := svc.Create(context.Background(), replacementInput)
 	require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestCreate_FeaturedDraftDoesNotReplacePublished(t *testing.T) {
 
 	publishedInput := validInput()
 	publishedInput.Title = "Перша стаття"
-	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.Status = models.StatusPublished
 	publishedInput.Featured = true
 	published, err := svc.Create(context.Background(), publishedInput)
 	require.NoError(t, err)
@@ -384,14 +384,14 @@ func TestUpdate_KeepsPublishedAtWhenRevertingToDraft(t *testing.T) {
 	svc, _ := newTestService()
 
 	input := validInput()
-	input.Status = string(models.StatusPublished)
+	input.Status = models.StatusPublished
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
 	require.NotNil(t, created.PublishedAt)
 	publishedAt := *created.PublishedAt
 
 	update := validInput()
-	update.Status = string(models.StatusDraft)
+	update.Status = models.StatusDraft
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
 	require.NotNil(t, updated.PublishedAt)
@@ -428,13 +428,13 @@ func TestUpdate_DoesNotOverwritePublishedAt(t *testing.T) {
 	svc, _ := newTestService()
 
 	input := validInput()
-	input.Status = string(models.StatusPublished)
+	input.Status = models.StatusPublished
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
 	publishedAt := *created.PublishedAt
 
 	update := validInput()
-	update.Status = string(models.StatusPublished)
+	update.Status = models.StatusPublished
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
 	require.NotNil(t, updated.PublishedAt)
@@ -449,7 +449,7 @@ func TestUpdate_FirstPublicationSetsPublishedAt(t *testing.T) {
 	require.Nil(t, created.PublishedAt)
 
 	update := validInput()
-	update.Status = string(models.StatusPublished)
+	update.Status = models.StatusPublished
 
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
@@ -476,14 +476,14 @@ func TestUpdate_PublishedMainEventReplacesPrevious(t *testing.T) {
 
 	previousInput := validInput()
 	previousInput.Title = "Перша головна подія"
-	previousInput.Status = string(models.StatusPublished)
+	previousInput.Status = models.StatusPublished
 	previousInput.MainEvent = true
 	_, err := svc.Create(context.Background(), previousInput)
 	require.NoError(t, err)
 
 	targetInput := validInput()
 	targetInput.Title = "Друга головна подія"
-	targetInput.Status = string(models.StatusPublished)
+	targetInput.Status = models.StatusPublished
 	target, err := svc.Create(context.Background(), targetInput)
 	require.NoError(t, err)
 
@@ -502,7 +502,7 @@ func TestUpdate_MainEventDraftDoesNotReplacePublished(t *testing.T) {
 
 	publishedInput := validInput()
 	publishedInput.Title = "Опублікована головна подія"
-	publishedInput.Status = string(models.StatusPublished)
+	publishedInput.Status = models.StatusPublished
 	publishedInput.MainEvent = true
 	published, err := svc.Create(context.Background(), publishedInput)
 	require.NoError(t, err)
@@ -529,14 +529,14 @@ func TestUpdate_PublishedFeaturedReplacesPrevious(t *testing.T) {
 
 	previousInput := validInput()
 	previousInput.Title = "Перша стаття"
-	previousInput.Status = string(models.StatusPublished)
+	previousInput.Status = models.StatusPublished
 	previousInput.Featured = true
 	_, err := svc.Create(context.Background(), previousInput)
 	require.NoError(t, err)
 
 	targetInput := validInput()
 	targetInput.Title = "Друга стаття"
-	targetInput.Status = string(models.StatusPublished)
+	targetInput.Status = models.StatusPublished
 	target, err := svc.Create(context.Background(), targetInput)
 	require.NoError(t, err)
 
@@ -558,7 +558,7 @@ func TestUpdate_AppliesEditableFields(t *testing.T) {
 
 	update := validInput()
 	update.Title = "Оновлений заголовок"
-	update.Category = string(models.CategoryAnalytics)
+	update.Category = models.CategoryAnalytics
 	update.Description = "Новий опис"
 	update.Featured = true
 	update.ImageUrl = "https://example.com/cover.jpg"

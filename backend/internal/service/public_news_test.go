@@ -26,7 +26,7 @@ func createPublished(t *testing.T, svc *NewsService, title string) *models.News 
 
 	input := validInput()
 	input.Title = title
-	input.Status = string(models.StatusPublished)
+	input.Status = models.StatusPublished
 
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)

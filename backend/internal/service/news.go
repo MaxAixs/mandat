@@ -22,13 +22,14 @@ const (
 )
 
 // NewsInput is the editable article payload accepted by the service.
+// Category and Status are domain enums validated by the service.
 type NewsInput struct {
-	Category    string
+	Category    models.Category
 	Title       string
 	Description string
 	Text        string
 	Language    string
-	Status      string
+	Status      models.Status
 	Featured    bool
 	MainEvent   bool
 	ImageUrl    string
@@ -196,7 +197,7 @@ func (s *NewsService) Update(ctx context.Context, slug string, input NewsInput) 
 
 	inputToValidate := input
 	if inputToValidate.Status == "" {
-		inputToValidate.Status = string(existing.Status)
+		inputToValidate.Status = existing.Status
 	}
 	if inputToValidate.Language == "" {
 		inputToValidate.Language = existing.Language
@@ -248,14 +249,14 @@ func (s *NewsService) Delete(ctx context.Context, slug string) error {
 func buildNews(input NewsInput) *models.News {
 	status := models.StatusDraft
 	if input.Status != "" {
-		status = models.Status(input.Status)
+		status = input.Status
 	}
 
 	now := time.Now().UTC()
 	news := &models.News{
 		ID:          uuid.New(),
 		Slug:        slugify(input.Title),
-		Category:    models.Category(input.Category),
+		Category:    input.Category,
 		Title:       input.Title,
 		Description: input.Description,
 		Text:        input.Text,

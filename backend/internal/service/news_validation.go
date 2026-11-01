@@ -19,17 +19,16 @@ func validateNews(input *NewsInput) error {
 		return errs.NewValidationError("title", "title is required")
 	}
 
-	category := models.Category(input.Category)
-	if category == "" {
+	if input.Category == "" {
 		return errs.NewValidationError("category", "category is required")
 	}
-	if !category.Valid() {
+	if !input.Category.Valid() {
 		return errs.NewValidationError("category", fmt.Sprintf("unknown category %q", input.Category))
 	}
 
 	status := models.StatusDraft
 	if input.Status != "" {
-		status = models.Status(input.Status)
+		status = input.Status
 		if !status.Valid() {
 			return errs.NewValidationError("status", fmt.Sprintf("unknown status %q", input.Status))
 		}
