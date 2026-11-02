@@ -1,0 +1,7 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "/tmp/opencode/mandat-category-latest-news-tests"
+  },
+  "include": ["../category-latest-news.test.ts", "../../src/**/*.ts"]
+}

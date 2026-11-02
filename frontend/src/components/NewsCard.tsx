@@ -3,19 +3,26 @@ import { Link } from 'react-router'
 
 import type { Article } from '@/types'
 
-export default function NewsCard({ article }: { article: Article }) {
+export default function NewsCard({ article, large }: { article: Article; large?: boolean }) {
   const featured = article.featured ?? false
+  const prominent = featured || (large ?? false)
 
   return (
     <Link
       to={`/news/${encodeURIComponent(article.id)}`}
       aria-label={`Читати новину: ${article.title}`}
       className={`flex no-underline text-mandat-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mandat-red-bright ${
-        featured ? 'lg:col-span-2 lg:row-span-2' : ''
+        prominent ? 'lg:col-span-2 lg:row-span-2' : ''
       }`}
     >
       <article className="flex w-full flex-1 flex-col border border-mandat-line bg-mandat-surface transition-all duration-200 hover:-translate-y-1 hover:border-mandat-red-bright">
-        <div className="relative aspect-[21/9] overflow-hidden">
+        <div
+          className={
+            prominent
+              ? 'relative aspect-[21/9] overflow-hidden lg:aspect-auto lg:min-h-80 lg:flex-1'
+              : 'relative aspect-[21/9] overflow-hidden'
+          }
+        >
           {article.imageUrl ? (
             <img
               src={article.imageUrl}
@@ -44,11 +51,11 @@ export default function NewsCard({ article }: { article: Article }) {
             {article.category}
           </span>
         </div>
-        <div className="p-5 pb-4 flex flex-col flex-1">
-          <h3 className={`font-semibold leading-[1.15] tracking-[0.01em] ${featured ? 'text-[24px]' : 'text-[17px]'}`}>
+        <div className={prominent ? 'p-5 pb-4 flex flex-col' : 'p-5 pb-4 flex flex-col flex-1'}>
+          <h3 className={`font-semibold leading-[1.15] tracking-[0.01em] ${prominent ? 'text-[24px]' : 'text-[17px]'}`}>
             {article.title}
           </h3>
-          <p className={`text-mandat-muted mt-2.5 ${featured ? 'text-[15px]' : 'text-[14px]'}`}>{article.excerpt}</p>
+          <p className={`text-mandat-muted mt-2.5 ${prominent ? 'text-[15px]' : 'text-[14px]'}`}>{article.excerpt}</p>
           <div className="mt-6 flex gap-4 border-t border-mandat-line pt-3.5 text-[12.5px] uppercase tracking-wider text-mandat-muted">
             <span className="inline-flex items-center gap-1.5 text-mandat-red-bright">
               <Eye className="size-3.5" aria-hidden="true" />

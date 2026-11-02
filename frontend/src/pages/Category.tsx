@@ -1,11 +1,14 @@
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from 'lucide-react'
 
+import { getCategoryLatestNews } from '@/api'
 import NewsCard from '@/components/NewsCard'
 import { Button } from '@/components/ui/button'
 import useCategoryNews from '@/hooks/use-category-news'
 import Footer from '@/sections/Footer'
 import Header from '@/sections/Header'
-import type { Category } from '@/types'
+import LatestNews from '@/sections/LatestNews'
+import type { Category, LatestNewsItem } from '@/types'
 
 export default function CategoryPage({ category }: { category: Category }) {
   const {
@@ -18,6 +21,26 @@ export default function CategoryPage({ category }: { category: Category }) {
     nextPage,
     previousPage,
   } = useCategoryNews(category)
+  const [latest, setLatest] = useState<{ category: Category; items: LatestNewsItem[] } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    getCategoryLatestNews(category).then(
+      (items) => {
+        if (!cancelled) setLatest({ category, items })
+      },
+      () => {
+        // The strip stays hidden when the feed is unavailable.
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [category])
+
+  const main = articles.find((article) => article.mainEvent)
 
   return (
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
@@ -25,7 +48,7 @@ export default function CategoryPage({ category }: { category: Category }) {
       <main className="mx-auto min-h-[60vh] max-w-[1240px] px-6 py-[72px]">
         <div className="mb-10">
           <div className="mb-2 text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">
-            РУБРИКА
+            КАТЕГОРІЯ
           </div>
           <h1 className="text-[30px] font-bold tracking-[1px] md:text-[42px]">{category}</h1>
         </div>
@@ -52,11 +75,18 @@ export default function CategoryPage({ category }: { category: Category }) {
             Опублікованих новин поки немає.
           </div>
         ) : (
-          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {articles.map((article) => (
-              <NewsCard key={article.id} article={article} />
-            ))}
-          </div>
+          <>
+            {main && (
+              <div className="mb-6">
+                <NewsCard article={main} large />
+              </div>
+            )}
+            <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {articles.map((article) => (
+                <NewsCard key={article.id} article={article} />
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-8 flex items-center justify-between border-t border-mandat-line pt-5 text-sm text-mandat-muted">
@@ -83,6 +113,7 @@ export default function CategoryPage({ category }: { category: Category }) {
           </Button>
         </div>
       </main>
+      <LatestNews items={latest !== null && latest.category === category ? latest.items : []} />
       <Footer />
     </div>
   )

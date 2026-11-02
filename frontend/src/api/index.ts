@@ -33,6 +33,11 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
   maximumFractionDigits: 1,
 })
 
+// «Головні новини» fills a 3-column mosaic: one featured 2×2 card plus five regular ones.
+const MAIN_NEWS_LIMIT = 6
+// The ticker keeps its own limit of five newest headlines.
+const TICKER_LIMIT = 5
+
 function formatDate(value: string | null, formatter: Intl.DateTimeFormat): string {
   if (!value) return ''
 
@@ -53,6 +58,7 @@ function toArticle(news: PublicNews): Article {
     views: formatViews(news.views),
     publishedAt: formatDate(news.published_at, publishedAtFormatter),
     featured: news.featured,
+    mainEvent: news.main_event,
     imageUrl: news.image_url || undefined,
   }
 }
@@ -92,21 +98,37 @@ export async function getCategoryNews(
   return { articles: response.items.map(toArticle), page: response.page, limit: response.limit }
 }
 
+// getCategoryLatestNews loads the newest articles of one rubric for the
+// «Останні новини» strip on the category page.
+const CATEGORY_LATEST_LIMIT = 5
+
+export async function getCategoryLatestNews(category: Category): Promise<LatestNewsItem[]> {
+  const response = await listPublicNews(1, CATEGORY_LATEST_LIMIT, category)
+
+  return response.items.map(toLatestNewsItem)
+}
+
 // getHomeNews loads and maps all news-driven content used on the home page.
 export async function getHomeNews(): Promise<HomeNewsData> {
   const response = await listPublicNews()
   const chronologicalItems = [...response.items].sort(
     (first, second) => publicationTimestamp(second.published_at) - publicationTimestamp(first.published_at),
   )
-  const mainEvent = response.items.find((news) => news.main_event)
-  const featuredFirstItems = [...response.items].sort(
-    (first, second) => Number(second.featured) - Number(first.featured),
-  )
+  const mainEvent = response.items
+    .filter((news) => news.main_event)
+    .sort(
+      (first, second) => publicationTimestamp(second.published_at) - publicationTimestamp(first.published_at),
+    )
+    .at(0)
+  const featuredFirstItems = [
+    ...chronologicalItems.filter((news) => news.featured),
+    ...chronologicalItems.filter((news) => !news.featured),
+  ]
 
   return {
-    articles: featuredFirstItems.map(toArticle),
+    articles: featuredFirstItems.slice(0, MAIN_NEWS_LIMIT).map(toArticle),
     latestNews: chronologicalItems.map(toLatestNewsItem),
-    tickerItems: chronologicalItems.slice(0, 5).map((news) => news.title),
+    tickerItems: chronologicalItems.slice(0, TICKER_LIMIT).map((news) => news.title),
     mainEvent: mainEvent ? toArticle(mainEvent) : null,
   }
 }

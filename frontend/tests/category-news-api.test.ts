@@ -160,6 +160,7 @@ test('getCategoryNews maps rubric items into Article cards and preserves paginat
     description: 'Опис прев’ю',
     image_url: '',
     featured: false,
+    main_event: true,
     views: 0,
     published_at: localIsoDate(24, 9, 5),
   })
@@ -187,6 +188,7 @@ test('getCategoryNews maps rubric items into Article cards and preserves paginat
         views: '12,4\u00A0тис.',
         publishedAt: '25.10.2026, 14:35',
         featured: true,
+        mainEvent: false,
         imageUrl: 'https://cdn.example.com/sport.jpg',
       },
       {
@@ -197,6 +199,7 @@ test('getCategoryNews maps rubric items into Article cards and preserves paginat
         views: '0',
         publishedAt: '24.10.2026, 09:05',
         featured: false,
+        mainEvent: true,
         imageUrl: undefined,
       },
     ],

@@ -18,6 +18,8 @@ export interface Article {
   comments?: string
   /** Featured article renders as a large card. */
   featured?: boolean
+  /** Main event of its category; the category page renders it as a large block. */
+  mainEvent?: boolean
   /** Cover image served by the backend; a pattern is used when absent. */
   imageUrl?: string
 }

@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-admin-news-editor-tests"
+  },
+  "include": ["../admin-news-editor.test.tsx"]
+}

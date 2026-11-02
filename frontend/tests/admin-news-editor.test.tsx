@@ -144,19 +144,19 @@ async function renderEditor(article?: AdminNewsWithMainEvent): Promise<string> {
   )
 }
 
-test('NewsEditorDialog shows an unchecked «Головна подія дня» switch for a new article', async () => {
+test('NewsEditorDialog shows an unchecked «Головна новина категорії» switch for a new article', async () => {
   const html = await renderEditor()
-  const mainEventSwitch = switchForLabel(html, 'Головна подія дня')
+  const mainEventSwitch = switchForLabel(html, 'Головна новина категорії')
 
   assert.ok(
     mainEventSwitch,
-    `expected a «Головна подія дня» switch in the editor markup:\n${html}`,
+    `expected a «Головна новина категорії» switch in the editor markup:\n${html}`,
   )
   assert.equal(attribute(mainEventSwitch.attributes, 'aria-checked'), 'false')
   assert.equal(attribute(mainEventSwitch.attributes, 'data-state'), 'unchecked')
 })
 
-test('NewsEditorDialog mirrors article.main_event in the «Головна подія дня» switch', async () => {
+test('NewsEditorDialog mirrors article.main_event in the «Головна новина категорії» switch', async () => {
   const cases = [
     {
       name: 'checks the switch for an article selected as the main event',
@@ -172,9 +172,9 @@ test('NewsEditorDialog mirrors article.main_event in the «Головна под
 
   for (const { name, article, expected } of cases) {
     const html = await renderEditor(article)
-    const mainEventSwitch = switchForLabel(html, 'Головна подія дня')
+    const mainEventSwitch = switchForLabel(html, 'Головна новина категорії')
 
-    assert.ok(mainEventSwitch, `${name}: expected the «Головна подія дня» switch in:\n${html}`)
+    assert.ok(mainEventSwitch, `${name}: expected the «Головна новина категорії» switch in:\n${html}`)
     assert.equal(
       attribute(mainEventSwitch.attributes, 'aria-checked'),
       expected,

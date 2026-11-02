@@ -156,7 +156,12 @@ afterEach(() => {
 // Fixtures and helpers
 // ---------------------------------------------------------------------------
 
-function makeArticle(category: Category, overrides: Partial<Article> = {}): Article {
+type ArticleWithMainEvent = Article & { mainEvent?: boolean }
+
+function makeArticle(
+  category: Category,
+  overrides: Partial<ArticleWithMainEvent> = {},
+): ArticleWithMainEvent {
   return {
     id: 'test-slug',
     category,
@@ -165,6 +170,7 @@ function makeArticle(category: Category, overrides: Partial<Article> = {}): Arti
     views: '12,4\u00A0тис.',
     publishedAt: '25.10.2026, 14:35',
     featured: false,
+    mainEvent: false,
     imageUrl: 'https://cdn.example.com/news-card.jpg',
     ...overrides,
   }
@@ -249,6 +255,10 @@ function attribute(attributes: string, name: string): string | undefined {
   const match = attributes.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`))
 
   return match?.[1]
+}
+
+function classTokens(attributes: string): string[] {
+  return (attribute(attributes, 'class') ?? '').split(/\s+/).filter(Boolean)
 }
 
 interface AnchorElement {
@@ -449,6 +459,72 @@ test('Category article cards link to /news/:slug', async () => {
       `${route}: expected the card title inside the article link`,
     )
   }
+})
+
+test('Category page renders the main event as a large block above the grid', async () => {
+  const mainEvent = makeArticle('Спорт', {
+    id: 'sport-main-event',
+    title: 'Головна подія спорту',
+    mainEvent: true,
+  })
+  const regular = makeArticle('Спорт', {
+    id: 'sport-regular',
+    title: 'Звичайна новина',
+  })
+  installFakeHook({ articles: [regular, mainEvent] })
+
+  const html = await renderRoute('/sport')
+  const expectedHref = `/news/${encodeURIComponent(mainEvent.id)}`
+  const largeBlock = articleLinks(html).find((anchor) =>
+    classTokens(anchor.attributes).includes('lg:col-span-2'),
+  )
+
+  assert.ok(largeBlock, `expected a large main-event block in:\n${html}`)
+  assert.equal(
+    attribute(largeBlock.attributes, 'href'),
+    expectedHref,
+    'the large block must link to the main-event article',
+  )
+  assert.ok(
+    visibleText(largeBlock.content).includes(mainEvent.title),
+    'the large block must show the main-event title',
+  )
+
+  const gridIndex = html.indexOf('lg:grid-cols-3')
+  const largeBlockIndex = html.indexOf(mainEvent.title)
+
+  assert.ok(gridIndex >= 0, `expected the article grid in:\n${html}`)
+  assert.ok(
+    largeBlockIndex >= 0 && largeBlockIndex < gridIndex,
+    'the main-event block must be rendered above the article grid',
+  )
+
+  const links = articleLinks(html)
+  assert.equal(
+    links.length,
+    3,
+    'expected the large block plus every article in the grid, including the main event',
+  )
+  for (const article of [regular, mainEvent]) {
+    const href = `/news/${encodeURIComponent(article.id)}`
+    assert.ok(
+      links.some((anchor) => attribute(anchor.attributes, 'href') === href),
+      `expected an article link to ${href} in:\n${html}`,
+    )
+  }
+})
+
+test('Category page omits the large block when no article is the main event', async () => {
+  const articles = makeArticles(3, 'Спорт', 'sport')
+  installFakeHook({ articles })
+
+  const html = await renderRoute('/sport')
+  const largeBlocks = articleLinks(html).filter((anchor) =>
+    classTokens(anchor.attributes).includes('lg:col-span-2'),
+  )
+
+  assert.deepEqual(largeBlocks, [], `expected no large main-event block in:\n${html}`)
+  assert.equal(articleLinks(html).length, articles.length)
 })
 
 // ---------------------------------------------------------------------------

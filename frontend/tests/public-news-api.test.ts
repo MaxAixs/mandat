@@ -211,6 +211,7 @@ test('getHomeNews maps public news into home page sections', async () => {
       views: '12,4\u00A0тис.',
       publishedAt: '25.10.2026, 14:35',
       featured: true,
+      mainEvent: false,
       imageUrl: 'https://cdn.example.com/important.jpg',
     },
     {
@@ -221,6 +222,7 @@ test('getHomeNews maps public news into home page sections', async () => {
       views: '0',
       publishedAt: '24.10.2026, 09:05',
       featured: false,
+      mainEvent: false,
       imageUrl: undefined,
     },
   ])
@@ -271,7 +273,7 @@ test('getHomeNews keeps featured articles first but secondary feeds chronologica
   assert.deepEqual(result.tickerItems, ['Новіша звичайна новина', 'Старіша важлива новина'])
 })
 
-test('getHomeNews limits the ticker to five newest headlines', async () => {
+test('getHomeNews limits the main news to six while keeping five ticker headlines', async () => {
   const items = Array.from({ length: 7 }, (_, index) =>
     makeItem({
       slug: `news-${index + 1}`,
@@ -283,7 +285,13 @@ test('getHomeNews limits the ticker to five newest headlines', async () => {
 
   const result = await getHomeNews()
 
-  assert.equal(result.articles.length, 7)
+  // All seven items are regular, so the featured-first order is chronological.
+  assert.equal(result.articles.length, 6, 'expected the main news list to be limited to 6')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['news-7', 'news-6', 'news-5', 'news-4', 'news-3', 'news-2'],
+    'expected the six main news to be the newest six in chronological order',
+  )
   assert.deepEqual(result.tickerItems, [
     'Новина 7',
     'Новина 6',
@@ -355,6 +363,7 @@ test('getHomeNews maps only the main_event article into mainEvent', async () => 
     views: '0',
     publishedAt: '23.10.2026, 08:10',
     featured: false,
+    mainEvent: true,
     imageUrl: 'https://cdn.example.com/main-event.jpg',
   })
   assert.notEqual(
@@ -364,9 +373,10 @@ test('getHomeNews maps only the main_event article into mainEvent', async () => 
   )
 
   // The main event is still part of every existing feed and does not reorder them.
+  // «Головні новини» keeps featured items first, then regulars chronologically.
   assert.deepEqual(
     result.articles.map((article) => article.id),
-    ['featured-newer', 'main-event', 'regular'],
+    ['featured-newer', 'regular', 'main-event'],
   )
   assert.deepEqual(
     result.latestNews.map((item) => item.id),
@@ -409,6 +419,87 @@ test('getHomeNews returns null mainEvent when no article is selected', async () 
     ['featured-only', 'regular-only'],
   )
   assert.deepEqual(result.tickerItems, ['Лише на головній', 'Без головної події'])
+})
+
+test('getHomeNews selects the newest main_event article regardless of response order', async () => {
+  const olderMainEvent = makeItem({
+    slug: 'main-event-older',
+    category: 'Новини',
+    title: 'Старіша головна подія',
+    description: 'Опис старішої головної події',
+    main_event: true,
+    published_at: localIsoDate(22, 9, 0),
+  })
+  const newerMainEvent = makeItem({
+    slug: 'main-event-newer',
+    category: 'Спорт',
+    title: 'Новіша головна подія',
+    description: 'Опис новішої головної події',
+    featured: false,
+    main_event: true,
+    published_at: localIsoDate(25, 17, 30),
+  })
+  const regular = makeItem({
+    slug: 'regular-middle',
+    title: 'Звичайна новина',
+    main_event: false,
+    published_at: localIsoDate(24, 12, 0),
+  })
+
+  // Backend ordering is per category, so an older main event can arrive before
+  // a newer one; the Hero must use the newest main event, not the first found.
+  mockResponse({
+    items: [olderMainEvent, newerMainEvent, regular],
+    page: 1,
+    limit: 20,
+  })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.ok(
+    result.mainEvent,
+    'expected getHomeNews to map one of the main_event articles into mainEvent',
+  )
+  assert.equal(
+    result.mainEvent.id,
+    'main-event-newer',
+    'expected the newest main_event article to become the main event',
+  )
+  assert.equal(result.mainEvent.title, 'Новіша головна подія')
+})
+
+test('getHomeNews prefers a dated main_event over an undated one', async () => {
+  // The undated main event comes first, so taking the first main_event is wrong.
+  const undatedMainEvent = makeItem({
+    slug: 'main-event-undated',
+    title: 'Головна подія без дати',
+    main_event: true,
+    published_at: null,
+  })
+  const datedMainEvent = makeItem({
+    slug: 'main-event-dated',
+    category: 'Міжнародні новини',
+    title: 'Головна подія з датою',
+    main_event: true,
+    published_at: localIsoDate(21, 10, 0),
+  })
+  mockResponse({
+    items: [undatedMainEvent, datedMainEvent],
+    page: 1,
+    limit: 20,
+  })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.ok(
+    result.mainEvent,
+    'expected getHomeNews to map one of the main_event articles into mainEvent',
+  )
+  assert.equal(
+    result.mainEvent.id,
+    'main-event-dated',
+    'an undated main_event article must lose to a dated one',
+  )
 })
 
 test('getHomeNews formats missing or invalid publication dates as empty strings', async () => {
@@ -513,6 +604,7 @@ test('getPublicNewsArticle maps a complete article', async () => {
     views: '12,4\u00A0тис.',
     publishedAt: '25.10.2026, 14:35',
     featured: true,
+    mainEvent: false,
     imageUrl: 'https://cdn.example.com/complete.jpg',
     text,
   })

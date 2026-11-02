@@ -521,6 +521,7 @@ test('useCategoryNews reports hasNextPage when a full page is returned', async (
     views: '0',
     publishedAt: '25.10.2026, 12:00',
     featured: false,
+    mainEvent: false,
     imageUrl: undefined,
   })
 })

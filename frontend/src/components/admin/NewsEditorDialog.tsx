@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { CalendarDays, Image, LoaderCircle, Star } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { CATEGORIES } from '@/constants'
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,6 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { validateNewsPayload, type NewsValidationErrors } from '@/lib/news-validation'
 import type { AdminNews, Category, NewsFormValues } from '@/types'
-
-const categories: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас']
 
 const emptyNews: NewsFormValues = {
   category: 'Новини',
@@ -124,13 +123,13 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="news-category" className="text-xs tracking-wide text-mandat-muted">РУБРИКА</Label>
+              <Label htmlFor="news-category" className="text-xs tracking-wide text-mandat-muted">КАТЕГОРІЯ</Label>
               <Select value={values.category} onValueChange={(value) => update('category', value as Category)}>
                 <SelectTrigger id="news-category" aria-invalid={Boolean(errors.category)} className={`${inputClassName} w-full`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-none border-mandat-line bg-mandat-surface text-mandat-text">
-                  {categories.map((category) => (
+                  {CATEGORIES.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
@@ -216,7 +215,7 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
             <div className="flex items-center justify-between border border-mandat-line bg-mandat-bg px-4">
               <Label htmlFor="news-main-event" className="flex cursor-pointer items-center gap-2 text-sm">
                 <CalendarDays className="size-4 text-mandat-red-bright" />
-                Головна подія дня
+                Головна новина категорії
               </Label>
               <Switch
                 id="news-main-event"
