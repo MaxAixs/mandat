@@ -114,21 +114,26 @@ export async function getHomeNews(): Promise<HomeNewsData> {
   const chronologicalItems = [...response.items].sort(
     (first, second) => publicationTimestamp(second.published_at) - publicationTimestamp(first.published_at),
   )
-  const mainEvent = response.items
+  const mains = response.items
     .filter((news) => news.main_event)
     .sort(
       (first, second) => publicationTimestamp(second.published_at) - publicationTimestamp(first.published_at),
     )
-    .at(0)
+  const [heroMain, secondMain] = mains
+  const shownSlugs = new Set(
+    [heroMain, secondMain].filter((news) => news !== undefined).map((news) => news.slug),
+  )
   const featuredFirstItems = [
     ...chronologicalItems.filter((news) => news.featured),
     ...chronologicalItems.filter((news) => !news.featured),
-  ]
+  ].filter((news) => !shownSlugs.has(news.slug))
 
   return {
-    articles: featuredFirstItems.slice(0, MAIN_NEWS_LIMIT).map(toArticle),
+    articles: [...(secondMain ? [secondMain] : []), ...featuredFirstItems]
+      .slice(0, MAIN_NEWS_LIMIT)
+      .map(toArticle),
     latestNews: chronologicalItems.map(toLatestNewsItem),
     tickerItems: chronologicalItems.slice(0, TICKER_LIMIT).map((news) => news.title),
-    mainEvent: mainEvent ? toArticle(mainEvent) : null,
+    mainEvent: heroMain ? toArticle(heroMain) : null,
   }
 }

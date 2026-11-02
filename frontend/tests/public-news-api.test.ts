@@ -372,11 +372,15 @@ test('getHomeNews maps only the main_event article into mainEvent', async () => 
     'a featured article must not become the main event by itself',
   )
 
-  // The main event is still part of every existing feed and does not reorder them.
+  // The hero is excluded from the mosaic, so it cannot repeat on the home page.
   // «Головні новини» keeps featured items first, then regulars chronologically.
   assert.deepEqual(
     result.articles.map((article) => article.id),
-    ['featured-newer', 'regular', 'main-event'],
+    ['featured-newer', 'regular'],
+  )
+  assert.ok(
+    result.articles.every((article) => article.id !== mainEvent.id),
+    'the hero article must not repeat inside the mosaic',
   )
   assert.deepEqual(
     result.latestNews.map((item) => item.id),
@@ -387,6 +391,158 @@ test('getHomeNews maps only the main_event article into mainEvent', async () => 
     'Звичайна новина',
     'Головна подія дня',
   ])
+})
+
+test('getHomeNews makes the second-newest main event lead the mosaic without repeating the hero', async () => {
+  const newestMain = makeItem({
+    slug: 'main-newest',
+    category: 'Новини',
+    title: 'Найновіша головна подія',
+    main_event: true,
+    published_at: localIsoDate(25, 12, 0),
+  })
+  const secondMain = makeItem({
+    slug: 'main-second',
+    category: 'Спорт',
+    title: 'Друга головна подія',
+    main_event: true,
+    published_at: localIsoDate(24, 12, 0),
+  })
+  const regularNewer = makeItem({
+    slug: 'regular-newer',
+    title: 'Звичайна новіша новина',
+    published_at: localIsoDate(23, 12, 0),
+  })
+  const featuredOlder = makeItem({
+    slug: 'featured-older',
+    category: "Інтерв'ю",
+    title: 'Старіша важлива новина',
+    featured: true,
+    published_at: localIsoDate(22, 12, 0),
+  })
+  // Response order is deliberately shuffled: ordering must come from published_at.
+  mockResponse({
+    items: [regularNewer, featuredOlder, secondMain, newestMain],
+    page: 1,
+    limit: 20,
+  })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.ok(result.mainEvent, 'expected the newest main_event article to become the hero')
+  assert.equal(result.mainEvent.id, 'main-newest', 'expected the newest main event as the hero')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['main-second', 'featured-older', 'regular-newer'],
+    'expected the second-newest main event to lead the mosaic, then featured-first items',
+  )
+  assert.deepEqual(
+    result.articles.map((article) => article.mainEvent),
+    [true, false, false],
+    'the second main event keeps its mainEvent flag as a regular mosaic card',
+  )
+  assert.ok(
+    result.articles.every((article) => article.id !== result.mainEvent?.id),
+    'no mosaic article may repeat the hero',
+  )
+})
+
+test('getHomeNews keeps the third main event in the mosaic as a regular card', async () => {
+  const firstMain = makeItem({
+    slug: 'main-first',
+    title: 'Перша головна подія',
+    main_event: true,
+    published_at: localIsoDate(25, 12, 0),
+  })
+  const secondMain = makeItem({
+    slug: 'main-second',
+    title: 'Друга головна подія',
+    main_event: true,
+    published_at: localIsoDate(24, 12, 0),
+  })
+  const thirdMain = makeItem({
+    slug: 'main-third',
+    title: 'Третя головна подія',
+    main_event: true,
+    published_at: localIsoDate(23, 12, 0),
+  })
+  const regular = makeItem({
+    slug: 'regular',
+    title: 'Звичайна новина',
+    published_at: localIsoDate(22, 12, 0),
+  })
+  mockResponse({
+    items: [thirdMain, regular, firstMain, secondMain],
+    page: 1,
+    limit: 20,
+  })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.ok(result.mainEvent, 'expected the newest main_event article to become the hero')
+  assert.equal(result.mainEvent.id, 'main-first', 'expected the newest main event as the hero')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['main-second', 'main-third', 'regular'],
+    'expected the second main event to lead and the third to stay in the mosaic pool',
+  )
+  assert.equal(
+    result.articles[1]?.id,
+    'main-third',
+    'the third main event must remain visible as a regular mosaic card',
+  )
+  assert.equal(result.articles[1]?.mainEvent, true)
+
+  const mosaicIds = result.articles.map((article) => article.id)
+  assert.equal(new Set(mosaicIds).size, mosaicIds.length, 'the mosaic must not repeat an article')
+})
+
+test('getHomeNews still caps the deduplicated mosaic at six articles', async () => {
+  const items = [
+    makeItem({
+      slug: 'main-first',
+      title: 'Головна подія 1',
+      main_event: true,
+      published_at: localIsoDate(30, 9, 0),
+    }),
+    makeItem({
+      slug: 'main-second',
+      title: 'Головна подія 2',
+      main_event: true,
+      published_at: localIsoDate(29, 9, 0),
+    }),
+    ...Array.from({ length: 6 }, (_, index) =>
+      makeItem({
+        slug: `regular-${index + 3}`,
+        title: `Звичайна новина ${index + 3}`,
+        published_at: localIsoDate(28 - index, 9, 0),
+      }),
+    ),
+  ]
+  mockResponse({ items, page: 1, limit: 20 })
+
+  const result = asHomeNewsWithMainEvent(await getHomeNews())
+
+  assert.ok(result.mainEvent, 'expected the newest main_event article to become the hero')
+  assert.equal(result.mainEvent.id, 'main-first')
+  assert.equal(result.articles.length, 6, 'expected the mosaic to stay limited to six articles')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['main-second', 'regular-3', 'regular-4', 'regular-5', 'regular-6', 'regular-7'],
+    'expected the second main event to lead a six-card mosaic without the hero',
+  )
+  assert.ok(
+    result.articles.every((article) => article.id !== result.mainEvent?.id),
+    'the hero must stay out of the limited mosaic',
+  )
+
+  // Only the mosaic changes: the secondary feeds keep the full page.
+  assert.equal(result.latestNews.length, 8, 'expected latestNews to keep every fetched item')
+  assert.deepEqual(
+    result.tickerItems,
+    ['Головна подія 1', 'Головна подія 2', 'Звичайна новина 3', 'Звичайна новина 4', 'Звичайна новина 5'],
+    'expected the ticker to stay unchanged',
+  )
 })
 
 test('getHomeNews returns null mainEvent when no article is selected', async () => {
@@ -466,6 +622,11 @@ test('getHomeNews selects the newest main_event article regardless of response o
     'expected the newest main_event article to become the main event',
   )
   assert.equal(result.mainEvent.title, 'Новіша головна подія')
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['main-event-older', 'regular-middle'],
+    'expected the second main event to lead the mosaic while the hero stays out',
+  )
 })
 
 test('getHomeNews prefers a dated main_event over an undated one', async () => {
@@ -499,6 +660,11 @@ test('getHomeNews prefers a dated main_event over an undated one', async () => {
     result.mainEvent.id,
     'main-event-dated',
     'an undated main_event article must lose to a dated one',
+  )
+  assert.deepEqual(
+    result.articles.map((article) => article.id),
+    ['main-event-undated'],
+    'expected the undated second main event to lead the mosaic instead of the hero',
   )
 })
 

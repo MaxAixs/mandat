@@ -41,6 +41,7 @@ export default function CategoryPage({ category }: { category: Category }) {
   }, [category])
 
   const main = articles.find((article) => article.mainEvent)
+  const rest = main ? articles.filter((article) => article.id !== main.id) : articles
 
   return (
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
@@ -75,18 +76,12 @@ export default function CategoryPage({ category }: { category: Category }) {
             Опублікованих новин поки немає.
           </div>
         ) : (
-          <>
-            {main && (
-              <div className="mb-6">
-                <NewsCard article={main} large />
-              </div>
-            )}
-            <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {articles.map((article) => (
-                <NewsCard key={article.id} article={article} />
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {main && <NewsCard article={main} large />}
+            {rest.map((article) => (
+              <NewsCard key={article.id} article={article} large={false} />
+            ))}
+          </div>
         )}
 
         <div className="mt-8 flex items-center justify-between border-t border-mandat-line pt-5 text-sm text-mandat-muted">

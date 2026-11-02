@@ -26,6 +26,7 @@ import {
   updateNews,
 } from '@/api/news'
 import NewsEditorDialog from '@/components/admin/NewsEditorDialog'
+import { CATEGORIES } from '@/constants'
 import useAuth from '@/hooks/use-auth'
 import {
   AlertDialog,
@@ -54,7 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { AdminNews, NewsFormValues, NewsStatus } from '@/types'
+import type { AdminNews, Category, NewsFormValues } from '@/types'
 
 const PAGE_SIZE = 20
 
@@ -71,14 +72,12 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
   maximumFractionDigits: 1,
 })
 
-type StatusFilter = 'all' | NewsStatus
-
 export default function Admin() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [articles, setArticles] = useState<AdminNews[]>([])
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<StatusFilter>('all')
+  const [category, setCategory] = useState<Category>('Новини')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -97,7 +96,13 @@ export default function Admin() {
     setLoadError(null)
 
     try {
-      const result = await listNews(page, PAGE_SIZE, status === 'all' ? undefined : status)
+      const result = await listNews(
+        page,
+        PAGE_SIZE,
+        undefined,
+        // «Новини» показує стрічку всіх категорій без фільтра.
+        category === 'Новини' ? undefined : category,
+      )
       if (currentRequest === requestId.current) setArticles(result.items)
     } catch (error) {
       if (currentRequest === requestId.current) {
@@ -107,7 +112,7 @@ export default function Admin() {
     } finally {
       if (currentRequest === requestId.current) setLoading(false)
     }
-  }, [page, status])
+  }, [page, category])
 
   useEffect(() => {
     void loadNews()
@@ -152,9 +157,9 @@ export default function Admin() {
         await createNews(values)
         setEditorOpen(false)
         setQuery('')
-        const alreadyOnFirstPage = page === 1 && status === 'all'
+        const alreadyOnFirstPage = page === 1 && category === values.category
         setPage(1)
-        setStatus('all')
+        setCategory(values.category)
         if (alreadyOnFirstPage) await loadNews()
       }
     } catch (error) {
@@ -324,19 +329,21 @@ export default function Admin() {
                 </div>
                 <div className="flex gap-2">
                   <Select
-                    value={status}
+                    value={category}
                     onValueChange={(value) => {
-                      setStatus(value as StatusFilter)
+                      setCategory(value as Category)
                       setPage(1)
                     }}
                   >
-                    <SelectTrigger aria-label="Фільтр за статусом" className="h-10 flex-1 rounded-none border-mandat-line bg-mandat-bg text-mandat-text md:w-48 md:flex-none">
+                    <SelectTrigger aria-label="Фільтр за категорією" className="h-10 flex-1 rounded-none border-mandat-line bg-mandat-bg text-mandat-text md:w-56 md:flex-none">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-none border-mandat-line bg-mandat-surface text-mandat-text">
-                      <SelectItem value="all">Усі статуси</SelectItem>
-                      <SelectItem value="published">Опубліковано</SelectItem>
-                      <SelectItem value="draft">Чернетки</SelectItem>
+                      {CATEGORIES.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button
@@ -357,7 +364,7 @@ export default function Admin() {
                   <TableHeader>
                     <TableRow className="border-mandat-line bg-mandat-bg/50 hover:bg-mandat-bg/50">
                       <TableHead className="px-5 text-[10px] tracking-[0.16em] text-mandat-muted">НОВИНА</TableHead>
-                      <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">РУБРИКА</TableHead>
+                      <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">КАТЕГОРІЯ</TableHead>
                       <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">СТАТУС</TableHead>
                       <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">ДАТА</TableHead>
                       <TableHead className="text-right text-[10px] tracking-[0.16em] text-mandat-muted">ПЕРЕГЛЯДИ</TableHead>

@@ -5,7 +5,7 @@ import type { Article } from '@/types'
 
 export default function NewsCard({ article, large }: { article: Article; large?: boolean }) {
   const featured = article.featured ?? false
-  const prominent = featured || (large ?? false)
+  const prominent = large ?? featured
 
   return (
     <Link

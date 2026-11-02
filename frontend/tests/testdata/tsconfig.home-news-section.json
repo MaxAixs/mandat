@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-home-news-section-tests"
+  },
+  "include": ["../home-news-section.test.tsx"]
+}
