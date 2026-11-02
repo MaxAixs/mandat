@@ -55,7 +55,7 @@ func (s *StubRepo) Create(_ context.Context, news *models.News) error {
 			if news.Featured {
 				item.Featured = false
 			}
-			if news.MainEvent {
+			if news.MainEvent && item.Category == news.Category {
 				item.MainEvent = false
 			}
 		}
@@ -107,6 +107,9 @@ func (s *StubRepo) List(_ context.Context, filter models.ListFilter) ([]*models.
 	matched := []*models.News{}
 	for _, item := range s.Items {
 		if filter.Status != nil && item.Status != *filter.Status {
+			continue
+		}
+		if filter.Category != nil && item.Category != *filter.Category {
 			continue
 		}
 		matched = append(matched, item)
@@ -193,7 +196,7 @@ func (s *StubRepo) Update(_ context.Context, news *models.News) error {
 			if news.Featured {
 				item.Featured = false
 			}
-			if news.MainEvent {
+			if news.MainEvent && item.Category == news.Category {
 				item.MainEvent = false
 			}
 		}

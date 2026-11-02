@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/maxaixs/mandat/backend/internal/errs"
@@ -71,7 +72,8 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 
 	require.NoError(t, pgdb.Migrate(ctx, pool, migrations.FS))
 
-	_, err = pool.Exec(ctx, "TRUNCATE news")
+	// CASCADE is required by news_viewers.news_id -> news(id).
+	_, err = pool.Exec(ctx, "TRUNCATE news CASCADE")
 	require.NoError(t, err)
 
 	return pool
@@ -161,6 +163,58 @@ func requireSinglePublishedMainEvent(t *testing.T, repo *newsrepo.NewsRepo, want
 	ids := publishedMainEventIDs(t, repo)
 	require.Len(t, ids, 1, "exactly one published article may remain the main event")
 	assert.Equal(t, wantID, ids[0])
+}
+
+// pgUniqueViolationCode is the PostgreSQL SQLSTATE for unique constraint violations.
+const pgUniqueViolationCode = "23505"
+
+// indexNewsSinglePublishedMainEventPerCategory is the partial unique index that
+// enforces one published main event per category.
+const indexNewsSinglePublishedMainEventPerCategory = "idx_news_single_published_main_event_per_category"
+
+func publishedMainEventIDsInCategory(
+	t *testing.T,
+	repo *newsrepo.NewsRepo,
+	category models.Category,
+) []uuid.UUID {
+	t.Helper()
+
+	items, err := repo.ListPublished(context.Background(), models.ListFilter{
+		Category: &category,
+		Page:     1,
+		Limit:    100,
+	})
+	require.NoError(t, err)
+
+	var ids []uuid.UUID
+	for _, item := range items {
+		if item.MainEvent {
+			ids = append(ids, item.ID)
+		}
+	}
+
+	return ids
+}
+
+// insertPublishedMainEventRaw seeds a row with raw SQL, bypassing the repository
+// rotation. Needed while fixtures must hold mains in several categories at once.
+func insertPublishedMainEventRaw(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	news *models.News,
+) error {
+	query := `INSERT INTO news
+		(id, slug, category, title, description, text, language, status,
+		main_event, image_url, published_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+
+	_, err := pool.Exec(ctx, query,
+		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
+		news.Language, news.Status, news.MainEvent, news.ImageUrl, news.PublishedAt,
+		news.CreatedAt, news.UpdatedAt,
+	)
+
+	return err
 }
 
 func TestNewsRepo_CreateAndGetByID(t *testing.T) {
@@ -515,6 +569,66 @@ func TestNewsRepo_List_PaginationAndFilter(t *testing.T) {
 	assert.Len(t, items, 1)
 }
 
+func TestNewsRepo_List_CategoryFilterAppliesBeforePagination(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
+
+	sportPublished := publishedNews("list-category-sport-published", base.Add(2*time.Hour))
+	sportPublished.Category = models.CategoryInsides
+	sportDraft := newsFixture("list-category-sport-draft", models.StatusDraft, base.Add(time.Hour))
+	sportDraft.Category = models.CategoryInsides
+
+	// Newer non-Sport rows would fill the first page if Category were applied after LIMIT/OFFSET.
+	for i := 1; i <= 3; i++ {
+		other := publishedNews(
+			fmt.Sprintf("list-category-other-%02d", i),
+			base.Add(time.Duration(i+2)*time.Hour),
+		)
+		other.Category = models.CategoryNews
+		require.NoError(t, repo.Create(ctx, other))
+	}
+	require.NoError(t, repo.Create(ctx, sportDraft))
+	require.NoError(t, repo.Create(ctx, sportPublished))
+
+	sportCategory := models.CategoryInsides
+
+	// Admin List does not restrict status, so Category-only returns both Sport rows.
+	categoryOnly, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, categoryOnly, 2, "Category-only List must include published and draft Sport rows")
+	assert.Equal(t, "list-category-sport-published", categoryOnly[0].Slug)
+	assert.Equal(t, "list-category-sport-draft", categoryOnly[1].Slug)
+	assert.Equal(t, models.CategoryInsides, categoryOnly[0].Category)
+	assert.Equal(t, models.CategoryInsides, categoryOnly[1].Category)
+
+	published := models.StatusPublished
+	publishedSport, err := repo.List(ctx, models.ListFilter{
+		Status:   &published,
+		Category: &sportCategory,
+		Page:     1,
+		Limit:    20,
+	})
+	require.NoError(t, err)
+	require.Len(t, publishedSport, 1, "Status+Category List must exclude the Sport draft")
+	assert.Equal(t, "list-category-sport-published", publishedSport[0].Slug)
+	assert.Equal(t, models.CategoryInsides, publishedSport[0].Category)
+
+	firstPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1, "page one must hold the newest Sport row, not a newer non-Sport row")
+	assert.Equal(t, "list-category-sport-published", firstPage[0].Slug)
+
+	secondPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 2, Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1, "page two must keep the category filter")
+	assert.Equal(t, "list-category-sport-draft", secondPage[0].Slug)
+
+	thirdPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 3, Limit: 1})
+	require.NoError(t, err)
+	assert.Empty(t, thirdPage)
+}
+
 func TestNewsRepo_ListPublished_ExcludesDraftsAndOrdersByPublishedAt(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -860,7 +974,7 @@ func TestNewsRepo_Migration_DeduplicatesPublishedFeatured(t *testing.T) {
 			t.Errorf("restore migrated state: %v", err)
 			return
 		}
-		_, err := pool.Exec(cleanupCtx, "TRUNCATE news")
+		_, err := pool.Exec(cleanupCtx, "TRUNCATE news CASCADE")
 		assert.NoError(t, err, "clean up migration fixtures")
 	})
 
@@ -961,6 +1075,60 @@ func TestNewsRepo_ListPublished_CategoryFilterAppliesBeforePagination(t *testing
 	}
 }
 
+// TestMainEventPerCategory pins the future per-category main-event rule:
+// one published main per category, not one globally.
+func TestMainEventPerCategory(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
+	// Unique slugs keep the test independent of rows left by other runs.
+	suffix := strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	sportMain := publishedNews("main-event-sport-"+suffix, base)
+	sportMain.Category = models.CategoryInsides
+	sportMain.MainEvent = true
+	require.NoError(t, repo.Create(ctx, sportMain))
+
+	newsMain := publishedNews("main-event-news-"+suffix, base.Add(time.Minute))
+	newsMain.Category = models.CategoryNews
+	newsMain.MainEvent = true
+	require.NoError(t, repo.Create(ctx, newsMain))
+
+	// Step 1: mains in different categories must coexist, so a main event in
+	// one category must not clear the main event of another category.
+	gotSport, err := repo.GetBySlug(ctx, sportMain.Slug)
+	require.NoError(t, err)
+	assert.True(t, gotSport.MainEvent,
+		"a main event in category %q must survive a main event in another category", models.CategoryInsides)
+
+	gotNews, err := repo.GetByID(ctx, newsMain.ID)
+	require.NoError(t, err)
+	assert.True(t, gotNews.MainEvent,
+		"a main event in category %q must survive a main event in another category", models.CategoryNews)
+
+	// Step 2: a second main event in the same category replaces the previous
+	// one, and only within that category.
+	secondSportMain := publishedNews("main-event-sport-second-"+suffix, base.Add(2*time.Minute))
+	secondSportMain.Category = models.CategoryInsides
+	secondSportMain.MainEvent = true
+	require.NoError(t, repo.Create(ctx, secondSportMain))
+
+	gotSport, err = repo.GetByID(ctx, sportMain.ID)
+	require.NoError(t, err)
+	assert.False(t, gotSport.MainEvent,
+		"the previous main event of category %q must be cleared", models.CategoryInsides)
+
+	gotSecondSport, err := repo.GetByID(ctx, secondSportMain.ID)
+	require.NoError(t, err)
+	assert.True(t, gotSecondSport.MainEvent,
+		"the new main event of category %q must be set", models.CategoryInsides)
+
+	gotNews, err = repo.GetBySlug(ctx, newsMain.Slug)
+	require.NoError(t, err)
+	assert.True(t, gotNews.MainEvent,
+		"the main event of category %q must not be touched by a rotation in another category", models.CategoryNews)
+}
+
 func TestNewsRepo_ListPublished_CategoryFilterPaginatesMatchingRows(t *testing.T) {
 	repo := setupRepo(t)
 	ctx := context.Background()
@@ -994,4 +1162,200 @@ func TestNewsRepo_ListPublished_CategoryFilterPaginatesMatchingRows(t *testing.T
 	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 3, Limit: 2})
 	require.NoError(t, err)
 	assert.Empty(t, emptyPage)
+}
+
+// TestMainEventRotationOnCategoryChange pins the rotation rule of a saved
+// article: the destination category slot is cleared, the source category is
+// left vacant, and unrelated categories keep their own main event.
+func TestMainEventRotationOnCategoryChange(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
+
+	sportMain := publishedNews("rotation-sport-main", base)
+	sportMain.Category = models.CategoryInsides
+	sportMain.MainEvent = true
+	require.NoError(t, repo.Create(ctx, sportMain))
+
+	// A main event of the destination category, set up before the move.
+	newsMain := publishedNews("rotation-news-main", base.Add(time.Minute))
+	newsMain.Category = models.CategoryNews
+	newsMain.MainEvent = true
+	require.NoError(t, repo.Create(ctx, newsMain))
+
+	// Precondition: a main event in one category must not clear the main event
+	// of another category.
+	gotSportMain, err := repo.GetByID(ctx, sportMain.ID)
+	require.NoError(t, err)
+	require.True(t, gotSportMain.MainEvent,
+		"the main event of %q must survive a main event in %q",
+		models.CategoryInsides, models.CategoryNews)
+
+	gotNewsMain, err := repo.GetByID(ctx, newsMain.ID)
+	require.NoError(t, err)
+	require.True(t, gotNewsMain.MainEvent,
+		"the main event of %q must be set", models.CategoryNews)
+
+	// Move the Sport main event into Новини in a single save, keeping the flag.
+	sportMain.Category = models.CategoryNews
+	sportMain.MainEvent = true
+	sportMain.UpdatedAt = base.Add(2 * time.Hour)
+	require.NoError(t, repo.Update(ctx, sportMain))
+
+	assert.Empty(t, publishedMainEventIDsInCategory(t, repo, models.CategoryInsides),
+		"the source category %q must be left without a published main event", models.CategoryInsides)
+	assert.Equal(t, []uuid.UUID{sportMain.ID},
+		publishedMainEventIDsInCategory(t, repo, models.CategoryNews),
+		"the moved article must be the only main event of %q", models.CategoryNews)
+
+	gotPreviousNewsMain, err := repo.GetByID(ctx, newsMain.ID)
+	require.NoError(t, err)
+	assert.False(t, gotPreviousNewsMain.MainEvent,
+		"the previous main event of the destination category %q must be cleared", models.CategoryNews)
+
+	gotMoved, err := repo.GetByID(ctx, sportMain.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CategoryNews, gotMoved.Category)
+	assert.True(t, gotMoved.MainEvent, "the moved article must stay the main event")
+}
+
+// TestMainEventDraftUpdateClearsNothing pins that a draft never triggers the
+// published rotation: publishing is the moment when slots are exchanged.
+func TestMainEventDraftUpdateClearsNothing(t *testing.T) {
+	pool := setupPool(t)
+	repo := newsrepo.NewNewsRepo(pool)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
+
+	// Seeded with raw SQL: the repository cannot place mains in two categories
+	// at once while rotation is still global, and this test covers only drafts.
+	sportMain := publishedNews("draft-update-sport-main", base)
+	sportMain.Category = models.CategoryInsides
+	sportMain.MainEvent = true
+	require.NoError(t, insertPublishedMainEventRaw(ctx, pool, sportMain))
+
+	newsMain := publishedNews("draft-update-news-main", base.Add(time.Minute))
+	newsMain.Category = models.CategoryNews
+	newsMain.MainEvent = true
+	require.NoError(t, insertPublishedMainEventRaw(ctx, pool, newsMain))
+
+	draft := newsFixture("draft-update-sport-draft", models.StatusDraft, base.Add(2*time.Minute))
+	draft.Category = models.CategoryInsides
+	require.NoError(t, repo.Create(ctx, draft))
+
+	draft.MainEvent = true
+	require.NoError(t, repo.Update(ctx, draft))
+
+	gotSportMain, err := repo.GetByID(ctx, sportMain.ID)
+	require.NoError(t, err)
+	assert.True(t, gotSportMain.MainEvent,
+		"a draft update must not clear the published main event of %q", models.CategoryInsides)
+
+	gotNewsMain, err := repo.GetByID(ctx, newsMain.ID)
+	require.NoError(t, err)
+	assert.True(t, gotNewsMain.MainEvent,
+		"a draft update must not clear the published main event of %q", models.CategoryNews)
+
+	gotDraft, err := repo.GetByID(ctx, draft.ID)
+	require.NoError(t, err)
+	assert.True(t, gotDraft.MainEvent, "a draft keeps its main_event flag until published")
+
+	assert.Equal(t, []uuid.UUID{sportMain.ID},
+		publishedMainEventIDsInCategory(t, repo, models.CategoryInsides))
+	assert.Equal(t, []uuid.UUID{newsMain.ID},
+		publishedMainEventIDsInCategory(t, repo, models.CategoryNews))
+}
+
+// TestMainEventIndexBackstop checks the database-level invariant behind the
+// repository rotation, bypassing the repository with raw SQL.
+func TestMainEventIndexBackstop(t *testing.T) {
+	base := time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name           string
+		secondCategory models.Category
+		wantConflict   bool
+	}{
+		{
+			name:           "second published main event in the same category",
+			secondCategory: models.CategoryInsides,
+			wantConflict:   true,
+		},
+		{
+			name:           "second published main event in another category",
+			secondCategory: models.CategoryNews,
+			wantConflict:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool := setupPool(t)
+			repo := newsrepo.NewNewsRepo(pool)
+			ctx := context.Background()
+
+			first := publishedNews("index-backstop-first", base)
+			first.Category = models.CategoryInsides
+			first.MainEvent = true
+			require.NoError(t, repo.Create(ctx, first))
+
+			second := publishedNews("index-backstop-second", base.Add(time.Minute))
+			second.Category = tt.secondCategory
+			second.MainEvent = true
+			err := insertPublishedMainEventRaw(ctx, pool, second)
+
+			if !tt.wantConflict {
+				require.NoError(t, err,
+					"the per-category index must allow a main event in another category")
+				assert.Equal(t, []uuid.UUID{second.ID},
+					publishedMainEventIDsInCategory(t, repo, tt.secondCategory))
+
+				return
+			}
+
+			require.Error(t, err,
+				"the index must reject a second published main event in the same category")
+
+			var pgErr *pgconn.PgError
+			require.True(t, errors.As(err, &pgErr), "expected a PostgreSQL error, got %v", err)
+			assert.Equal(t, pgUniqueViolationCode, pgErr.Code)
+			assert.Equal(t, indexNewsSinglePublishedMainEventPerCategory, pgErr.ConstraintName)
+
+			_, err = repo.GetBySlug(ctx, second.Slug)
+			assert.True(t, errors.Is(err, errs.ErrNewsNotFound),
+				"the rejected insert must not leave a row behind, got %v", err)
+			assert.Equal(t, []uuid.UUID{first.ID},
+				publishedMainEventIDsInCategory(t, repo, models.CategoryInsides))
+		})
+	}
+}
+
+// TestFeaturedRotationStaysGlobal pins that featured stays a single global slot
+// even when the competing article carries main_event = FALSE.
+func TestFeaturedRotationStaysGlobal(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
+
+	first := publishedNews("featured-global-first", base)
+	first.Category = models.CategoryInsides
+	first.Featured = true
+	require.NoError(t, repo.Create(ctx, first))
+
+	second := publishedNews("featured-global-second", base.Add(time.Minute))
+	second.Category = models.CategoryNews
+	second.Featured = true
+	second.MainEvent = false
+	require.NoError(t, repo.Create(ctx, second))
+
+	gotFirst, err := repo.GetByID(ctx, first.ID)
+	require.NoError(t, err)
+	assert.False(t, gotFirst.Featured,
+		"featured must stay global: a featured article in another category takes the slot")
+
+	gotSecond, err := repo.GetByID(ctx, second.ID)
+	require.NoError(t, err)
+	assert.True(t, gotSecond.Featured)
+
+	requireSinglePublishedFeatured(t, repo, second.ID)
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,7 +43,7 @@ func (r *NewsRepo) Create(ctx context.Context, news *models.News) error {
 	var err error
 	selectsFlags := news.Featured || news.MainEvent
 	if news.Status == models.StatusPublished && selectsFlags {
-		err = r.withPublishedFlagsLock(ctx, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
+		err = r.withPublishedFlagsLock(ctx, news.Category, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
 			return insertNews(ctx, tx, news)
 		})
 	} else {
@@ -109,10 +110,20 @@ func (r *NewsRepo) List(ctx context.Context, filter models.ListFilter) ([]*model
 
 	listQuery := `SELECT ` + newsColumns + ` FROM news`
 
-	var args []any
+	var (
+		args       []any
+		conditions []string
+	)
 	if filter.Status != nil {
-		listQuery += ` WHERE status = $1`
 		args = append(args, *filter.Status)
+		conditions = append(conditions, fmt.Sprintf(`status = $%d`, len(args)))
+	}
+	if filter.Category != nil {
+		args = append(args, *filter.Category)
+		conditions = append(conditions, fmt.Sprintf(`category = $%d`, len(args)))
+	}
+	if len(conditions) > 0 {
+		listQuery += ` WHERE ` + strings.Join(conditions, ` AND `)
 	}
 
 	limitPos := len(args) + 1
@@ -189,7 +200,7 @@ func (r *NewsRepo) Update(ctx context.Context, news *models.News) error {
 	var err error
 	selectsFlags := news.Featured || news.MainEvent
 	if news.Status == models.StatusPublished && selectsFlags {
-		err = r.withPublishedFlagsLock(ctx, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
+		err = r.withPublishedFlagsLock(ctx, news.Category, news.Featured, news.MainEvent, func(tx pgx.Tx) error {
 			return updateNews(ctx, tx, news)
 		})
 	} else {
@@ -228,6 +239,7 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 func (r *NewsRepo) withPublishedFlagsLock(
 	ctx context.Context,
+	category models.Category,
 	featured bool,
 	mainEvent bool,
 	write func(pgx.Tx) error,
@@ -256,7 +268,7 @@ func (r *NewsRepo) withPublishedFlagsLock(
 	}
 	if mainEvent {
 		if _, err = tx.Exec(ctx, `UPDATE news SET main_event = FALSE
-			WHERE status = 'published' AND main_event = TRUE`); err != nil {
+			WHERE status = 'published' AND main_event = TRUE AND category = $1`, category); err != nil {
 			return fmt.Errorf("%s: clear main event: %w", fc, err)
 		}
 	}

@@ -261,6 +261,41 @@ func TestCreate_MainEventDraftDoesNotReplacePublished(t *testing.T) {
 	assert.True(t, repo.Items[draft.ID].MainEvent, "main-event intent must be retained on the draft")
 }
 
+func TestCreate_MainEventPerCategory(t *testing.T) {
+	svc, repo := newTestService()
+
+	newsInput := validInput()
+	newsInput.Category = models.CategoryNews
+	newsInput.Title = "Головна подія в новинах"
+	newsInput.Status = models.StatusPublished
+	newsInput.MainEvent = true
+	newsArticle, err := svc.Create(context.Background(), newsInput)
+	require.NoError(t, err)
+
+	sportInput := validInput()
+	sportInput.Category = models.CategoryInsides
+	sportInput.Title = "Головна подія у спорті"
+	sportInput.Status = models.StatusPublished
+	sportInput.MainEvent = true
+	sportArticle, err := svc.Create(context.Background(), sportInput)
+	require.NoError(t, err)
+
+	require.NotEqual(t, newsArticle.Slug, sportArticle.Slug)
+
+	storedNews, err := repo.GetBySlug(context.Background(), newsArticle.Slug)
+	require.NoError(t, err)
+	assert.True(t, storedNews.MainEvent,
+		"a main event in Новини must survive a main event in Спорт")
+	assert.True(t, repo.Items[newsArticle.ID].MainEvent)
+
+	storedSport, err := repo.GetBySlug(context.Background(), sportArticle.Slug)
+	require.NoError(t, err)
+	assert.True(t, storedSport.MainEvent)
+
+	assert.Len(t, publishedMainEventItems(repo), 2,
+		"each category may keep its own published main event")
+}
+
 func TestCreate_PublishedFeaturedReplacesPrevious(t *testing.T) {
 	svc, repo := newTestService()
 
@@ -338,11 +373,11 @@ func TestGetBySlug_NotFound(t *testing.T) {
 func TestList_ValidatesPagination(t *testing.T) {
 	svc, _ := newTestService()
 
-	_, err := svc.List(context.Background(), 0, 10, "")
+	_, err := svc.List(context.Background(), 0, 10, "", "")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput))
 
-	_, err = svc.List(context.Background(), 1, 0, "")
+	_, err = svc.List(context.Background(), 1, 0, "", "")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput))
 }
@@ -350,7 +385,7 @@ func TestList_ValidatesPagination(t *testing.T) {
 func TestList_ClampsLimitToMax(t *testing.T) {
 	svc, repo := newTestService()
 
-	result, err := svc.List(context.Background(), 1, 100000, "")
+	result, err := svc.List(context.Background(), 1, 100000, "", "")
 	require.NoError(t, err)
 	assert.Equal(t, MaxPageLimit, result.Limit)
 	assert.Equal(t, MaxPageLimit, repo.LastFilter.Limit)
@@ -359,7 +394,7 @@ func TestList_ClampsLimitToMax(t *testing.T) {
 func TestList_RejectsUnknownStatus(t *testing.T) {
 	svc, _ := newTestService()
 
-	_, err := svc.List(context.Background(), 1, 10, "archived")
+	_, err := svc.List(context.Background(), 1, 10, "archived", "")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput))
 }
@@ -367,7 +402,7 @@ func TestList_RejectsUnknownStatus(t *testing.T) {
 func TestList_EmptyStatusMeansNoFilter(t *testing.T) {
 	svc, repo := newTestService()
 
-	_, err := svc.List(context.Background(), 1, 10, "")
+	_, err := svc.List(context.Background(), 1, 10, "", "")
 	require.NoError(t, err)
 	assert.Nil(t, repo.LastFilter.Status)
 }
