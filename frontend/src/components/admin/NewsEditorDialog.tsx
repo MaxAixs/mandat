@@ -35,6 +35,8 @@ const emptyNews: NewsFormValues = {
   featured: false,
   main_event: false,
   image_url: '',
+  source: '',
+  source_url: '',
 }
 
 const inputClassName =
@@ -61,6 +63,8 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
           featured: article.featured,
           main_event: article.main_event,
           image_url: article.image_url,
+          source: article.source ?? '',
+          source_url: article.source_url ?? '',
         }
       : emptyNews,
   )
@@ -183,6 +187,36 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
                 />
               </div>
               {errors.image_url && <p className="text-xs text-mandat-red-bright">{errors.image_url}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="news-source" className="text-xs tracking-wide text-mandat-muted">
+                ДЖЕРЕЛО
+              </Label>
+              <Input
+                id="news-source"
+                value={values.source ?? ''}
+                onChange={(event) => update('source', event.target.value)}
+                placeholder="Назва видання чи автора"
+                aria-invalid={Boolean(errors.source)}
+                className={inputClassName}
+              />
+              {errors.source && <p className="text-xs text-mandat-red-bright">{errors.source}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="news-source-url" className="text-xs tracking-wide text-mandat-muted">
+                ПОСИЛАННЯ НА ДЖЕРЕЛО
+              </Label>
+              <Input
+                id="news-source-url"
+                value={values.source_url ?? ''}
+                onChange={(event) => update('source_url', event.target.value)}
+                placeholder="https://..."
+                aria-invalid={Boolean(errors.source_url)}
+                className={inputClassName}
+              />
+              {errors.source_url && <p className="text-xs text-mandat-red-bright">{errors.source_url}</p>}
             </div>
 
             <div className="space-y-2">

@@ -27,6 +27,10 @@ export interface Article {
 /** A complete news article with its plain-text body. */
 export interface ArticleDetail extends Article {
   text: string
+  /** Source outlet name shown as «Джерело: …» at the end of the article. */
+  source?: string
+  /** Optional hyperlink attached to the source name. */
+  sourceUrl?: string
 }
 
 /** A single entry in the "Останні новини" feed. */
@@ -80,6 +84,8 @@ export interface NewsFormValues {
   featured: boolean
   main_event: boolean
   image_url: string
+  source?: string
+  source_url?: string
 }
 
 /** News article displayed in the administration panel. */

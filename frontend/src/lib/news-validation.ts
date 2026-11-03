@@ -9,7 +9,7 @@ export function validateNewsPayload(values: NewsFormValues): NewsValidationError
     errors.title = 'Введіть заголовок новини.'
   }
   if (!values.category) {
-    errors.category = 'Оберіть рубрику.'
+    errors.category = 'Оберіть категорію.'
   }
   if (values.status === 'published' && !values.text.trim()) {
     errors.text = 'Додайте текст перед публікацією.'
@@ -19,6 +19,12 @@ export function validateNewsPayload(values: NewsFormValues): NewsValidationError
   }
   if (values.image_url && !isHttpUrl(values.image_url)) {
     errors.image_url = 'Введіть коректне посилання, яке починається з http:// або https://.'
+  }
+  if (values.source_url && !isHttpUrl(values.source_url)) {
+    errors.source_url = 'Введіть коректне посилання, яке починається з http:// або https://.'
+  }
+  if (values.source_url && !values.source?.trim()) {
+    errors.source = 'Вкажіть назву джерела, якщо додаєте посилання.'
   }
 
   return errors

@@ -13,6 +13,8 @@ import type { PublicNews, PublicNewsListResponse } from '../src/api/news'
 import { validateNewsPayload } from '../src/lib/news-validation'
 import type { NewsFormValues } from '../src/types'
 
+const SPORT_CATEGORY_ENCODED = '%D0%A1%D0%BF%D0%BE%D1%80%D1%82'
+
 const originalFetch = globalThis.fetch
 
 const payload: NewsFormValues = {
@@ -69,6 +71,42 @@ test('listNews omits an empty status filter', async () => {
   await listNews(1, 20)
 
   assert.equal(requestedUrl, 'http://localhost:8080/api/admin/news?page=1&limit=20')
+})
+
+test('listNews sends the category filter after the status filter', async () => {
+  let requestedUrl = ''
+  globalThis.fetch = async (input) => {
+    requestedUrl = String(input)
+    return new Response(JSON.stringify({ items: [], page: 1, limit: 20 }), { status: 200 })
+  }
+
+  await listNews(1, 20, 'published', 'Спорт')
+
+  assert.equal(
+    requestedUrl,
+    `http://localhost:8080/api/admin/news?page=1&limit=20&status=published&category=${SPORT_CATEGORY_ENCODED}`,
+  )
+  assert.equal(new URL(requestedUrl).searchParams.get('category'), 'Спорт')
+})
+
+test('listNews sends the category without a status filter', async () => {
+  let requestedUrl = ''
+  globalThis.fetch = async (input) => {
+    requestedUrl = String(input)
+    return new Response(JSON.stringify({ items: [], page: 2, limit: 20 }), { status: 200 })
+  }
+
+  await listNews(2, 20, undefined, 'Спорт')
+
+  assert.equal(
+    requestedUrl,
+    `http://localhost:8080/api/admin/news?page=2&limit=20&category=${SPORT_CATEGORY_ENCODED}`,
+  )
+  assert.equal(
+    new URL(requestedUrl).searchParams.has('status'),
+    false,
+    'an absent status must not be serialised',
+  )
 })
 
 test('createNews sends a POST JSON payload', async () => {

@@ -2,21 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import {
   ArrowLeft,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   FileEdit,
   FileText,
+  Globe,
+  Info,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
+  Mic,
   Newspaper,
   Plus,
   RefreshCw,
   Search,
   Star,
   Trash2,
+  Volleyball,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import {
   createNews,
@@ -71,6 +75,29 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
   notation: 'compact',
   maximumFractionDigits: 1,
 })
+
+/** Main-event badge icon per category, so editors tell category mains apart. */
+const mainEventIconByCategory: Record<Category, LucideIcon> = {
+  Новини: Newspaper,
+  'Міжнародні новини': Globe,
+  Спорт: Volleyball,
+  "Інтерв'ю": Mic,
+  'Про нас': Info,
+}
+
+function MainEventBadge({ category }: { category: Category }) {
+  const Icon = mainEventIconByCategory[category]
+
+  return (
+    <span className="mt-0.5 shrink-0" title="Головна новина категорії">
+      <Icon
+        className="size-3.5 text-mandat-red-bright"
+        role="img"
+        aria-label="Головна новина категорії"
+      />
+    </span>
+  )
+}
 
 export default function Admin() {
   const { user, logout } = useAuth()
@@ -384,13 +411,7 @@ export default function Admin() {
                               <Star className="mt-0.5 size-3.5 shrink-0 fill-mandat-red-bright text-mandat-red-bright" />
                             )}
                             {article.main_event && (
-                              <span className="mt-0.5 shrink-0" title="Подія дня">
-                                <CalendarDays
-                                  className="size-3.5 text-mandat-red-bright"
-                                  role="img"
-                                  aria-label="Подія дня"
-                                />
-                              </span>
+                              <MainEventBadge category={article.category} />
                             )}
                           </div>
                         </TableCell>

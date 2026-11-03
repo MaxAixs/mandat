@@ -54,6 +54,23 @@ export function ArticleContent({ article }: { article: ArticleDetail }) {
         <div className="mt-8 whitespace-pre-line text-[17px] leading-8 text-mandat-text">
           {article.text}
         </div>
+        {article.source && (
+          <p className="mt-8 border-t border-mandat-line pt-6 text-[15px] text-mandat-muted">
+            Джерело:{' '}
+            {article.sourceUrl ? (
+              <a
+                href={article.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-mandat-red-bright no-underline hover:underline"
+              >
+                {article.source}
+              </a>
+            ) : (
+              article.source
+            )}
+          </p>
+        )}
       </div>
     </article>
   )

@@ -1,4 +1,4 @@
-import type { NavLink } from '@/types'
+import type { Category, NavLink } from '@/types'
 
 export const SITE_NAME = 'МАНДАТ'
 export const SITE_TAGLINE = 'новини · інсайди · аналітика'
@@ -9,6 +9,9 @@ export const TELEGRAM_CHANNEL = {
   url: 'https://t.me/mandat_ua',
   subscribers: '42 728',
 }
+
+/** Categories available for news articles. */
+export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас']
 
 /** Header navigation. */
 export const NAV_LINKS: NavLink[] = [

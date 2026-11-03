@@ -3,6 +3,9 @@ import type { AdminNews, Category, NewsFormValues, NewsStatus } from '@/types'
 const NEWS_API_URL = 'http://localhost:8080/api/admin/news'
 const PUBLIC_NEWS_API_URL = 'http://localhost:8080/api/news'
 
+// DEFAULT_SEARCH_LIMIT is the suggestion count used by the header search box.
+export const DEFAULT_SEARCH_LIMIT = 7
+
 export interface NewsListResponse {
   items: AdminNews[]
   page: number
@@ -23,6 +26,8 @@ export interface PublicNews {
 
 export interface PublicNewsDetail extends PublicNews {
   text: string
+  source?: string
+  source_url?: string
 }
 
 export interface PublicNewsListResponse {
@@ -70,12 +75,18 @@ function jsonRequest(method: 'POST' | 'PUT', payload: NewsFormValues): RequestIn
   }
 }
 
-export function listNews(page = 1, limit = 20, status?: NewsStatus): Promise<NewsListResponse> {
+export function listNews(
+  page = 1,
+  limit = 20,
+  status?: NewsStatus,
+  category?: Category,
+): Promise<NewsListResponse> {
   const query = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
   })
   if (status) query.set('status', status)
+  if (category) query.set('category', category)
 
   return request<NewsListResponse>(NEWS_API_URL, `?${query.toString()}`)
 }
@@ -92,6 +103,21 @@ export function listPublicNews(page = 1, limit = 20, category?: Category): Promi
 
 export function getPublicNews(slug: string): Promise<PublicNewsDetail> {
   return request<PublicNewsDetail>(PUBLIC_NEWS_API_URL, `/${encodeURIComponent(slug)}`)
+}
+
+export function searchPublicNews(
+  query: string,
+  limit = DEFAULT_SEARCH_LIMIT,
+  opts?: { signal?: AbortSignal },
+): Promise<PublicNewsListResponse> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: limit.toString(),
+  })
+
+  return request<PublicNewsListResponse>(PUBLIC_NEWS_API_URL, `/search?${params.toString()}`, {
+    signal: opts?.signal,
+  })
 }
 
 export async function recordPublicNewsView(slug: string): Promise<number> {

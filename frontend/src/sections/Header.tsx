@@ -1,9 +1,13 @@
-import { Search } from 'lucide-react'
+import { useState } from 'react'
+import { Search, X } from 'lucide-react'
 import { Link } from 'react-router'
 
+import SearchBox from '@/components/SearchBox'
 import { NAV_LINKS, SITE_NAME } from '@/constants'
 
 export default function Header() {
+  const [searchOpen, setSearchOpen] = useState(false)
+
   return (
     <header
       className="sticky top-0 z-50 border-b border-mandat-line"
@@ -30,22 +34,28 @@ export default function Header() {
               </a>
             ))}
           </nav>
-          <div className="hidden md:flex min-w-0 justify-self-end items-center gap-2.5">
-            <input
-              type="search"
-              placeholder="Пошук новин…"
-              className="hidden xl:block w-[220px] h-10 px-4 text-[13px] text-mandat-text bg-mandat-bg outline-none border border-mandat-line focus:border-mandat-red-bright transition-colors"
-            />
-            <a
-              href="#news"
+          <div className="hidden xl:flex min-w-0 justify-self-end items-center gap-2.5">
+            <div className="w-[220px]">
+              <SearchBox />
+            </div>
+          </div>
+          <div className="xl:hidden justify-self-end">
+            <button
+              type="button"
+              onClick={() => setSearchOpen((prev) => !prev)}
               aria-label="Пошук новин"
-              title="Пошук новин"
+              aria-expanded={searchOpen}
               className="w-10 h-10 grid place-items-center border border-mandat-line text-mandat-muted transition-colors hover:border-mandat-red-bright hover:text-mandat-text bg-transparent cursor-pointer"
             >
-              <Search size={18} />
-            </a>
+              {searchOpen ? <X size={18} /> : <Search size={18} />}
+            </button>
           </div>
         </div>
+        {searchOpen && (
+          <div className="xl:hidden pb-4">
+            <SearchBox autoFocus onNavigate={() => setSearchOpen(false)} />
+          </div>
+        )}
       </div>
     </header>
   )

@@ -84,7 +84,11 @@ function toLatestNewsItem(news: PublicNews): LatestNewsItem {
 export async function getPublicNewsArticle(slug: string): Promise<ArticleDetail> {
   const news = await getPublicNews(slug)
 
-  return { ...toArticle(news), text: news.text }
+  const article: ArticleDetail = { ...toArticle(news), text: news.text }
+  if (news.source) article.source = news.source
+  if (news.source_url) article.sourceUrl = news.source_url
+
+  return article
 }
 
 // getCategoryNews loads one page of a single public rubric.

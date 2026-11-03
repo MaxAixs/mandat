@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-category-labels-tests"
+  },
+  "include": [
+    "../category-labels.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/App.tsx",
+    "../../src/pages/Admin.tsx",
+    "../../src/components/admin/NewsEditorDialog.tsx",
+    "../../src/lib/news-validation.ts"
+  ]
+}

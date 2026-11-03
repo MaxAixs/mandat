@@ -12,6 +12,14 @@ The application expects the Go backend at `http://localhost:8080`.
 Start the backend before running `npm run dev`. Network failures and an empty
 published feed are shown directly on the home page.
 
+## Header search
+
+The header search shows live title suggestions from the first typed letter
+(backed by `GET /api/news/search`), newest first. Clicking a suggestion opens
+the article, Enter opens the first suggestion, and an empty result or a failed
+request hides the list. On mobile the magnifier icon toggles a search row
+under the header.
+
 ## Public article views
 
 After an article loads, the client calls `POST /api/news/:slug/view` with
