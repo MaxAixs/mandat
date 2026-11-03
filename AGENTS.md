@@ -19,9 +19,9 @@ The superpowers workflow is unchanged; only the model performing each role diffe
 
 | Role | Model | Agent |
 |------|-------|-------|
-| Brainstorming, plans, code, coordination, fixing review findings | `opencode-go/kimi-k3.1-pro` | primary session |
-| Writing tests (RED step of TDD) | `opencode/deepseek-v4.1-flash-free` | `test-author` subagent |
-| Code review | `opencode/deepseek-v4.1-flash-free` | `reviewer` subagent |
+| Brainstorming, plans, code, coordination, fixing review findings | `opencode-go/muse-spark-1.3-contributor` | primary session |
+| Writing tests (RED step of TDD) | `opencode-go/deepseek-v4.1-flash` | `test-author` subagent |
+| Code review | `opencode-go/deepseek-v4.1-flash` | `reviewer` subagent |
 
 - Tests are never written by the primary agent: dispatch `test-author` before implementing a task.
 - `reviewer` writes its report to `.superpowers/reviews/*.txt` (git-ignored); the primary agent reads that file and fixes the findings.

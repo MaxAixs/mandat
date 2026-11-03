@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": ["superpowers@git+https://github.com/obra/superpowers.git"],
-  "model": "opencode-go/kimi-k3.1-pro",
-  // Kimi plans and writes code; tests are owned by the test-author subagent.
+  "model": "opencode-go/muse-spark-1.3-contributor",
+  // Muse Spark plans and writes code; tests are owned by the test-author subagent.
   "permissions": [
     { "action": "edit", "resource": "*_test.go", "effect": "deny" },
     { "action": "edit", "resource": "*.test.ts", "effect": "deny" },
