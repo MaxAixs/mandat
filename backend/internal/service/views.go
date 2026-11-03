@@ -12,7 +12,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/errs"
 )
 
-const viewCooldown = time.Hour
+const viewCooldown = 3 * time.Hour
 
 // ViewRepository is the persistence contract used by ViewService.
 type ViewRepository interface {
@@ -30,7 +30,7 @@ func NewViewService(repo ViewRepository, logger *slog.Logger) *ViewService {
 	return &ViewService{repo: repo, logger: logger}
 }
 
-// RecordView records at most one view per visitor per article each hour.
+// RecordView records at most one view per visitor per article every three hours.
 func (s *ViewService) RecordView(ctx context.Context, slug string, viewerID uuid.UUID) (int64, error) {
 	const fc = "viewService_RecordView"
 

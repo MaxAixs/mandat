@@ -4,6 +4,7 @@ package testsupport
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/maxaixs/mandat/backend/internal/errs"
@@ -18,11 +19,14 @@ type StubRepo struct {
 	GetErr              error
 	ListErr             error
 	ListPublishedErr    error
+	SearchErr           error
 	UpdateErr           error
 	DeleteErr           error
 	CreateCalls         int
 	LastFilter          models.ListFilter
 	LastPublishedFilter models.ListFilter
+	LastSearchQuery     string
+	LastSearchLimit     int
 }
 
 // NewStubRepo creates an empty StubRepo.
@@ -177,6 +181,48 @@ func (s *StubRepo) ListPublished(_ context.Context, filter models.ListFilter) ([
 	}
 
 	return matched[offset:end], nil
+}
+
+// SearchPublished returns published articles whose title contains query, newest first.
+func (s *StubRepo) SearchPublished(_ context.Context, query string, limit int) ([]*models.News, error) {
+	s.LastSearchQuery = query
+	s.LastSearchLimit = limit
+	if s.SearchErr != nil {
+		return nil, s.SearchErr
+	}
+
+	needle := strings.ToLower(query)
+	matched := []*models.News{}
+	for _, item := range s.Items {
+		if item.Status != models.StatusPublished {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(item.Title), needle) {
+			continue
+		}
+		matched = append(matched, item)
+	}
+	sort.Slice(matched, func(i, j int) bool {
+		if matched[i].PublishedAt == nil {
+			return false
+		}
+		if matched[j].PublishedAt == nil {
+			return true
+		}
+		if matched[i].PublishedAt.Equal(*matched[j].PublishedAt) {
+			return matched[i].ID.String() > matched[j].ID.String()
+		}
+
+		return matched[i].PublishedAt.After(*matched[j].PublishedAt)
+	})
+	if limit < 0 {
+		limit = 0
+	}
+	if len(matched) > limit {
+		matched = matched[:limit]
+	}
+
+	return matched, nil
 }
 
 // Update replaces a stored article.

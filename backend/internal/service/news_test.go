@@ -704,3 +704,100 @@ func TestListPublished_UnknownCategorySkipsRepositoryEvenOnFailure(t *testing.T)
 	assert.Equal(t, models.ListFilter{}, repo.LastPublishedFilter,
 		"an unknown category must not reach the repository")
 }
+
+func TestList_ValidCategoryReachesFilter(t *testing.T) {
+	tests := []struct {
+		name     string
+		category models.Category
+	}{
+		{"news", models.CategoryNews},
+		{"international", models.CategoryAnalytics},
+		{"sport", models.CategoryInsides},
+		{"interview", models.CategoryImportant},
+		{"about", models.CategoryInvestigation},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, repo := newTestService()
+
+			result, err := svc.List(context.Background(), 1, 10, "", string(tt.category))
+			require.NoError(t, err)
+
+			require.NotNil(t, repo.LastFilter.Category,
+				"a valid category must be forwarded to the repository")
+			assert.Equal(t, tt.category, *repo.LastFilter.Category,
+				"the filter must carry the exact category value")
+			assert.Nil(t, repo.LastFilter.Status,
+				"an omitted status must leave the filter unfiltered")
+			assert.Equal(t, 1, result.Page)
+			assert.Equal(t, 10, result.Limit)
+		})
+	}
+}
+
+func TestList_EmptyCategoryLeavesFilterNil(t *testing.T) {
+	svc, repo := newTestService()
+
+	_, err := svc.List(context.Background(), 1, 10, "", "")
+	require.NoError(t, err)
+
+	assert.Nil(t, repo.LastFilter.Category,
+		"an omitted category must leave the filter unfiltered")
+}
+
+func TestList_RejectsUnknownCategory(t *testing.T) {
+	tests := []struct {
+		name     string
+		category string
+	}{
+		{"unknown rubric", "Політика"},
+		{"lowercase sport", "спорт"},
+		{"trailing space", "Спорт "},
+		{"arbitrary text", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, repo := newTestService()
+
+			_, err := svc.List(context.Background(), 1, 10, "", tt.category)
+
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, errs.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)
+			assert.Equal(t, models.ListFilter{}, repo.LastFilter,
+				"an unknown category must not reach the repository")
+		})
+	}
+}
+
+func TestList_StatusAndCategoryTogetherPopulateFilter(t *testing.T) {
+	svc, repo := newTestService()
+
+	result, err := svc.List(context.Background(), 2, 5, string(models.StatusPublished), string(models.CategoryInsides))
+	require.NoError(t, err)
+
+	require.NotNil(t, repo.LastFilter.Status,
+		"a valid status must be forwarded to the repository")
+	assert.Equal(t, models.StatusPublished, *repo.LastFilter.Status)
+	require.NotNil(t, repo.LastFilter.Category,
+		"a valid category must be forwarded to the repository")
+	assert.Equal(t, models.CategoryInsides, *repo.LastFilter.Category)
+	assert.Equal(t, 2, result.Page)
+	assert.Equal(t, 5, result.Limit)
+}
+
+func TestList_UnknownCategorySkipsRepositoryEvenOnFailure(t *testing.T) {
+	cause := errors.New("db is down")
+	svc, repo := newTestService()
+	repo.ListErr = cause
+
+	_, err := svc.List(context.Background(), 1, 10, "", "Політика")
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, errs.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)
+	assert.False(t, errors.Is(err, cause),
+		"category validation must happen before any repository access")
+	assert.Equal(t, models.ListFilter{}, repo.LastFilter,
+		"an unknown category must not reach the repository")
+}

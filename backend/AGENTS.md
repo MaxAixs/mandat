@@ -126,6 +126,34 @@ Follow idiomatic Go and the official Go Code Review Comments and Effective Go gu
 - Run `gofmt` on all Go source files.
 - Do not add dependencies without a clear reason.
 
+### Function and method ordering
+
+Within a Go source file, place methods at the top and helper functions at
+the bottom, in the order they are called:
+
+- Exported and unexported methods of the file's main type come first.
+- Unexported helpers follow after the methods, ordered by invocation:
+  a helper appears after the method (or helper) that calls it.
+- Constructor functions stay at the top, right after the type declaration.
+
+Correct:
+
+```go
+func NewNewsRepo(pool *pgxpool.Pool) *NewsRepo { ... }
+
+func (r *NewsRepo) List(ctx context.Context) { ... insertNews(ctx, ...) ... }
+
+func insertNews(ctx context.Context) { ... }
+```
+
+Incorrect — a helper above the method that calls it:
+
+```go
+func insertNews(ctx context.Context) { ... }
+
+func (r *NewsRepo) List(ctx context.Context) { ... insertNews(ctx, ...) ... }
+```
+
 ### Function parameter formatting
 
 Place each parameter on a separate line when either condition holds:

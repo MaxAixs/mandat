@@ -24,7 +24,7 @@ const (
 type NewsService interface {
 	Create(ctx context.Context, input service.NewsInput) (*models.News, error)
 	GetBySlug(ctx context.Context, slug string) (*models.News, error)
-	List(ctx context.Context, page int, limit int, status string) (*service.ListResult, error)
+	List(ctx context.Context, page int, limit int, status string, category string) (*service.ListResult, error)
 	Update(ctx context.Context, slug string, input service.NewsInput) (*models.News, error)
 	Delete(ctx context.Context, slug string) error
 }
@@ -89,7 +89,7 @@ func (h *NewsHandler) List(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.List(c.Request.Context(), page, limit, c.Query("status"))
+	result, err := h.svc.List(c.Request.Context(), page, limit, c.Query("status"), c.Query("category"))
 	if err != nil {
 		WriteError(c, err)
 

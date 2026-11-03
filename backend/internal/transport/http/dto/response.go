@@ -21,6 +21,8 @@ type NewsResponse struct {
 	Featured    bool       `json:"featured"`
 	MainEvent   bool       `json:"main_event"`
 	ImageUrl    string     `json:"image_url"`
+	Source      string     `json:"source"`
+	SourceURL   string     `json:"source_url"`
 	PublishedAt *time.Time `json:"published_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -63,6 +65,8 @@ type PublicNewsDetailResponse struct {
 	ImageUrl    string     `json:"image_url"`
 	Featured    bool       `json:"featured"`
 	MainEvent   bool       `json:"main_event"`
+	Source      string     `json:"source"`
+	SourceURL   string     `json:"source_url"`
 	Views       int64      `json:"views"`
 	PublishedAt *time.Time `json:"published_at"`
 }
@@ -106,6 +110,8 @@ func NewsToPublicDetailResponse(news *models.News) *PublicNewsDetailResponse {
 		ImageUrl:    news.ImageUrl,
 		Featured:    news.Featured,
 		MainEvent:   news.MainEvent,
+		Source:      news.Source,
+		SourceURL:   news.SourceURL,
 		Views:       news.Views,
 		PublishedAt: news.PublishedAt,
 	}
@@ -130,6 +136,8 @@ func NewsToResponse(news *models.News) *NewsResponse {
 		Featured:    news.Featured,
 		MainEvent:   news.MainEvent,
 		ImageUrl:    news.ImageUrl,
+		Source:      news.Source,
+		SourceURL:   news.SourceURL,
 		PublishedAt: news.PublishedAt,
 		CreatedAt:   news.CreatedAt,
 		UpdatedAt:   news.UpdatedAt,

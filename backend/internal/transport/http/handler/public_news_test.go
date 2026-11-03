@@ -1,12 +1,15 @@
 package handler_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/testsupport"
 	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/handler"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -390,4 +394,311 @@ func TestPublicDetail_RepoFailureReturnsGeneric500(t *testing.T) {
 	assert.Equal(t, "Internal server error", body.Error.Message)
 	assert.NotContains(t, rec.Body.String(), "relation",
 		"the response must not leak repository details")
+}
+
+// createAdminArticle stores an article through the admin API and returns the
+// response body so callers can inspect the created record.
+func createAdminArticle(
+	t *testing.T,
+	router http.Handler,
+	category string,
+	title string,
+	status string,
+) map[string]any {
+	t.Helper()
+
+	body := fmt.Sprintf(
+		`{"category":%q,"title":%q,"text":"Повний текст","status":%q}`,
+		category, title, status,
+	)
+	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", body)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	var article map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &article))
+
+	return article
+}
+
+type adminListPayload struct {
+	Items []map[string]any `json:"items"`
+	Page  int              `json:"page"`
+	Limit int              `json:"limit"`
+}
+
+func decodeAdminList(t *testing.T, body []byte) adminListPayload {
+	t.Helper()
+
+	var payload adminListPayload
+	require.NoError(t, json.Unmarshal(body, &payload))
+
+	return payload
+}
+
+func categoryQuery(category string) string {
+	return "?category=" + url.QueryEscape(category)
+}
+
+func TestList_CategoryFilterReturnsOnlyMatchingArticles(t *testing.T) {
+	router, _ := setupRouter()
+	createAdminArticle(t, router, "Спорт", "Спортивна новина", "draft")
+	createAdminArticle(t, router, "Новини", "Звичайна новина", "draft")
+
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+categoryQuery("Спорт"), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodeAdminList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "only the Sport article must be returned")
+	assert.Equal(t, "Спорт", payload.Items[0]["category"])
+	assert.Equal(t, "Спортивна новина", payload.Items[0]["title"])
+}
+
+func TestList_CombinedStatusAndCategoryFiltersBoth(t *testing.T) {
+	router, _ := setupRouter()
+	createAdminArticle(t, router, "Спорт", "Спортивна чернетка", "draft")
+	createAdminArticle(t, router, "Спорт", "Спортивна опублікована", "published")
+	createAdminArticle(t, router, "Новини", "Звичайна опублікована", "published")
+
+	query := "?status=published&category=" + url.QueryEscape("Спорт")
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+query, "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodeAdminList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "both the status and the category must be applied")
+	assert.Equal(t, "Спортивна опублікована", payload.Items[0]["title"])
+	assert.Equal(t, "Спорт", payload.Items[0]["category"])
+	assert.Equal(t, "published", payload.Items[0]["status"])
+}
+
+func TestList_UnknownCategoryReturns400(t *testing.T) {
+	router, _ := setupRouter()
+	createAdminArticle(t, router, "Спорт", "Спортивна новина", "draft")
+
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+categoryQuery("Політика"), "")
+
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message)
+}
+
+// seedSearchNews inserts a deterministic article directly into the stub.
+func seedSearchNews(
+	t *testing.T,
+	repo *testsupport.StubRepo,
+	slug string,
+	title string,
+	category models.Category,
+	status models.Status,
+	publishedAt time.Time,
+) {
+	t.Helper()
+
+	var published *time.Time
+	if status == models.StatusPublished {
+		published = &publishedAt
+	}
+
+	require.NoError(t, repo.Create(context.Background(), &models.News{
+		ID:          uuid.New(),
+		Slug:        slug,
+		Category:    category,
+		Title:       title,
+		Description: "Стислий опис",
+		Text:        "Повний текст",
+		Status:      status,
+		PublishedAt: published,
+		CreatedAt:   publishedAt,
+		UpdatedAt:   publishedAt,
+	}))
+}
+
+// setupPublicRouterWithViewer mirrors the production wiring: the viewer
+// middleware guards the detail route only, never the search route.
+func setupPublicRouterWithViewer() (http.Handler, *testsupport.StubRepo) {
+	repo := testsupport.NewStubRepo()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	svc := service.NewNewsService(repo, logger)
+
+	httpSrv := httptransport.New(httptransport.HTTPConfig{
+		AllowedOrigins: []string{allowedOrigin},
+	}, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc, middleware.EnsureViewer(false)))
+
+	return httpSrv.Handler(), repo
+}
+
+func TestPublicSearch_RepoErrorMapsTo500(t *testing.T) {
+	router, repo := setupPublicRouter()
+	repo.SearchErr = errors.New("boom")
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("тест"), "")
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	payload := decodeError(t, rec.Body.Bytes())
+	assert.Equal(t, http.StatusInternalServerError, payload.Error.Status)
+	assert.Equal(t, "Internal server error", payload.Error.Message)
+	assert.NotContains(t, rec.Body.String(), "boom",
+		"the response must not leak repository details")
+}
+
+func TestPublicSearch_LimitClampedOverMax(t *testing.T) {
+	router, repo := setupPublicRouter()
+	seedSearchNews(t, repo, "search-limit", "Тестова стаття про ліміт",
+		models.CategoryNews, models.StatusPublished, time.Now())
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("тестова")+"&limit=99", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "the seeded article must match the query")
+	assert.Equal(t, 20, payload.Limit, "a search limit above 20 must be clamped to 20")
+	assert.Contains(t, rec.Body.String(), `"limit":20`,
+		"the clamped limit must be visible in the JSON envelope")
+	assert.Equal(t, 20, repo.LastSearchLimit, "the repository must receive the clamped limit")
+}
+
+func TestPublicSearch_SetsNoViewerCookie(t *testing.T) {
+	router, repo := setupPublicRouterWithViewer()
+	seedSearchNews(t, repo, "search-no-cookie", "Тестова стаття без cookie",
+		models.CategoryNews, models.StatusPublished, time.Now())
+
+	search := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("тестова"), "")
+
+	require.Equal(t, http.StatusOK, search.Code, search.Body.String())
+	assert.Empty(t, search.Header().Values("Set-Cookie"),
+		"live search must not hand out a mandat_viewer cookie")
+
+	// Control request: proves the viewer middleware is wired in this router,
+	// so the assertion above can actually catch a regression.
+	detail := doRequest(t, router, http.MethodGet, "/api/news/search-no-cookie", "")
+	require.Equal(t, http.StatusOK, detail.Code, detail.Body.String())
+	assert.NotEmpty(t, detail.Header().Values("Set-Cookie"),
+		"the detail route must keep receiving the viewer middleware")
+}
+
+func TestPublicSearch_ReturnsEnvelope(t *testing.T) {
+	router, repo := setupPublicRouter()
+	base := time.Date(2026, time.November, 3, 10, 0, 0, 0, time.UTC)
+
+	seedSearchNews(t, repo, "search-older", "Перша пошукова стаття",
+		models.CategoryNews, models.StatusPublished, base)
+	seedSearchNews(t, repo, "search-newer", "Друга пошукова стаття",
+		models.CategoryAnalytics, models.StatusPublished, base.Add(time.Hour))
+	seedSearchNews(t, repo, "search-unrelated", "Зовсім інший матеріал",
+		models.CategoryNews, models.StatusPublished, base.Add(2*time.Hour))
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("пошукова"), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+
+	assert.Equal(t, 1, payload.Page)
+	assert.Equal(t, 7, payload.Limit, "the search limit must default to 7")
+	require.Len(t, payload.Items, 2, "only titles matching the query must be returned")
+
+	slugs := map[string]bool{}
+	for _, item := range payload.Items {
+		slug, ok := item["slug"].(string)
+		require.True(t, ok, "slug must be a string")
+		title, ok := item["title"].(string)
+		require.True(t, ok, "title must be a string")
+		category, ok := item["category"].(string)
+		require.True(t, ok, "category must be a string")
+
+		assert.NotEmpty(t, slug)
+		assert.NotEmpty(t, title)
+		assert.NotEmpty(t, category)
+		assert.NotContains(t, item, "text", "a search card must not expose the article body")
+
+		slugs[slug] = true
+	}
+	assert.True(t, slugs["search-older"])
+	assert.True(t, slugs["search-newer"])
+	assert.False(t, slugs["search-unrelated"], "a non-matching title must not be returned")
+}
+
+func TestPublicSearch_EmptyQueryReturnsEmptyItems(t *testing.T) {
+	router, repo := setupPublicRouter()
+	seedSearchNews(t, repo, "search-published", "Пошукова стаття",
+		models.CategoryNews, models.StatusPublished, time.Now())
+
+	rec := doRequest(t, router, http.MethodGet, "/api/news/search?q=%20%20", "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.NotNil(t, payload.Items, "an empty result must serialize as [] rather than null")
+	assert.Empty(t, payload.Items, "a blank query must not return the whole feed")
+	assert.Equal(t, 1, payload.Page)
+	assert.Equal(t, 7, payload.Limit)
+}
+
+func TestPublicSearch_InvalidLimit400(t *testing.T) {
+	tests := []struct {
+		name  string
+		limit string
+	}{
+		{"non numeric", "abc"},
+		{"zero", "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, _ := setupPublicRouter()
+
+			rec := doRequest(t, router, http.MethodGet,
+				"/api/news/search?q="+url.QueryEscape("пошук")+"&limit="+tt.limit, "")
+
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message)
+		})
+	}
+}
+
+func TestPublicSearch_LongQuery400(t *testing.T) {
+	router, _ := setupPublicRouter()
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape(strings.Repeat("а", 101)), "")
+
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message)
+}
+
+func TestPublicSearch_ExcludesDrafts(t *testing.T) {
+	router, repo := setupPublicRouter()
+	base := time.Date(2026, time.November, 3, 12, 0, 0, 0, time.UTC)
+
+	seedSearchNews(t, repo, "search-published", "Опублікована пошукова стаття",
+		models.CategoryNews, models.StatusPublished, base)
+	seedSearchNews(t, repo, "search-draft", "Чернеткова пошукова стаття",
+		models.CategoryNews, models.StatusDraft, base.Add(time.Hour))
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("пошукова"), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicList(t, rec.Body.Bytes())
+	require.Len(t, payload.Items, 1, "drafts must never appear in search results")
+	assert.Equal(t, "search-published", payload.Items[0]["slug"])
+	assert.NotContains(t, rec.Body.String(), "search-draft")
+}
+
+func TestPublicSearch_SearchRouteBeatsSlug(t *testing.T) {
+	router, repo := setupPublicRouter()
+	seedSearchNews(t, repo, "search", "Пошукова стаття зі слагом search",
+		models.CategoryNews, models.StatusPublished, time.Now())
+
+	rec := doRequest(t, router, http.MethodGet,
+		"/api/news/search?q="+url.QueryEscape("пошукова"), "")
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	payload := decodePublicDetail(t, rec.Body.Bytes())
+
+	assert.Contains(t, payload, "items", "the static /search route must beat the /:slug detail route")
+	assert.Contains(t, payload, "page")
+	assert.Contains(t, payload, "limit")
+	assert.NotContains(t, payload, "text",
+		"the article detail payload must not be served for /api/news/search")
 }

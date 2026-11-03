@@ -70,24 +70,27 @@ moderator session cookie. Cross-origin frontend requests must include credential
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/admin/news` | Create an article |
-| `GET` | `/api/admin/news?page=&limit=&status=` | Paginated list (newest first) |
+| `GET` | `/api/admin/news?page=&limit=&status=&category=` | Paginated list (newest first) |
 | `GET` | `/api/admin/news/:slug` | Get one article |
 | `PUT` | `/api/admin/news/:slug` | Update an article |
 | `DELETE` | `/api/admin/news/:slug` | Delete an article (`200 OK`, empty body) |
 
 `page` starts at 1, `limit` defaults to 20 and is capped at 100.
-`status` accepts `draft` or `published`.
+`status` accepts `draft` or `published`. `category` accepts `Новини`,
+`Міжнародні новини`, `Спорт`, `Інтерв'ю`, or `Про нас`; an unknown value
+returns `400 Invalid input`.
 
 ## Public API
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/news?page=&limit=` | Paginated published articles for the public site |
+| `GET` | `/api/news/search?q=&limit=` | Live title suggestions over published articles, newest first (default limit 7, max 20; empty `q` returns an empty list) |
 | `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
 | `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |
 
 View recording accepts at most one view per anonymous visitor per article per
-hour. The `mandat_viewer` cookie contains only a random UUID, lasts one year, and
+three hours. The `mandat_viewer` cookie contains only a random UUID, lasts one year, and
 is `HttpOnly` and `SameSite=Lax`; no IP address or browser fingerprint is stored.
 The article-detail GET sets this cookie before the frontend records a view, so
 simultaneous tracking requests share the same visitor ID. Cooldown enforcement

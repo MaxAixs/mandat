@@ -15,6 +15,8 @@ const maxLanguageLen = 10
 // validateNews normalizes the input in place and checks the editable article fields.
 func validateNews(input *NewsInput) error {
 	input.Title = strings.TrimSpace(input.Title)
+	input.Source = strings.TrimSpace(input.Source)
+	input.SourceURL = strings.TrimSpace(input.SourceURL)
 	if input.Title == "" {
 		return errs.NewValidationError("title", "title is required")
 	}
@@ -35,6 +37,9 @@ func validateNews(input *NewsInput) error {
 	}
 	if status == models.StatusPublished && strings.TrimSpace(input.Text) == "" {
 		return errs.NewValidationError("text", "text is required for published articles")
+	}
+	if input.SourceURL != "" && input.Source == "" {
+		return errs.NewValidationError("source", "source is required when source_url is set")
 	}
 
 	if utf8.RuneCountInString(input.Language) > maxLanguageLen {

@@ -20,7 +20,7 @@ const uniqueViolation = "23505"
 
 // newsColumns is the canonical column list shared by SELECT queries.
 const newsColumns = `id, slug, category, title, description, text, language,
-	status, views, featured, main_event, image_url, published_at, created_at, updated_at`
+	status, views, featured, main_event, image_url, source, source_url, published_at, created_at, updated_at`
 
 // NewsRepo persists news articles in PostgreSQL.
 type NewsRepo struct {
@@ -61,13 +61,13 @@ func insertNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 	query := `INSERT INTO news
 		(id, slug, category, title, description, text, language, status,
-		featured, main_event, image_url, published_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+		featured, main_event, image_url, source, source_url, published_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
 
 	_, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description,
 		news.Text, news.Language, news.Status, news.Featured, news.MainEvent,
-		news.ImageUrl, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
+		news.ImageUrl, news.Source, news.SourceURL, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, err)
@@ -193,6 +193,42 @@ func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) 
 	return items, nil
 }
 
+// SearchPublished returns up to limit published articles whose title contains query.
+// Title matching relies on ILIKE case folding, which follows the database
+// collation: the database must use a UTF-8 collation for Cyrillic search
+// to stay case-insensitive.
+func (r *NewsRepo) SearchPublished(ctx context.Context, query string, limit int) ([]*models.News, error) {
+	const fc = "newsRepo_SearchPublished"
+
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT `+newsColumns+` FROM news
+		WHERE status = $1 AND title ILIKE '%' || $2 || '%' ESCAPE '\'
+		ORDER BY published_at DESC NULLS LAST, id DESC LIMIT $3`,
+		models.StatusPublished,
+		escapeLike(query),
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+	}
+	defer rows.Close()
+
+	var items []*models.News
+	for rows.Next() {
+		news, err := scanNews(rows)
+		if err != nil {
+			return nil, fmt.Errorf("%s: scan: %w", fc, err)
+		}
+		items = append(items, news)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows: %w", fc, err)
+	}
+
+	return items, nil
+}
+
 // Update overwrites all editable fields of the article with news.ID.
 func (r *NewsRepo) Update(ctx context.Context, news *models.News) error {
 	const fc = "newsRepo_Update"
@@ -208,30 +244,6 @@ func (r *NewsRepo) Update(ctx context.Context, news *models.News) error {
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, mapError(err))
-	}
-
-	return nil
-}
-
-func updateNews(ctx context.Context, db commandExecutor, news *models.News) error {
-	const fc = "newsRepo_updateNews"
-
-	query := `UPDATE news SET
-		slug = $2, category = $3, title = $4, description = $5, text = $6,
-		language = $7, status = $8, featured = $9, main_event = $10, image_url = $11,
-		published_at = $12, updated_at = $13
-		WHERE id = $1`
-
-	tag, err := db.Exec(ctx, query,
-		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
-		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageUrl,
-		news.PublishedAt, news.UpdatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("%s: %w", fc, err)
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("%s: %w", fc, errs.ErrNewsNotFound)
 	}
 
 	return nil
@@ -308,13 +320,42 @@ func scanNews(row scanner) (*models.News, error) {
 	err := row.Scan(
 		&news.ID, &news.Slug, &news.Category, &news.Title, &news.Description,
 		&news.Text, &news.Language, &news.Status, &news.Views, &news.Featured,
-		&news.MainEvent, &news.ImageUrl, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
+		&news.MainEvent, &news.ImageUrl, &news.Source, &news.SourceURL, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &news, nil
+}
+
+func updateNews(ctx context.Context, db commandExecutor, news *models.News) error {
+	const fc = "newsRepo_updateNews"
+
+	query := `UPDATE news SET
+		slug = $2, category = $3, title = $4, description = $5, text = $6,
+		language = $7, status = $8, featured = $9, main_event = $10, image_url = $11,
+		source = $12, source_url = $13, published_at = $14, updated_at = $15
+		WHERE id = $1`
+
+	tag, err := db.Exec(ctx, query,
+		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
+		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageUrl,
+		news.Source, news.SourceURL, news.PublishedAt, news.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", fc, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%s: %w", fc, errs.ErrNewsNotFound)
+	}
+
+	return nil
+}
+
+// escapeLike escapes the LIKE pattern metacharacters in s.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 // mapError translates PostgreSQL errors into domain sentinel errors.

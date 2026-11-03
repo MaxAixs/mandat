@@ -14,6 +14,7 @@ import (
 type PublicNewsService interface {
 	GetPublishedBySlug(ctx context.Context, slug string) (*models.News, error)
 	ListPublished(ctx context.Context, page int, limit int, category string) (*service.ListResult, error)
+	SearchPublished(ctx context.Context, query string, limit int) (*service.ListResult, error)
 }
 
 // PublicNewsHandler exposes published news to the public site.
@@ -34,6 +35,7 @@ func NewPublicNewsHandler(
 func (h *PublicNewsHandler) Register(r *gin.RouterGroup) {
 	news := r.Group("/api" + newsPath)
 	news.GET("", h.List)
+	news.GET("/search", h.Search)
 
 	detailHandlers := append(h.viewerMiddleware, h.GetBySlug)
 	news.GET("/:slug", detailHandlers...)
@@ -68,6 +70,34 @@ func (h *PublicNewsHandler) List(c *gin.Context) {
 	}
 
 	result, err := h.svc.ListPublished(c.Request.Context(), page, limit, c.Query("category"))
+	if err != nil {
+		WriteError(c, err)
+
+		return
+	}
+
+	items := make([]*dto.PublicNewsResponse, 0, len(result.Items))
+	for _, news := range result.Items {
+		items = append(items, dto.NewsToPublicResponse(news))
+	}
+
+	c.JSON(http.StatusOK, dto.PublicNewsListResponse{
+		Items: items,
+		Page:  result.Page,
+		Limit: result.Limit,
+	})
+}
+
+// Search handles GET /api/news/search and returns title suggestions.
+func (h *PublicNewsHandler) Search(c *gin.Context) {
+	limit, err := queryInt(c, "limit", service.DefaultSearchLimit)
+	if err != nil {
+		WriteError(c, err)
+
+		return
+	}
+
+	result, err := h.svc.SearchPublished(c.Request.Context(), c.Query("q"), limit)
 	if err != nil {
 		WriteError(c, err)
 

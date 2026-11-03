@@ -18,6 +18,8 @@ type NewsRequest struct {
 	Featured    bool   `json:"featured"`
 	MainEvent   bool   `json:"main_event"`
 	ImageUrl    string `json:"image_url"`
+	Source      string `json:"source"`
+	SourceURL   string `json:"source_url"`
 }
 
 // ToInput maps the request body onto the service input.
@@ -32,5 +34,7 @@ func (r NewsRequest) ToInput() service.NewsInput {
 		Featured:    r.Featured,
 		MainEvent:   r.MainEvent,
 		ImageUrl:    r.ImageUrl,
+		Source:      r.Source,
+		SourceURL:   r.SourceURL,
 	}
 }

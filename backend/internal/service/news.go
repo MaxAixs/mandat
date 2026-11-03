@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/maxaixs/mandat/backend/internal/errs"
@@ -21,6 +23,13 @@ const (
 	maxSlugAttempts = 10
 )
 
+// Limits for published-news title search.
+const (
+	DefaultSearchLimit = 7
+	MaxSearchLimit     = 20
+	MaxSearchQueryLen  = 20
+)
+
 // NewsInput is the editable article payload accepted by the service.
 // Category and Status are domain enums validated by the service.
 type NewsInput struct {
@@ -33,6 +42,8 @@ type NewsInput struct {
 	Featured    bool
 	MainEvent   bool
 	ImageUrl    string
+	Source      string
+	SourceURL   string
 }
 
 // ListResult is a page of articles returned by the service.
@@ -48,6 +59,7 @@ type NewsRepository interface {
 	GetBySlug(ctx context.Context, slug string) (*models.News, error)
 	List(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
 	ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
+	SearchPublished(ctx context.Context, query string, limit int) ([]*models.News, error)
 	Update(ctx context.Context, news *models.News) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -127,8 +139,8 @@ func (s *NewsService) GetPublishedBySlug(ctx context.Context, slug string) (*mod
 	return news, nil
 }
 
-// List returns a page of articles, optionally filtered by status.
-func (s *NewsService) List(ctx context.Context, page int, limit int, status string) (*ListResult, error) {
+// List returns a page of articles, optionally filtered by status and category.
+func (s *NewsService) List(ctx context.Context, page int, limit int, status string, category string) (*ListResult, error) {
 	const fc = "newsService_List"
 
 	if page < 1 {
@@ -148,6 +160,13 @@ func (s *NewsService) List(ctx context.Context, page int, limit int, status stri
 			return nil, fmt.Errorf("%s: %w: unknown status %q", fc, errs.ErrInvalidInput, status)
 		}
 		filter.Status = &parsed
+	}
+	if category != "" {
+		parsed := models.Category(category)
+		if !parsed.Valid() {
+			return nil, fmt.Errorf("%s: %w: unknown category %q", fc, errs.ErrInvalidInput, category)
+		}
+		filter.Category = &parsed
 	}
 
 	items, err := s.repo.List(ctx, filter)
@@ -191,6 +210,39 @@ func (s *NewsService) ListPublished(ctx context.Context, page int, limit int, ca
 	}
 
 	return &ListResult{Items: items, Page: page, Limit: limit}, nil
+}
+
+// SearchPublished returns up to limit published articles whose title contains query.
+func (s *NewsService) SearchPublished(ctx context.Context, query string, limit int) (*ListResult, error) {
+	const fc = "newsService_SearchPublished"
+
+	if limit < 1 {
+		return nil, fmt.Errorf("%s: %w: limit must be at least 1", fc, errs.ErrInvalidInput)
+	}
+	resolvedLimit := min(limit, MaxSearchLimit)
+
+	trimmedQuery := strings.TrimSpace(query)
+	if trimmedQuery == "" {
+		return &ListResult{Items: []*models.News{}, Page: 1, Limit: resolvedLimit}, nil
+	}
+	if !utf8.ValidString(trimmedQuery) || strings.ContainsRune(trimmedQuery, 0) {
+		return nil, fmt.Errorf("%s: %w: malformed query", fc, errs.ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(trimmedQuery) > MaxSearchQueryLen {
+		return nil, fmt.Errorf("%s: %w: query too long", fc, errs.ErrInvalidInput)
+	}
+
+	items, err := s.repo.SearchPublished(ctx, trimmedQuery, resolvedLimit)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to search published news articles", "fc", fc, "error", err)
+
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+	if len(items) == 0 {
+		items = []*models.News{}
+	}
+
+	return &ListResult{Items: items, Page: 1, Limit: resolvedLimit}, nil
 }
 
 // Update applies the editable fields of an existing article.
@@ -274,6 +326,8 @@ func buildNews(input NewsInput) *models.News {
 		Featured:    input.Featured,
 		MainEvent:   input.MainEvent,
 		ImageUrl:    input.ImageUrl,
+		Source:      input.Source,
+		SourceURL:   input.SourceURL,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

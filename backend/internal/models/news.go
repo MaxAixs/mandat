@@ -56,6 +56,8 @@ type News struct {
 	Featured    bool
 	MainEvent   bool
 	ImageUrl    string
+	Source      string
+	SourceURL   string
 	PublishedAt *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
