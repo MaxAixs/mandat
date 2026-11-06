@@ -18,10 +18,11 @@ The public part of the news website: news feed, digests, analytics. An SPA built
 npm run dev       # dev server with HMR
 npm run build     # tsc -b && vite build (type checking + production build)
 npm run lint      # ESLint across the whole project
+npm test          # Vitest component tests
 npm run preview   # preview of the production build
 ```
 
-Before finishing any task: `npm run lint` and `npm run build` must pass without errors.
+Before finishing any task: `npm test`, `npm run lint` and `npm run build` must pass without errors. Vitest covers `src/**/*.test.{ts,tsx}`; the independent `node:test` suites under `tests/` have their own compile/run tsconfigs in `tests/testdata/` and are not collected by `npm test`.
 
 ## Structure
 
@@ -32,6 +33,7 @@ src/
   components/    Shared components (NewsCard.tsx)
   components/ui/  shadcn/ui components (40+ of them) — do NOT edit manually
   hooks/       Custom hooks (use-mobile.ts)
+  test/        Shared Vitest/Testing Library setup
   lib/         Utilities: utils.ts (cn() for merging classes)
   types/       Shared TypeScript types (domain model: Article, StatItem, NavLink)
   constants/   Site constants: NAV_LINKS, FOOTER_LINKS, SITE_NAME

@@ -10,6 +10,7 @@ export interface CategoryNewsData {
 
 export interface HomeNewsData {
   articles: Article[]
+  heroArticles: Article[]
   latestNews: LatestNewsItem[]
   tickerItems: string[]
   mainEvent: Article | null
@@ -33,6 +34,8 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
   maximumFractionDigits: 1,
 })
 
+// The Hero shows the five newest articles independently of the curated mosaic.
+const HERO_NEWS_LIMIT = 5
 // «Головні новини» fills a 3-column mosaic: one large 2×2 card plus five regular ones.
 const MAIN_NEWS_LIMIT = 6
 // The ticker keeps its own limit of five newest headlines.
@@ -145,6 +148,7 @@ export async function getHomeNews(): Promise<HomeNewsData> {
     articles: [...(secondMain ? [secondMain] : []), ...featuredFirstItems]
       .slice(0, MAIN_NEWS_LIMIT)
       .map(toArticle),
+    heroArticles: chronologicalItems.slice(0, HERO_NEWS_LIMIT).map(toArticle),
     latestNews: chronologicalItems.map(toLatestNewsItem),
     tickerItems: chronologicalItems.slice(0, TICKER_LIMIT).map((news) => news.title),
     mainEvent: heroMain ? toArticle(heroMain) : null,

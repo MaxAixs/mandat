@@ -1,59 +1,51 @@
 import { Link } from 'react-router'
 
-import heroBg from '@/assets/hero-bg.jpg'
 import type { Article } from '@/types'
 
-const headingClassName = 'text-[clamp(34px,4.8vw,68px)] font-bold leading-[1.05] tracking-[0.5px]'
-const mainEventHeadingClassName = 'text-[clamp(28px,3.8vw,52px)] font-bold leading-[1.05] tracking-[0.5px]'
-const fallbackDescription = 'Факти без емоцій. Аналітика без шуму. Новини та інсайди, яким довіряють — у зручному форматі сайту.'
+const HERO_NEWS_COUNT = 5
 
 interface HeroProps {
-  mainEvent?: Article | null
+  articles: Article[]
 }
 
-export default function Hero({ mainEvent }: HeroProps) {
-  const backgroundImage = mainEvent?.imageUrl || heroBg
+export default function Hero({ articles }: HeroProps) {
+  const heroArticles = articles.slice(0, HERO_NEWS_COUNT)
+
+  if (heroArticles.length === 0) return null
 
   return (
-    <section className="relative flex min-h-[240px] items-center overflow-hidden isolate border-b border-mandat-line py-[72px] pb-14 sm:min-h-[360px] lg:min-h-[480px]">
-      {/* Background photo with a dark gradient so the text stays readable */}
-      <img
-        src={backgroundImage}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover object-center -z-10"
-      />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-mandat-bg via-mandat-bg/80 to-mandat-bg/40" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-mandat-bg via-transparent to-mandat-bg/70" />
-
-      <div className="w-full px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-12 items-end">
-          <div>
-            {mainEvent ? (
-              <Link
-                to={`/news/${encodeURIComponent(mainEvent.id)}`}
-                className="inline-block text-inherit no-underline transition-colors hover:text-mandat-red-bright focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mandat-red-bright"
-              >
-                <h1 className={mainEventHeadingClassName}>{mainEvent.title}</h1>
-              </Link>
-            ) : (
-              <h1 className={headingClassName}>
-                Про владу, рішення,
-                <br />
-                гроші та <span className="text-mandat-red-bright">вплив.</span>
-              </h1>
+    <section aria-label="Головні новини" className="border-b border-mandat-line p-4 sm:p-6 lg:p-8">
+      <h1 className="sr-only">Головні новини</h1>
+      <div className="grid gap-3 md:[@media(hover:hover)]:flex md:[@media(hover:hover)]:h-[420px] lg:[@media(hover:hover)]:h-[500px]">
+        {heroArticles.map((article) => (
+          <Link
+            key={article.id}
+            to={`/news/${encodeURIComponent(article.id)}`}
+            aria-label={`Читати новину: ${article.title}`}
+            className="group relative min-h-[300px] overflow-hidden border border-mandat-line bg-mandat-surface text-mandat-text no-underline transition-[flex-grow] duration-500 ease-out motion-reduce:transition-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-mandat-red-bright md:[@media(hover:hover)]:min-h-0 md:[@media(hover:hover)]:flex-1 md:[@media(hover:hover)]:hover:flex-[3] md:[@media(hover:hover)]:focus-visible:flex-[3]"
+          >
+            {article.imageUrl && (
+              <img
+                src={article.imageUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out motion-reduce:transition-none group-hover:scale-105 group-focus-visible:scale-105 motion-reduce:group-hover:scale-100 motion-reduce:group-focus-visible:scale-100"
+              />
             )}
-            <p className="max-w-[520px] text-mandat-muted text-[17px] mt-7">
-              {mainEvent?.excerpt ?? fallbackDescription}
-            </p>
-          </div>
-          <div className="lg:absolute lg:bottom-8 lg:right-8 lg:border-l-[2px] lg:border-mandat-red-bright lg:pl-7 lg:justify-self-end">
-            <div className="font-display text-[56px] font-bold leading-none">42 728</div>
-            <div className="text-mandat-muted uppercase tracking-[2px] text-[13px] mt-2">
-              підписників уже з нами
+            <div className="absolute inset-0 bg-gradient-to-t from-mandat-bg to-transparent" />
+
+            <div className="absolute inset-x-0 bottom-0 p-5 lg:p-6">
+              <div className="md:[@media(hover:hover)]:translate-y-4 md:[@media(hover:hover)]:opacity-0 transition-all md:duration-300 motion-reduce:transition-none md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-visible:translate-y-0 md:group-focus-visible:opacity-100">
+                <span className="mb-3 inline-block bg-mandat-red px-3 py-1 font-display text-[11px] uppercase tracking-[2px] text-mandat-text">
+                  {article.category}
+                </span>
+                <h2 className="break-words text-[22px] font-bold leading-[1.15] lg:text-[26px]">{article.title}</h2>
+                <p className="mt-3 line-clamp-3 max-w-[560px] text-[15px] text-mandat-muted">
+                  {article.excerpt}
+                </p>
+              </div>
             </div>
-          </div>
-        </div>
+          </Link>
+        ))}
       </div>
     </section>
   )

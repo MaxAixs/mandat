@@ -55,6 +55,18 @@ function asHomeNewsWithMainEvent(
   return result as HomeNewsWithMainEvent
 }
 
+// HomeNewsData.heroArticles is specified but not implemented yet. Declaring the
+// expected shape locally keeps this suite compiling so the failure stays behavioral.
+type HomeNewsWithHeroArticles = Awaited<ReturnType<HomeApi['getHomeNews']>> & {
+  heroArticles: Article[]
+}
+
+function asHomeNewsWithHeroArticles(
+  result: Awaited<ReturnType<HomeApi['getHomeNews']>>,
+): HomeNewsWithHeroArticles {
+  return result as HomeNewsWithHeroArticles
+}
+
 let getHomeNews: HomeApi['getHomeNews']
 let getPublicNews: ExpectedNewsApi['getPublicNews']
 let getPublicNewsArticle: ExpectedHomeApi['getPublicNewsArticle']
@@ -261,10 +273,17 @@ test('getHomeNews keeps featured articles first but secondary feeds chronologica
   mockResponse({ items: [olderFeatured, newerRegular], page: 1, limit: 20 })
 
   const result = await getHomeNews()
+  const heroResult = asHomeNewsWithHeroArticles(result)
 
   assert.deepEqual(
     result.articles.map((article) => article.id),
     ['featured-older', 'regular-newer'],
+  )
+  assert.ok(Array.isArray(heroResult.heroArticles), 'expected getHomeNews to return heroArticles')
+  assert.deepEqual(
+    heroResult.heroArticles.map((article) => article.id),
+    ['regular-newer', 'featured-older'],
+    'expected heroArticles to follow publication order regardless of featured curation',
   )
   assert.deepEqual(
     result.latestNews.map((item) => item.id),
@@ -308,6 +327,7 @@ test('getHomeNews returns empty sections and no main event for an empty feed', a
 
   assert.deepEqual(result, {
     articles: [],
+    heroArticles: [],
     latestNews: [],
     tickerItems: [],
     mainEvent: null,
@@ -382,6 +402,17 @@ test('getHomeNews maps only the main_event article into mainEvent', async () => 
     result.articles.every((article) => article.id !== mainEvent.id),
     'the hero article must not repeat inside the mosaic',
   )
+
+  // The hero list is independent of the curated mosaic: a selected main event
+  // is still one of the newest publications and must be available to Hero.
+  const heroResult = asHomeNewsWithHeroArticles(result)
+  assert.ok(Array.isArray(heroResult.heroArticles), 'expected getHomeNews to return heroArticles')
+  assert.deepEqual(
+    heroResult.heroArticles.map((article) => article.id),
+    ['featured-newer', 'regular', 'main-event'],
+    'expected heroArticles to include the selected main event in publication order',
+  )
+
   assert.deepEqual(
     result.latestNews.map((item) => item.id),
     ['featured-newer', 'regular', 'main-event'],

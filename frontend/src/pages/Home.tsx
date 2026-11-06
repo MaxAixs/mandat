@@ -11,12 +11,12 @@ import usePublicNews from '@/hooks/use-public-news'
 const LATEST_NEWS_COUNT = 10
 
 export default function Home() {
-  const { articles, latestNews, tickerItems, mainEvent, loading, error, retry } = usePublicNews()
+  const { articles, heroArticles, latestNews, tickerItems, loading, error, retry } = usePublicNews()
 
   return (
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
       <Header />
-      <Hero mainEvent={mainEvent} />
+      <Hero articles={heroArticles} />
       <Ticker headlines={tickerItems} />
       <News articles={articles} loading={loading} error={error} onRetry={retry} />
       <LatestNews items={latestNews.slice(0, LATEST_NEWS_COUNT)} />

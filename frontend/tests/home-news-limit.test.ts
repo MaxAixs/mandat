@@ -4,6 +4,7 @@ import Module from 'node:module'
 import path from 'node:path'
 
 import type { PublicNews, PublicNewsListResponse } from '../src/api/news'
+import type { Article } from '../src/types'
 
 // src/api/index.ts imports '@/api/news'; Node needs the alias resolved at runtime.
 interface ModuleInternals {
@@ -26,6 +27,12 @@ moduleInternals._resolveFilename = function resolveAlias(request, ...rest) {
 }
 
 type HomeApi = typeof import('../src/api')
+
+// HomeNewsData.heroArticles is specified but not implemented yet. Declaring the
+// expected shape locally keeps this suite compiling so the failure stays behavioral.
+type HomeNewsWithHeroArticles = Awaited<ReturnType<HomeApi['getHomeNews']>> & {
+  heroArticles: Article[]
+}
 
 let getHomeNews: HomeApi['getHomeNews']
 
@@ -197,6 +204,16 @@ test('getHomeNews limits the main news list to six featured-first articles', asy
     result.articles.map((article) => article.featured),
     [true, true, true, false, false, false],
     'expected featured articles to stay first inside the limited list',
+  )
+
+  // The Hero is curated independently of the mosaic: it takes the five newest
+  // publications, ignoring the featured-first ordering used by «Головні новини».
+  const heroArticles = (result as HomeNewsWithHeroArticles).heroArticles
+  assert.ok(Array.isArray(heroArticles), 'expected getHomeNews to return heroArticles')
+  assert.deepEqual(
+    heroArticles.map((article) => article.id),
+    CHRONOLOGICAL_ORDER.slice(0, 5),
+    'expected heroArticles to be the five newest publications in chronological order',
   )
 
   // Only «Головні новини» is limited: the secondary feeds keep every item.

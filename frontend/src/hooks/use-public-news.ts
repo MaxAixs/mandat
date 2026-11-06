@@ -6,6 +6,7 @@ import { getNewsErrorMessage } from '@/api/news'
 
 const emptyNews: HomeNewsData = {
   articles: [],
+  heroArticles: [],
   latestNews: [],
   tickerItems: [],
   mainEvent: null,

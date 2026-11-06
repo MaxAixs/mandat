@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-home-layout-tests"
+  },
+  "include": ["../home-layout.test.tsx"]
+}
