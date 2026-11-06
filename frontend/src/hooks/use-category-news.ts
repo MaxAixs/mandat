@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { getCategoryNews } from '@/api'
+import { getFeedNews } from '@/api'
 import type { CategoryNewsData } from '@/api'
 import { getNewsErrorMessage } from '@/api/news'
 import type { Category } from '@/types'
 
-const CATEGORY_PAGE_LIMIT = 20
+const DEFAULT_PAGE_LIMIT = 20
 
-export default function useCategoryNews(category: Category) {
+export default function useCategoryNews(category: Category | null, limit = DEFAULT_PAGE_LIMIT) {
   const [data, setData] = useState<CategoryNewsData>({
     articles: [],
     page: 1,
-    limit: CATEGORY_PAGE_LIMIT,
+    limit,
   })
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -24,17 +24,17 @@ export default function useCategoryNews(category: Category) {
     setError(null)
 
     try {
-      const result = await getCategoryNews(category, page, CATEGORY_PAGE_LIMIT)
+      const result = await getFeedNews(category, page, limit)
       if (currentRequest === requestId.current) setData(result)
     } catch (loadError) {
       if (currentRequest === requestId.current) {
-        setData({ articles: [], page, limit: CATEGORY_PAGE_LIMIT })
+        setData({ articles: [], page, limit })
         setError(getNewsErrorMessage(loadError))
       }
     } finally {
       if (currentRequest === requestId.current) setLoading(false)
     }
-  }, [category, page])
+  }, [category, page, limit])
 
   useEffect(() => {
     setPage(1)
@@ -44,7 +44,7 @@ export default function useCategoryNews(category: Category) {
     void loadNews()
   }, [loadNews])
 
-  const hasNextPage = data.articles.length === CATEGORY_PAGE_LIMIT
+  const hasNextPage = data.articles.length === limit
   const nextPage = useCallback(() => {
     if (hasNextPage) setPage((current) => current + 1)
   }, [hasNextPage])

@@ -22,16 +22,11 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'Про нас', href: '#about' },
 ]
 
-/** Footer link columns. */
+/** Footer link columns. The "Розділи" column mirrors the header navigation. */
 export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
   {
     title: 'Розділи',
-    links: [
-      { label: 'Новини', href: '#news' },
-      { label: 'Аналітика', href: '#analytics' },
-      { label: 'Інсайди', href: '#insight' },
-      { label: 'Розслідування', href: '#insight' },
-    ],
+    links: NAV_LINKS,
   },
   {
     title: 'Про проєкт',
@@ -40,15 +35,6 @@ export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
       { label: 'Редакційна політика', href: '#' },
       { label: 'Реклама', href: '#' },
       { label: 'Контакти', href: '#' },
-    ],
-  },
-  {
-    title: 'Соцмережі',
-    links: [
-      { label: 'Telegram', href: '#' },
-      { label: 'Facebook', href: '#' },
-      { label: 'YouTube', href: '#' },
-      { label: 'RSS', href: '#' },
     ],
   },
 ]

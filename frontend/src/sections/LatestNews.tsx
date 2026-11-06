@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+
 import { cn } from '@/lib/utils'
 import type { LatestNewsItem } from '@/types'
 
@@ -12,19 +14,19 @@ export default function LatestNews({ items }: { items: LatestNewsItem[] }) {
             <span className="inline-block w-2 h-7 bg-mandat-red-bright mr-3.5 align-middle" />
             Останні новини
           </h2>
-          <a
-            href="#"
+          <Link
+            to="/news"
             className="font-display shrink-0 whitespace-nowrap text-[11px] sm:text-[14px] tracking-[0.5px] sm:tracking-[2px] uppercase text-mandat-muted hover:text-mandat-red-bright transition-colors no-underline"
           >
             Всі новини →
-          </a>
+          </Link>
         </div>
 
         <div className="bg-mandat-surface border border-mandat-line divide-y divide-mandat-line">
           {items.map((item) => (
-            <a
+            <Link
               key={item.id}
-              href="#"
+              to={`/news/${encodeURIComponent(item.id)}`}
               className="group block px-6 py-4 no-underline transition-colors hover:bg-mandat-surface-2"
             >
               <div className="text-[12px] tracking-[1px] text-mandat-muted uppercase">
@@ -50,7 +52,7 @@ export default function LatestNews({ items }: { items: LatestNewsItem[] }) {
                 )}
                 {item.title}
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

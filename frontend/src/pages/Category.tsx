@@ -10,6 +10,10 @@ import Header from '@/sections/Header'
 import LatestNews from '@/sections/LatestNews'
 import type { Category, LatestNewsItem } from '@/types'
 
+// A rubric shows six cards: one prominent plus five regular ones.
+// The «Всі новини» feed keeps the default page of twenty.
+const CATEGORY_PAGE_LIMIT = 6
+
 export default function CategoryPage({ category }: { category: Category }) {
   const {
     articles,
@@ -20,7 +24,7 @@ export default function CategoryPage({ category }: { category: Category }) {
     retry,
     nextPage,
     previousPage,
-  } = useCategoryNews(category)
+  } = useCategoryNews(category, CATEGORY_PAGE_LIMIT)
   const [latest, setLatest] = useState<{ category: Category; items: LatestNewsItem[] } | null>(null)
 
   useEffect(() => {

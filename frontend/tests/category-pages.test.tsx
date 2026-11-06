@@ -461,7 +461,7 @@ test('Category article cards link to /news/:slug', async () => {
   }
 })
 
-test('Category page renders the main event as a large block above the grid', async () => {
+test('Category page renders the main event as a large first card inside the grid', async () => {
   const mainEvent = makeArticle('Спорт', {
     id: 'sport-main-event',
     title: 'Головна подія спорту',
@@ -475,43 +475,47 @@ test('Category page renders the main event as a large block above the grid', asy
 
   const html = await renderRoute('/sport')
   const expectedHref = `/news/${encodeURIComponent(mainEvent.id)}`
-  const largeBlock = articleLinks(html).find((anchor) =>
+  const largeCards = articleLinks(html).filter((anchor) =>
     classTokens(anchor.attributes).includes('lg:col-span-2'),
   )
 
-  assert.ok(largeBlock, `expected a large main-event block in:\n${html}`)
   assert.equal(
-    attribute(largeBlock.attributes, 'href'),
+    largeCards.length,
+    1,
+    `expected exactly one large main-event card in:\n${html}`,
+  )
+
+  const [largeCard] = largeCards
+  assert.equal(
+    attribute(largeCard.attributes, 'href'),
     expectedHref,
-    'the large block must link to the main-event article',
+    'the large card must link to the main-event article',
   )
   assert.ok(
-    visibleText(largeBlock.content).includes(mainEvent.title),
-    'the large block must show the main-event title',
+    visibleText(largeCard.content).includes(mainEvent.title),
+    'the large card must show the main-event title',
   )
 
   const gridIndex = html.indexOf('lg:grid-cols-3')
-  const largeBlockIndex = html.indexOf(mainEvent.title)
+  const largeCardIndex = html.indexOf(largeCard.attributes)
 
   assert.ok(gridIndex >= 0, `expected the article grid in:\n${html}`)
   assert.ok(
-    largeBlockIndex >= 0 && largeBlockIndex < gridIndex,
-    'the main-event block must be rendered above the article grid',
+    largeCardIndex > gridIndex,
+    'the main-event card must be rendered inside the article grid, not above it',
   )
 
   const links = articleLinks(html)
   assert.equal(
     links.length,
-    3,
-    'expected the large block plus every article in the grid, including the main event',
+    2,
+    'expected the large main card and the regular card only, with the main event not duplicated',
   )
-  for (const article of [regular, mainEvent]) {
-    const href = `/news/${encodeURIComponent(article.id)}`
-    assert.ok(
-      links.some((anchor) => attribute(anchor.attributes, 'href') === href),
-      `expected an article link to ${href} in:\n${html}`,
-    )
-  }
+  assert.equal(
+    links.filter((anchor) => attribute(anchor.attributes, 'href') === expectedHref).length,
+    1,
+    'the main-event article must be linked exactly once',
+  )
 })
 
 test('Category page omits the large block when no article is the main event', async () => {

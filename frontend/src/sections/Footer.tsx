@@ -4,11 +4,11 @@ export default function Footer() {
   return (
     <footer className="border-t border-mandat-line py-14 pb-8 bg-mandat-surface">
       <div className="mx-auto max-w-[1240px] px-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr] gap-10">
           <div>
-            <a href="#" className="flex items-center gap-3 no-underline text-mandat-text">
-              <span className="inline-block w-[12px] h-[34px] bg-mandat-red-bright" />
-              <span className="font-display text-[18px] font-bold tracking-[1.5px]">{SITE_NAME}</span>
+            <a href="#" className="flex items-center gap-4 no-underline text-mandat-text">
+              <span className="inline-block w-[16px] h-[44px] bg-mandat-red-bright" />
+              <span className="font-display text-[24px] font-bold tracking-[1.5px]">{SITE_NAME}</span>
             </a>
             <p className="text-mandat-muted text-[14px] mt-4 max-w-[280px]">
               Про владу, рішення, гроші та вплив. {SITE_TAGLINE}.

@@ -7,6 +7,9 @@ import Telegram from '@/sections/Telegram'
 import Footer from '@/sections/Footer'
 import usePublicNews from '@/hooks/use-public-news'
 
+// The «Останні новини» strip shows the ten newest articles.
+const LATEST_NEWS_COUNT = 10
+
 export default function Home() {
   const { articles, latestNews, tickerItems, mainEvent, loading, error, retry } = usePublicNews()
 
@@ -16,7 +19,7 @@ export default function Home() {
       <Hero mainEvent={mainEvent} />
       <Ticker headlines={tickerItems} />
       <News articles={articles} loading={loading} error={error} onRetry={retry} />
-      <LatestNews items={latestNews} />
+      <LatestNews items={latestNews.slice(0, LATEST_NEWS_COUNT)} />
       <Telegram />
       <Footer />
     </div>

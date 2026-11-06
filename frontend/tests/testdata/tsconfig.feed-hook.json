@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "/tmp/opencode/mandat-feed-hook-tests"
+  },
+  "include": [
+    "../feed-hook.test.ts",
+    "../../src/**/*.ts"
+  ]
+}

@@ -33,7 +33,7 @@ const viewsFormatter = new Intl.NumberFormat('uk-UA', {
   maximumFractionDigits: 1,
 })
 
-// «Головні новини» fills a 3-column mosaic: one featured 2×2 card plus five regular ones.
+// «Головні новини» fills a 3-column mosaic: one large 2×2 card plus five regular ones.
 const MAIN_NEWS_LIMIT = 6
 // The ticker keeps its own limit of five newest headlines.
 const TICKER_LIMIT = 5
@@ -97,7 +97,16 @@ export async function getCategoryNews(
   page = 1,
   limit = 20,
 ): Promise<CategoryNewsData> {
-  const response = await listPublicNews(page, limit, category)
+  return getFeedNews(category, page, limit)
+}
+
+// getFeedNews loads one page of the public feed, optionally filtered by rubric.
+export async function getFeedNews(
+  category: Category | null,
+  page = 1,
+  limit = 20,
+): Promise<CategoryNewsData> {
+  const response = await listPublicNews(page, limit, category ?? undefined)
 
   return { articles: response.items.map(toArticle), page: response.page, limit: response.limit }
 }

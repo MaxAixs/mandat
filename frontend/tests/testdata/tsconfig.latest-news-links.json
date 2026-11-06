@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-latest-news-links-tests"
+  },
+  "include": [
+    "../latest-news-links.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/sections/LatestNews.tsx"
+  ]
+}
