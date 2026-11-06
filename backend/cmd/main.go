@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/maxaixs/mandat/backend/internal/config"
+	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
 	"github.com/maxaixs/mandat/backend/internal/models"
 	newsrepo "github.com/maxaixs/mandat/backend/internal/repository/postgres"
 	redisrepo "github.com/maxaixs/mandat/backend/internal/repository/redis"
@@ -21,6 +22,7 @@ import (
 	pgdb "github.com/maxaixs/mandat/backend/pkg/database/postgres"
 	"github.com/maxaixs/mandat/backend/pkg/logger"
 	redisclient "github.com/maxaixs/mandat/backend/pkg/redis"
+	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
 )
 
 const configFile = "config.yaml"
@@ -62,7 +64,18 @@ func run() error {
 	}
 	defer redisClient.Close()
 
-	newsService := service.NewNewsService(newsrepo.NewNewsRepo(pool), log)
+	newsRepo := newsrepo.NewNewsRepo(pool)
+	r2client, err := r2.NewClient(cfg.Storage, nil)
+	if err != nil {
+		return fmt.Errorf("init r2 storage: %w", err)
+	}
+	newsService := service.NewNewsService(
+		newsRepo,
+		log,
+		r2client,
+		cfg.Storage.PublicBase(),
+		imgdownloader.NewDownloader(cfg.Download),
+	)
 	authRepo := newsrepo.NewAuthRepo(pool)
 	sessionStore := redisrepo.NewSessionStore(redisClient)
 	authService := service.NewAuthService(authRepo, sessionStore, log, cfg.HTTP.SessionTTL)

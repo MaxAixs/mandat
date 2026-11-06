@@ -23,7 +23,7 @@ const allowedOrigin = "http://localhost:5173"
 func setupRouter() (http.Handler, *testsupport.StubRepo) {
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := service.NewNewsService(repo, logger)
+	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
 	httpSrv := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},

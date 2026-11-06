@@ -12,9 +12,6 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
 )
 
-// maxBodyBytes is the maximum accepted request body size.
-const maxBodyBytes = 1 << 20
-
 // Server owns the http server, its gin router, and the graceful
 // shutdown policy.
 type Server struct {
@@ -44,7 +41,7 @@ func New(cfg HTTPConfig, registrars ...Registrar) *Server {
 	}
 
 	s.router.Use(gin.Recovery())
-	s.router.Use(middleware.LimitBodySize(maxBodyBytes))
+	s.router.Use(middleware.LimitBodySize(middleware.DefaultMaxBodyBytes))
 
 	if len(cfg.AllowedOrigins) > 0 {
 		s.router.Use(middleware.CORS(cfg.AllowedOrigins))

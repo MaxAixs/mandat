@@ -285,6 +285,105 @@ func TestDockerignored_MatchesDockerignoreSemantics(t *testing.T) {
 
 // Guards the image build: every file the Dockerfile copies from the build
 // context must survive .dockerignore, otherwise COPY fails the build.
+const r2MinimalYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+func TestLoad_R2EnvWiring(t *testing.T) {
+	cfg, err := config.Load(writeConfig(t, r2MinimalYAML), envMap(map[string]string{
+		"DB_PASSWORD":          "secret",
+		"R2_ACCESS_KEY_ID":     "env-key-id",
+		"R2_SECRET_ACCESS_KEY": "env-secret-key",
+		"R2_ENDPOINT":          "https://env-account.r2.cloudflarestorage.com",
+		"R2_BUCKET":            "env-bucket",
+		"R2_PUBLIC_BASE_URL":   "https://media.example.com",
+	}))
+
+	require.NoError(t, err)
+	assert.Equal(t, "env-key-id", cfg.Storage.AccessKeyID)
+	assert.Equal(t, "env-secret-key", cfg.Storage.SecretAccessKey)
+	assert.Equal(t, "https://env-account.r2.cloudflarestorage.com", cfg.Storage.Endpoint)
+	assert.Equal(t, "env-bucket", cfg.Storage.Bucket)
+	assert.Equal(t, "https://media.example.com", cfg.Storage.PublicBaseURL)
+}
+
+func TestLoad_R2AccountIDDerivesEndpoint(t *testing.T) {
+	cfg, err := config.Load(writeConfig(t, r2MinimalYAML), envMap(map[string]string{
+		"DB_PASSWORD":          "secret",
+		"R2_ACCOUNT_ID":        "abc123",
+		"R2_ACCESS_KEY_ID":     "env-key-id",
+		"R2_SECRET_ACCESS_KEY": "env-secret-key",
+		"R2_BUCKET":            "env-bucket",
+		"R2_PUBLIC_BASE_URL":   "https://media.example.com",
+	}))
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://abc123.r2.cloudflarestorage.com", cfg.Storage.Endpoint,
+		"R2_ACCOUNT_ID must derive the endpoint when none is configured")
+}
+
+func TestLoad_PartialStorageConfigFails(t *testing.T) {
+	cfg, err := config.Load(writeConfig(t, r2MinimalYAML), envMap(map[string]string{
+		"DB_PASSWORD": "secret",
+		"R2_BUCKET":   "env-bucket",
+	}))
+
+	require.Error(t, err, "a partially configured storage section must fail startup")
+	assert.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "storage")
+}
+
+func TestLoad_EmptyStoragePasses(t *testing.T) {
+	cfg, err := config.Load(writeConfig(t, r2MinimalYAML), envMap(map[string]string{
+		"DB_PASSWORD": "secret",
+	}))
+
+	require.NoError(t, err, "an untouched storage section must keep startup working")
+	require.NotNil(t, cfg)
+	assert.False(t, cfg.Storage.Configured())
+	assert.Empty(t, cfg.Storage.Endpoint)
+	assert.Empty(t, cfg.Storage.Bucket)
+	assert.Empty(t, cfg.Storage.PublicBaseURL)
+}
+
+// The shipped config must keep the pasted-image fetcher bounded: a timeout, a
+// byte cap, a redirect cap, and the private-address guard switched on.
+func TestLoad_DownloadDefaults(t *testing.T) {
+	cfg, err := config.Load(shippedConfigPath(t), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, 15*time.Second, cfg.Download.Timeout)
+	assert.Equal(t, int64(10<<20), cfg.Download.MaxBytes)
+	assert.Equal(t, 3, cfg.Download.MaxRedirects)
+	assert.False(t, cfg.Download.AllowPrivate,
+		"the private-address guard must stay on: AllowPrivate is code-only")
+}
+
+// A download section in the file may tune the bounds, but it must never lift
+// the SSRF guard through a hand-written allowprivate key.
+func TestLoad_DownloadOverrides(t *testing.T) {
+	const downloadYAML = `
+db:
+  host: localhost
+  user: mandat
+  database: mandat
+download:
+  timeout: 5s
+  max_bytes: 1024
+  max_redirects: 1
+  allowprivate: true
+`
+
+	cfg, err := config.Load(writeConfig(t, downloadYAML), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, 5*time.Second, cfg.Download.Timeout)
+	assert.Equal(t, int64(1024), cfg.Download.MaxBytes)
+	assert.Equal(t, 1, cfg.Download.MaxRedirects)
+	assert.False(t, cfg.Download.AllowPrivate,
+		"allowprivate in a config file must not lift the SSRF guard")
+}
+
 func TestDockerfileSourcesAreNotDockerignored(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	require.True(t, ok, "resolve config test file location")

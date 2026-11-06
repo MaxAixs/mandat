@@ -2,9 +2,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -30,6 +32,53 @@ const (
 	MaxSearchQueryLen  = 20
 )
 
+// NewsRepository is the persistence contract the service depends on.
+type NewsRepository interface {
+	Create(ctx context.Context, news *models.News) error
+	GetBySlug(ctx context.Context, slug string) (*models.News, error)
+	List(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
+	ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
+	SearchPublished(ctx context.Context, query string, limit int) ([]*models.News, error)
+	Update(ctx context.Context, news *models.News) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// ImageStorage uploads and deletes cover images.
+// The service owns this contract; pkg/storage/r2 implements it.
+type ImageStorage interface {
+	Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error)
+	Delete(ctx context.Context, key string) error
+}
+
+// ImageFetcher downloads pasted image URLs for cover storage.
+// The service owns this contract; internal/imgdownloader implements it.
+type ImageFetcher interface {
+	Fetch(ctx context.Context, url string) ([]byte, string, error)
+}
+
+// NewsService implements the business rules for news articles.
+type NewsService struct {
+	repo         NewsRepository
+	logger       *slog.Logger
+	storage      ImageStorage
+	coverBaseURL string
+	fetcher      ImageFetcher
+}
+
+// NewNewsService creates a fully initialized NewsService.
+// Storage and fetcher are required: main fails startup when R2 is down,
+// so cover paths never meet a nil dependency here. A nil fetcher alone
+// keeps the legacy behavior of storing pasted URLs as-is.
+func NewNewsService(
+	repo NewsRepository,
+	logger *slog.Logger,
+	storage ImageStorage,
+	publicBaseURL string,
+	fetcher ImageFetcher,
+) *NewsService {
+	return &NewsService{repo: repo, logger: logger, storage: storage, coverBaseURL: publicBaseURL, fetcher: fetcher}
+}
+
 // NewsInput is the editable article payload accepted by the service.
 // Category and Status are domain enums validated by the service.
 type NewsInput struct {
@@ -44,6 +93,16 @@ type NewsInput struct {
 	ImageUrl    string
 	Source      string
 	SourceURL   string
+	// Cover, when non-nil, uploads a new cover image and replaces ImageUrl.
+	Cover *CoverUpload
+}
+
+// CoverUpload is a raw cover file supplied with a create or update call.
+type CoverUpload struct {
+	Body        io.Reader
+	Filename    string
+	ContentType string
+	Size        int64
 }
 
 // ListResult is a page of articles returned by the service.
@@ -53,26 +112,22 @@ type ListResult struct {
 	Limit int
 }
 
-// NewsRepository is the persistence contract the service depends on.
-type NewsRepository interface {
-	Create(ctx context.Context, news *models.News) error
-	GetBySlug(ctx context.Context, slug string) (*models.News, error)
-	List(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
-	ListPublished(ctx context.Context, filter models.ListFilter) ([]*models.News, error)
-	SearchPublished(ctx context.Context, query string, limit int) ([]*models.News, error)
-	Update(ctx context.Context, news *models.News) error
-	Delete(ctx context.Context, id uuid.UUID) error
+// coverExtWhitelist lists the filename extensions accepted for covers.
+// Content itself is re-validated by the storage driver.
+var coverExtWhitelist = map[string]struct{}{
+	"jpg":  {},
+	"jpeg": {},
+	"png":  {},
+	"webp": {},
+	"gif":  {},
 }
 
-// NewsService implements the business rules for news articles.
-type NewsService struct {
-	repo   NewsRepository
-	logger *slog.Logger
-}
-
-// NewNewsService creates a NewsService over repo.
-func NewNewsService(repo NewsRepository, logger *slog.Logger) *NewsService {
-	return &NewsService{repo: repo, logger: logger}
+// fetchedExt maps sniffed image types onto cover key extensions.
+var fetchedExt = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/webp": "webp",
+	"image/gif":  "gif",
 }
 
 // Create derives a slug from the title and stores the article.
@@ -81,6 +136,23 @@ func (s *NewsService) Create(ctx context.Context, input NewsInput) (*models.News
 
 	if err := validateNews(&input); err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+
+	cover, imageURL, err := s.resolvePastedURL(ctx, input.ImageUrl, input.Cover)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to fetch pasted image", "fc", fc, "error", err)
+
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+	input.Cover, input.ImageUrl = cover, imageURL
+
+	imgExt := ""
+	if input.Cover != nil {
+		ext, err := coverExt(input.Cover.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", fc, err)
+		}
+		imgExt = ext
 	}
 
 	news := buildNews(input)
@@ -94,7 +166,7 @@ func (s *NewsService) Create(ctx context.Context, input NewsInput) (*models.News
 
 		createErr := s.repo.Create(ctx, &candidate)
 		if createErr == nil {
-			return &candidate, nil
+			return s.storeImg(ctx, &candidate, input.Cover, imgExt)
 		}
 		if !errors.Is(createErr, errs.ErrConflict) {
 			s.logger.ErrorContext(ctx, "failed to create news article", "fc", fc, "error", createErr)
@@ -268,6 +340,22 @@ func (s *NewsService) Update(ctx context.Context, slug string, input NewsInput) 
 		return nil, fmt.Errorf("%s: %w", fc, err)
 	}
 
+	cover, imageURL, err := s.resolvePastedURL(ctx, inputToValidate.ImageUrl, inputToValidate.Cover)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+	inputToValidate.Cover, inputToValidate.ImageUrl = cover, imageURL
+	input = inputToValidate
+
+	covExt := ""
+	if input.Cover != nil {
+		ext, err := coverExt(input.Cover.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", fc, err)
+		}
+		covExt = ext
+	}
+
 	news := buildNews(inputToValidate)
 
 	news.ID = existing.ID
@@ -278,11 +366,43 @@ func (s *NewsService) Update(ctx context.Context, slug string, input NewsInput) 
 		publishedAt := time.Now().UTC()
 		news.PublishedAt = &publishedAt
 	}
+	if input.Cover == nil && input.ImageUrl == "" {
+		news.ImageUrl = existing.ImageUrl
+	}
+
+	if input.Cover == nil {
+		if err := s.repo.Update(ctx, news); err != nil {
+			s.logger.ErrorContext(ctx, "failed to update news article", "fc", fc, "error", err)
+
+			return nil, fmt.Errorf("%s: %w", fc, err)
+		}
+
+		return news, nil
+	}
+
+	key := "covers/" + news.Slug + "." + covExt
+	url, err := s.storage.Upload(ctx, key, input.Cover.Body, input.Cover.ContentType)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to upload news cover", "fc", fc, "error", err)
+
+		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+	news.ImageUrl = url
 
 	if err := s.repo.Update(ctx, news); err != nil {
 		s.logger.ErrorContext(ctx, "failed to update news article", "fc", fc, "error", err)
 
+		if derr := s.storage.Delete(ctx, key); derr != nil {
+			s.logger.ErrorContext(ctx, "failed to delete orphaned news cover", "fc", fc, "key", key, "error", derr)
+		}
+
 		return nil, fmt.Errorf("%s: %w", fc, err)
+	}
+
+	if oldKey, _ := s.ownedCoverKey(existing.ImageUrl); oldKey != "" && oldKey != key {
+		if err := s.storage.Delete(ctx, oldKey); err != nil {
+			s.logger.ErrorContext(ctx, "failed to delete replaced news cover", "fc", fc, "key", oldKey, "error", err)
+		}
 	}
 
 	return news, nil
@@ -295,16 +415,87 @@ func (s *NewsService) Delete(ctx context.Context, slug string) error {
 	existing, err := s.repo.GetBySlug(ctx, slug)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to load news article", "fc", fc, "error", err)
+
 		return fmt.Errorf("%s: %w", fc, err)
 	}
 
 	if err := s.repo.Delete(ctx, existing.ID); err != nil {
 		s.logger.ErrorContext(ctx, "failed to delete news article", "fc", fc, "error", err)
+
 		return fmt.Errorf("%s: %w", fc, err)
+	}
+
+	if key, owned := s.ownedCoverKey(existing.ImageUrl); owned {
+		if err := s.storage.Delete(ctx, key); err != nil {
+			s.logger.ErrorContext(ctx, "failed to delete news cover", "fc", fc, "key", key, "error", err)
+		}
 	}
 
 	return nil
 }
+
+// resolvePastedURL downloads an external image URL into a cover upload.
+// It runs before any database write, so failures leave no partial state.
+// The returned cover and image URL replace the passed ones.
+func (s *NewsService) resolvePastedURL(ctx context.Context, imageURL string, cover *CoverUpload) (*CoverUpload, string, error) {
+	if cover != nil || s.fetcher == nil || !s.isExternalImageURL(imageURL) {
+		return cover, imageURL, nil
+	}
+
+	data, mime, err := s.fetcher.Fetch(ctx, imageURL)
+	if err != nil {
+		return nil, "", err
+	}
+
+	imgExt, ok := fetchedExt[mime]
+	if !ok {
+		return nil, "", errs.NewValidationError("image_url", "unsupported image type "+mime)
+	}
+
+	return &CoverUpload{Body: bytes.NewReader(data), Filename: "image." + imgExt, ContentType: mime}, "", nil
+}
+
+// isExternalImageURL reports pasted links pointing outside our bucket.
+func (s *NewsService) isExternalImageURL(raw string) bool {
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+		return false
+	}
+	_, owned := s.ownedCoverKey(raw)
+
+	return !owned
+}
+
+// storeImg uploads cover for a freshly created article and persists its
+// URL. A nil cover leaves the article as is. Failures compensate the
+// created row (and the uploaded object) so no orphan state survives.
+func (s *NewsService) storeImg(ctx context.Context, news *models.News, cover *CoverUpload, ext string) (*models.News, error) {
+	if cover == nil {
+		return news, nil
+	}
+
+	key := "covers/" + news.Slug + "." + ext
+	prevURL := news.ImageUrl
+	url, err := s.storage.Upload(ctx, key, cover.Body, cover.ContentType)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to upload news cover, article kept without cover", "error", err)
+
+		return news, nil
+	}
+
+	news.ImageUrl = url
+	if err := s.repo.Update(ctx, news); err != nil {
+		s.logger.ErrorContext(ctx, "failed to save news cover url", "error", err)
+		if derr := s.storage.Delete(ctx, key); derr != nil {
+			s.logger.ErrorContext(ctx, "failed to delete orphaned news cover", "key", key, "error", derr)
+		}
+		news.ImageUrl = prevURL
+
+		return news, nil
+	}
+
+	return news, nil
+}
+
 
 // buildNews maps validated input onto a domain article.
 func buildNews(input NewsInput) *models.News {
@@ -336,4 +527,38 @@ func buildNews(input NewsInput) *models.News {
 	}
 
 	return news
+}
+
+// coverExt validates the cover filename and returns its lowercase extension.
+func coverExt(filename string) (string, error) {
+	dotIndex := strings.LastIndex(filename, ".")
+	if dotIndex < 0 || dotIndex == len(filename)-1 {
+		return "", errs.NewValidationError("cover", "file must have an image extension")
+	}
+	ext := strings.ToLower(filename[dotIndex+1:])
+	if _, ok := coverExtWhitelist[ext]; !ok {
+		return "", errs.NewValidationError("cover", "unsupported image type "+ext)
+	}
+
+	return ext, nil
+}
+
+// ownedCoverKey extracts the storage key when url points at our bucket.
+// Only keys under covers/ qualify: shared assets on the same host stay
+// untouched, and unsafe key shapes are rejected.
+func (s *NewsService) ownedCoverKey(url string) (string, bool) {
+	if s.storage == nil || s.coverBaseURL == "" || url == "" {
+		return "", false
+	}
+
+	prefix := strings.TrimRight(s.coverBaseURL, "/") + "/"
+	if !strings.HasPrefix(url, prefix) {
+		return "", false
+	}
+	key := strings.TrimPrefix(url, prefix)
+	if !strings.HasPrefix(key, "covers/") || strings.Contains(key, "..") || strings.HasPrefix(key, "/") {
+		return "", false
+	}
+
+	return key, true
 }

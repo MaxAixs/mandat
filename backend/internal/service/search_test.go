@@ -60,7 +60,7 @@ func (r *searchFakeRepo) SearchPublished(_ context.Context, query string, limit 
 func newSearchTestService(repo *searchFakeRepo) *NewsService {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	return NewNewsService(repo, logger)
+	return NewNewsService(repo, logger, nil, "", nil)
 }
 
 func TestSearchPublished_EmptyQueryReturnsEmptyList(t *testing.T) {

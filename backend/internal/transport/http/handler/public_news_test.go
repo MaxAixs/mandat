@@ -49,7 +49,7 @@ type publicListPayload struct {
 func setupPublicRouter() (http.Handler, *testsupport.StubRepo) {
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := service.NewNewsService(repo, logger)
+	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
 	httpSrv := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},
@@ -311,7 +311,7 @@ const publishedDetailBody = `{"category":"Міжнародні новини","ti
 // publicDetailFields is the exact field set of a public detail payload.
 var publicDetailFields = []string{
 	"slug", "category", "title", "description", "image_url",
-	"featured", "main_event", "views", "published_at", "text",
+	"featured", "main_event", "source", "source_url", "views", "published_at", "text",
 }
 
 func decodePublicDetail(t *testing.T, body []byte) map[string]any {
@@ -516,7 +516,7 @@ func seedSearchNews(
 func setupPublicRouterWithViewer() (http.Handler, *testsupport.StubRepo) {
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	svc := service.NewNewsService(repo, logger)
+	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
 	httpSrv := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},

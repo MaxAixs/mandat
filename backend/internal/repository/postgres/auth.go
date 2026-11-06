@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -58,11 +57,7 @@ func (r *AuthRepo) getAdminUser(
 		&user.PasswordHash,
 		&user.Role,
 	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("%s: %w", fc, errs.ErrUnauthorized)
-		}
-
-		return nil, fmt.Errorf("%s: %w", fc, err)
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrUnauthorized))
 	}
 
 	return &user, nil

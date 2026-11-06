@@ -63,7 +63,7 @@ func newTestService() (*NewsService, *testsupport.StubRepo) {
 	repo := testsupport.NewStubRepo()
 	handler := &captureHandler{}
 	logger := slog.New(handler)
-	return NewNewsService(repo, logger), repo
+	return NewNewsService(repo, logger, nil, "", nil), repo
 }
 
 func validInput() NewsInput {
@@ -619,7 +619,7 @@ func TestCreate_LogsFailureWithFunctionContext(t *testing.T) {
 	repo := testsupport.NewStubRepo()
 	repo.CreateErr = errors.New("db is down")
 	handler := &captureHandler{}
-	svc := NewNewsService(repo, slog.New(handler))
+	svc := NewNewsService(repo, slog.New(handler), nil, "", nil)
 
 	_, err := svc.Create(context.Background(), validInput())
 	require.Error(t, err)

@@ -1,4 +1,4 @@
-# The single application configuration. Docker Compose is the supported way to
+  # The single application configuration. Docker Compose is the supported way to
 # run the service, so the hosts below are Compose service names. Secrets never
 # live here: they come from the environment (see .env.example).
 
@@ -17,6 +17,7 @@ http:
   allowed_origins:
     - http://localhost:5173
     - http://localhost:3000
+    - http://localhost:3001
 
 db:
   host: db
@@ -29,3 +30,15 @@ redis:                # admin sessions; the local Compose Redis has no password
   addr: redis:6379
   db: 0
   dial_timeout: 5s
+
+storage:              # Cloudflare R2; keys come from R2_ACCESS_KEY_ID /
+  endpoint: ""        # R2_SECRET_ACCESS_KEY (or set R2_ACCOUNT_ID to derive it)
+  bucket: ""         # or R2_ENDPOINT / R2_BUCKET env overrides
+  public_base_url: "" # REQUIRED when storage is enabled: public r2.dev or
+                      # custom-domain root; the S3 API endpoint is authenticated
+                      # and its fallback URLs are not publicly deliverable
+
+download:             # pasted-image fetcher (covers); AllowPrivate is code-only
+  timeout: 15s
+  max_bytes: 10485760 # 10 MB, keep in sync with the R2 driver cap
+  max_redirects: 3

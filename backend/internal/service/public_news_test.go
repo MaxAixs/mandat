@@ -17,7 +17,7 @@ func newPublicTestService() (*NewsService, *testsupport.StubRepo, *captureHandle
 	repo := testsupport.NewStubRepo()
 	handler := &captureHandler{}
 
-	return NewNewsService(repo, slog.New(handler)), repo, handler
+	return NewNewsService(repo, slog.New(handler), nil, "", nil), repo, handler
 }
 
 // createPublished stores a published article and returns it.

@@ -9,15 +9,23 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/pkg/database/postgres"
 	"github.com/maxaixs/mandat/backend/pkg/redis"
+	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
 	"github.com/spf13/viper"
 )
 
 const (
 	passwordEnvVar      = "DB_PASSWORD"
 	redisPasswordEnvVar = "REDIS_PASSWORD"
+	r2AccessKeyEnvVar   = "R2_ACCESS_KEY_ID"
+	r2SecretKeyEnvVar   = "R2_SECRET_ACCESS_KEY"
+	r2AccountIDEnvVar   = "R2_ACCOUNT_ID"
+	r2EndpointEnvVar    = "R2_ENDPOINT"
+	r2BucketEnvVar      = "R2_BUCKET"
+	r2PublicBaseEnvVar  = "R2_PUBLIC_BASE_URL"
 )
 
 // Config is the full application configuration.
@@ -26,6 +34,8 @@ type Config struct {
 	HTTP     httptransport.HTTPConfig `mapstructure:"http"`
 	DB       postgres.DBConfig        `mapstructure:"db"`
 	Redis    redis.Config             `mapstructure:"redis"`
+	Storage  r2.Config                `mapstructure:"storage"`
+	Download imgdownloader.Config     `mapstructure:"download"`
 }
 
 // Load reads the YAML file at path and validates it.
@@ -46,6 +56,22 @@ func Load(path string, getenv func(string) string) (*Config, error) {
 
 	cfg.DB.Password = getenv(passwordEnvVar)
 	cfg.Redis.Password = getenv(redisPasswordEnvVar)
+	cfg.Storage.AccessKeyID = getenv(r2AccessKeyEnvVar)
+	cfg.Storage.SecretAccessKey = getenv(r2SecretKeyEnvVar)
+	if value := getenv(r2EndpointEnvVar); value != "" {
+		cfg.Storage.Endpoint = value
+	}
+	if value := getenv(r2BucketEnvVar); value != "" {
+		cfg.Storage.Bucket = value
+	}
+	if value := getenv(r2PublicBaseEnvVar); value != "" {
+		cfg.Storage.PublicBaseURL = value
+	}
+	if cfg.Storage.Endpoint == "" {
+		if accountID := getenv(r2AccountIDEnvVar); accountID != "" {
+			cfg.Storage.Endpoint = "https://" + accountID + ".r2.cloudflarestorage.com"
+		}
+	}
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -70,6 +96,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("redis.addr", "localhost:6379")
 	v.SetDefault("redis.db", 0)
 	v.SetDefault("redis.dial_timeout", 5*time.Second)
+	v.SetDefault("download.timeout", 15*time.Second)
+	v.SetDefault("download.max_bytes", 10<<20)
+	v.SetDefault("download.max_redirects", 3)
 }
 
 // validate fails fast on missing required settings.
@@ -83,6 +112,11 @@ func (c *Config) validate() error {
 		return fmt.Errorf("db.database is required in the config file")
 	case c.DB.Password == "":
 		return fmt.Errorf("%s environment variable is required (the password never lives in the config file)", passwordEnvVar)
+	}
+	if c.Storage.Configured() {
+		if err := c.Storage.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/maxaixs/mandat/backend/internal/errs"
 )
 
 // ViewDB is the PostgreSQL surface used by ViewRepo.
@@ -55,7 +56,7 @@ func (r *ViewRepo) RecordView(
 
 	var views int64
 	if err := r.db.QueryRow(ctx, query, slug, viewerID, cooldown.Seconds()).Scan(&views); err != nil {
-		return 0, fmt.Errorf("%s: %w", fc, mapError(err))
+		return 0, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 
 	return views, nil

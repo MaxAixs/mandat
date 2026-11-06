@@ -15,9 +15,6 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/models"
 )
 
-// uniqueViolation is the PostgreSQL SQLSTATE for unique constraint violations.
-const uniqueViolation = "23505"
-
 // newsColumns is the canonical column list shared by SELECT queries.
 const newsColumns = `id, slug, category, title, description, text, language,
 	status, views, featured, main_event, image_url, source, source_url, published_at, created_at, updated_at`
@@ -50,7 +47,7 @@ func (r *NewsRepo) Create(ctx context.Context, news *models.News) error {
 		err = insertNews(ctx, r.pool, news)
 	}
 	if err != nil {
-		return fmt.Errorf("%s: %w", fc, mapError(err))
+		return fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 
 	return nil
@@ -84,7 +81,7 @@ func (r *NewsRepo) GetBySlug(ctx context.Context, slug string) (*models.News, er
 
 	news, err := scanNews(r.pool.QueryRow(ctx, query, slug))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 
 	return news, nil
@@ -98,7 +95,7 @@ func (r *NewsRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.News, err
 
 	news, err := scanNews(r.pool.QueryRow(ctx, query, id))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 
 	return news, nil
@@ -133,7 +130,7 @@ func (r *NewsRepo) List(ctx context.Context, filter models.ListFilter) ([]*model
 
 	rows, err := r.pool.Query(ctx, listQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 	defer rows.Close()
 
@@ -174,7 +171,7 @@ func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) 
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 	defer rows.Close()
 
@@ -210,7 +207,7 @@ func (r *NewsRepo) SearchPublished(ctx context.Context, query string, limit int)
 		limit,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fc, mapError(err))
+		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 	defer rows.Close()
 
@@ -243,7 +240,7 @@ func (r *NewsRepo) Update(ctx context.Context, news *models.News) error {
 		err = updateNews(ctx, r.pool, news)
 	}
 	if err != nil {
-		return fmt.Errorf("%s: %w", fc, mapError(err))
+		return fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
 
 	return nil
@@ -356,18 +353,4 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 // escapeLike escapes the LIKE pattern metacharacters in s.
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
-}
-
-// mapError translates PostgreSQL errors into domain sentinel errors.
-func mapError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
-		return errs.ErrNewsNotFound
-	}
-
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
-		return fmt.Errorf("%s: %w", pgErr.ConstraintName, errs.ErrConflict)
-	}
-
-	return err
 }

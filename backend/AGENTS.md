@@ -14,7 +14,7 @@ The application must follow Clean Architecture, SOLID principles, and idiomatic 
 - CRUD operations for news articles.
 - News content editing, translation, and text improvement using an AI API.
 - Image upload, storage, and editing for news articles.
-- Image storage using an S3-compatible cloud service.
+- Image storage in Cloudflare R2.
 - PostgreSQL for persistent data storage.
 - Docker-based local development and deployment.
 - Future support for Kubernetes without introducing unnecessary infrastructure complexity now.
@@ -25,7 +25,7 @@ The application must follow Clean Architecture, SOLID principles, and idiomatic 
 - HTTP framework: Gin.
 - Database: PostgreSQL.
 - Database access: use a repository abstraction.
-- Object storage: S3-compatible storage.
+- Object storage: Cloudflare R2 (S3 API).
 - Containerization: Docker and Docker Compose.
 - Dependency injection: Uber FX when it provides a clear benefit.
 - Future orchestration: Kubernetes.
@@ -90,7 +90,7 @@ Notes:
 
 ### Dependency rules
 
-- Domain must not depend on Gin, PostgreSQL, S3 SDKs, or external AI providers.
+- Domain must not depend on Gin, PostgreSQL, R2 SDKs, or external AI providers.
 - Services contain business logic and depend on interfaces rather than infrastructure implementations.
 - Repositories implement persistence operations and must not contain business logic.
 - HTTP handlers translate HTTP requests into service calls and service results into HTTP responses.
@@ -471,12 +471,14 @@ For image editing, define the provider capabilities and supported operations bef
 
 ## 10. Image Storage
 
-Store image files in an S3-compatible object storage service. Store image metadata and object references in PostgreSQL, not the binary contents themselves.
+Store image files in Cloudflare R2. Store image metadata and object references in PostgreSQL, not the binary contents themselves. R2 is the only object storage; AWS S3 is not supported.
+
+Cover object keys derive from the article slug (`covers/<slug>.<ext>`) at create/update time.
 
 Requirements:
 
 - Encapsulate storage operations behind an interface.
-- Keep the implementation independent of a specific S3-compatible vendor.
+- Keep the implementation behind the service-owned `ImageStorage` interface (`internal/service`).
 - Configure bucket names, endpoints, regions, and credentials externally.
 - Validate file types and sizes.
 - Do not trust client-provided MIME types alone.
@@ -559,7 +561,7 @@ Write tests for business logic and critical application behavior.
 
 Requirements:
 
-- Unit-test services independently of PostgreSQL, Gin, S3, and AI providers.
+- Unit-test services independently of PostgreSQL, Gin, R2, and AI providers.
 - Use mocks or small test doubles for external dependencies when appropriate.
 - Test error paths as well as successful execution.
 - Add repository integration tests against PostgreSQL for important queries and transaction behavior.
@@ -636,7 +638,7 @@ Do not hardcode:
 
 - Database credentials.
 - AI API keys.
-- S3 credentials.
+- R2 credentials.
 - Deployment-specific endpoints.
 - Production bucket names.
 - Environment-specific URLs.
@@ -653,7 +655,7 @@ Possible future capabilities:
 - Background processing for AI operations.
 - Scheduled article publication.
 - Multiple AI providers.
-- Multiple image storage providers.
+- Multiple image storage providers (not planned; R2 only).
 - Caching and CDN integration.
 - Editorial roles and permissions.
 - Audit history for article edits.
