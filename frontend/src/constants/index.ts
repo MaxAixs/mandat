@@ -11,14 +11,16 @@ export const TELEGRAM_CHANNEL = {
 }
 
 /** Categories available for news articles. */
-export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас']
+export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас', 'Політика', 'Регіональні новини']
 
 /** Header navigation. */
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '/' },
+  { label: 'Політика', href: '/politics' },
   { label: 'Міжнародні новини', href: '/international' },
+  { label: 'Регіональні новини', href: '/regional' },
   { label: 'Спорт', href: '/sport' },
-  { label: 'Інтерв\'ю', href: '#' },
+  { label: 'Інтерв\'ю', href: '/interview' },
   { label: 'Про нас', href: '#about' },
 ]
 

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from 'lucide-react
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { CATEGORIES } from '@/constants'
 import useCategoryNews from '@/hooks/use-category-news'
 import { cn } from '@/lib/utils'
 import Footer from '@/sections/Footer'
@@ -11,10 +12,12 @@ import type { Category } from '@/types'
 
 type FeedFilter = Category | null
 
+// Rubric filter buttons: every news rubric except «Про нас» (an about page,
+// not news). Single source is CATEGORIES, so the next rubric appears here
+// automatically.
 const FILTERS: { label: string; value: FeedFilter }[] = [
   { label: 'Всі новини', value: null },
-  { label: 'Міжнародні новини', value: 'Міжнародні новини' },
-  { label: 'Спорт', value: 'Спорт' },
+  ...CATEGORIES.filter((c) => c !== 'Про нас').map((c) => ({ label: c, value: c })),
 ]
 
 export default function Feed() {
@@ -35,10 +38,8 @@ export default function Feed() {
       <Header />
       <main className="mx-auto min-h-[60vh] max-w-[1240px] px-6 py-[72px]">
         <div className="mb-10">
-          <div className="mb-2 text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">
-            СТРІЧКА НОВИН
-          </div>
           <h1 className="text-[30px] font-bold tracking-[1px] md:text-[42px]">
+            <span className="inline-block w-2 h-8 bg-mandat-red-bright mr-3.5 align-middle md:h-10" />
             {filter ?? 'Всі новини'}
           </h1>
         </div>

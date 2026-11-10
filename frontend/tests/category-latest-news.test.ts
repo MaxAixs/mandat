@@ -129,14 +129,12 @@ test('getCategoryLatestNews maps items into LatestNewsItem entries', async () =>
       id: 'interview-final',
       time: '14:35',
       source: 'Інтерв\'ю',
-      important: true,
       title: 'Інтерв’ю з тренером',
     },
     {
       id: 'sport-preview',
       time: '',
       source: 'Спорт',
-      important: false,
       title: 'Прев’ю матчу',
     },
   ])

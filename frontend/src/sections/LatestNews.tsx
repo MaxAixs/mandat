@@ -9,7 +9,7 @@ export default function LatestNews({ items }: { items: LatestNewsItem[] }) {
   return (
     <section id="latest" className="pb-[72px]">
       <div className="mx-auto max-w-[1240px] px-6">
-        <div className="flex items-baseline justify-between mb-10">
+        <div className="flex items-baseline justify-between mb-6">
           <h2 className="text-[20px] sm:text-[30px] tracking-[1px] font-bold">
             <span className="inline-block w-2 h-7 bg-mandat-red-bright mr-3.5 align-middle" />
             Останні новини

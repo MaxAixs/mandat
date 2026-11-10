@@ -231,14 +231,12 @@ test('getHomeNews maps public news into home page sections', async () => {
       id: 'important-1',
       time: '14:35',
       source: "Інтерв'ю",
-      important: true,
       title: 'Важлива новина',
     },
     {
       id: 'news-2',
       time: '09:05',
       source: 'Новини',
-      important: false,
       title: 'Звичайна новина',
     },
   ])

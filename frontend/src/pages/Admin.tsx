@@ -8,9 +8,11 @@ import {
   FileText,
   Globe,
   Info,
+  Landmark,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
+  MapPin,
   Mic,
   Newspaper,
   Plus,
@@ -83,6 +85,8 @@ const mainEventIconByCategory: Record<Category, LucideIcon> = {
   Спорт: Volleyball,
   "Інтерв'ю": Mic,
   'Про нас': Info,
+  Політика: Landmark,
+  'Регіональні новини': MapPin,
 }
 
 function MainEventBadge({ category }: { category: Category }) {

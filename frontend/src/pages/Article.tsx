@@ -37,40 +37,42 @@ export function ArticleContent({ article }: { article: ArticleDetail }) {
           )}
         </div>
 
-        <h1 className="mt-6 text-center text-[30px] font-semibold leading-tight tracking-[0.01em] text-balance md:mt-8 md:text-[40px]">
+        <h1 className="mt-6 text-left text-[30px] font-semibold leading-tight tracking-[0.01em] md:mt-8 md:text-[40px]">
           {article.title}
         </h1>
 
-        <div className="mt-5 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-b border-mandat-line pb-6 text-[13px] uppercase tracking-wider text-mandat-muted">
-          <span className="inline-flex items-center gap-2">
-            <CalendarDays className="size-4" aria-hidden="true" />
-            {article.publishedAt}
-          </span>
-          <span className="inline-flex items-center gap-2 text-mandat-red-bright">
-            <Eye className="size-4" aria-hidden="true" />
-            {article.views}
-          </span>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-mandat-line pb-2 text-[13px] uppercase tracking-wider text-mandat-muted">
+          {article.source && (
+            <span>
+              Джерело:{' '}
+              {article.sourceUrl ? (
+                <a
+                  href={article.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-mandat-red-bright no-underline hover:underline"
+                >
+                  {article.source}
+                </a>
+              ) : (
+                article.source
+              )}
+            </span>
+          )}
+          <div className="inline-flex flex-wrap items-center gap-x-6 gap-y-2 ml-auto">
+            <span className="inline-flex items-center gap-2">
+              <CalendarDays className="size-4" aria-hidden="true" />
+              {article.publishedAt}
+            </span>
+            <span className="inline-flex items-center gap-2 text-mandat-red-bright">
+              <Eye className="size-4" aria-hidden="true" />
+              {article.views}
+            </span>
+          </div>
         </div>
         <div className="mt-8 whitespace-pre-line text-[17px] leading-8 text-mandat-text">
           {article.text}
         </div>
-        {article.source && (
-          <p className="mt-8 border-t border-mandat-line pt-6 text-[15px] text-mandat-muted">
-            Джерело:{' '}
-            {article.sourceUrl ? (
-              <a
-                href={article.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-mandat-red-bright no-underline hover:underline"
-              >
-                {article.source}
-              </a>
-            ) : (
-              article.source
-            )}
-          </p>
-        )}
       </div>
     </article>
   )

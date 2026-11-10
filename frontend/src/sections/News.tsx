@@ -1,30 +1,23 @@
-import { LoaderCircle, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from 'lucide-react'
 
 import NewsCard from '@/components/NewsCard'
-import type { Article } from '@/types'
+import { Button } from '@/components/ui/button'
+import useCategoryNews from '@/hooks/use-category-news'
 
-interface NewsProps {
-  articles: Article[]
-  loading: boolean
-  error: string | null
-  onRetry: () => void
-}
+const HOME_NEWS_PAGE_LIMIT = 6
 
-export default function News({ articles, loading, error, onRetry }: NewsProps) {
+export default function News() {
+  const { articles, loading, error, page, hasNextPage, retry, nextPage, previousPage } =
+    useCategoryNews(null, HOME_NEWS_PAGE_LIMIT)
+
   return (
     <section id="news" className="py-[72px]">
       <div className="mx-auto max-w-[1240px] px-6">
-        <div className="flex items-baseline justify-between mb-10">
+        <div className="flex items-baseline justify-between mb-6">
           <h2 className="text-[20px] sm:text-[30px] tracking-[1px] font-bold">
             <span className="inline-block w-2 h-7 bg-mandat-red-bright mr-3.5 align-middle" />
             Головні новини
           </h2>
-          <a
-            href="#"
-            className="font-display shrink-0 whitespace-nowrap text-[11px] sm:text-[14px] tracking-[0.5px] sm:tracking-[2px] uppercase text-mandat-muted hover:text-mandat-red-bright transition-colors no-underline"
-          >
-            Всі новини →
-          </a>
         </div>
 
         {loading ? (
@@ -39,7 +32,7 @@ export default function News({ articles, loading, error, onRetry }: NewsProps) {
             </p>
             <button
               type="button"
-              onClick={() => void onRetry()}
+              onClick={() => void retry()}
               className="inline-flex items-center gap-2 border border-mandat-line px-4 py-2 text-mandat-text transition-colors hover:border-mandat-red-bright"
             >
               <RefreshCw className="size-4" aria-hidden="true" />
@@ -61,6 +54,30 @@ export default function News({ articles, loading, error, onRetry }: NewsProps) {
             ))}
           </div>
         )}
+
+        <div className="mt-8 flex items-center justify-between border-t border-mandat-line pt-5 text-sm text-mandat-muted">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1 || loading}
+            onClick={previousPage}
+            className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
+          >
+            <ChevronLeft className="size-4" />
+            Назад
+          </Button>
+          <span>Сторінка {page}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasNextPage || loading}
+            onClick={nextPage}
+            className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
+          >
+            Далі
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
     </section>
   )

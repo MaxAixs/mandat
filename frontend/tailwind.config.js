@@ -4,9 +4,11 @@ module.exports = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
-      // One self-hosted variable family for text and headings (see src/index.css).
+      // PT Serif carries body text and article copy (`font-sans` is the default
+      // family); Inter is used for headings (see the base layer in index.css)
+      // and UI labels/captions via `font-display`.
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
+        sans: ['PT Serif', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
         display: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
       },
       colors: {

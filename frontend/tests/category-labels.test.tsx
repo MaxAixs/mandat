@@ -256,12 +256,12 @@ function headerCellTexts(html: string): string[] {
   return [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((match) => visibleText(match[1]))
 }
 
-function eyebrowAboveHeading(html: string): string {
-  const match = /<div\b[^>]*>\s*([^<]*?)\s*<\/div>\s*<h1\b[^>]*>/i.exec(html)
+function headingContent(html: string): string {
+  const match = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)
 
-  assert.ok(match, `expected an eyebrow element directly above the <h1> in:\n${html}`)
+  assert.ok(match, `expected an <h1> heading in:\n${html}`)
 
-  return visibleText(match[1])
+  return match[1]
 }
 
 function labelTextFor(html: string, htmlFor: string): string {
@@ -295,13 +295,22 @@ test('validateNewsPayload asks for «категорію» instead of «рубр�
   }
 })
 
-test('Category route labels the eyebrow above the heading «КАТЕГОРІЯ»', async () => {
+test('Category route marks the rubric heading with a red rule instead of an eyebrow', async () => {
   const html = await renderCategoryRoute()
+  const heading = headingContent(html)
 
-  assert.equal(
-    eyebrowAboveHeading(html),
-    'категорія',
-    `Category route: expected the eyebrow directly above <h1> to read «КАТЕГОРІЯ»:\n${html}`,
+  assert.ok(
+    visibleText(heading).includes('спорт'),
+    `Category route: expected the <h1> to name the rubric «Спорт»:\n${html}`,
+  )
+  assert.match(
+    heading,
+    /<span\b[^>]*class="[^"]*\bbg-mandat-red-bright\b[^"]*"[^>]*>/,
+    `Category route: expected the red rule inside <h1>:\n${html}`,
+  )
+  assert.ok(
+    !visibleText(html).includes('категорія'),
+    `Category route: the «КАТЕГОРІЯ» eyebrow above <h1> must be gone:\n${html}`,
   )
   assertNoRubric(html, 'Category route')
 })

@@ -17,6 +17,9 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/sport" element={<CategoryPage category="Спорт" />} />
         <Route path="/international" element={<CategoryPage category="Міжнародні новини" />} />
+        <Route path="/politics" element={<CategoryPage category="Політика" />} />
+        <Route path="/regional" element={<CategoryPage category="Регіональні новини" />} />
+        <Route path="/interview" element={<CategoryPage category="Інтерв'ю" />} />
         <Route path="/news" element={<Feed />} />
         <Route path="/news/:slug" element={<Article />} />
         <Route path="/admin/login" element={<Login />} />

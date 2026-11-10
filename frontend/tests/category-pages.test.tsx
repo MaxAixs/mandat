@@ -366,18 +366,29 @@ function clickControl(label: string): void {
 // Header and navigation
 // ---------------------------------------------------------------------------
 
-test('NAV_LINKS points Sport and International to their routes and keeps the other links', () => {
+test('NAV_LINKS points every rubric to its route and keeps the other links', () => {
   const hrefByLabel = new Map(NAV_LINKS.map((link) => [link.label, link.href]))
 
-  assert.equal(NAV_LINKS.length, 5, 'the header must keep exactly the five existing links')
+  assert.equal(NAV_LINKS.length, 7, 'the header must contain exactly the seven rubric links')
+  assert.deepEqual(
+    NAV_LINKS.map((link) => link.label),
+    ['Новини', 'Політика', 'Міжнародні новини', 'Регіональні новини', 'Спорт', 'Інтерв\'ю', 'Про нас'],
+    'the header must list the seven rubrics in navigation order',
+  )
   assert.equal(hrefByLabel.get('Новини'), '/', '«Новини» must keep the home route')
+  assert.equal(hrefByLabel.get('Політика'), '/politics', '«Політика» must open /politics')
   assert.equal(
     hrefByLabel.get('Міжнародні новини'),
     '/international',
     '«Міжнародні новини» must open /international',
   )
+  assert.equal(
+    hrefByLabel.get('Регіональні новини'),
+    '/regional',
+    '«Регіональні новини» must open /regional',
+  )
   assert.equal(hrefByLabel.get('Спорт'), '/sport', '«Спорт» must open /sport')
-  assert.equal(hrefByLabel.get('Інтерв\'ю'), '#', '«Інтерв\'ю» must keep its current href')
+  assert.equal(hrefByLabel.get('Інтерв\'ю'), '/interview', '«Інтерв\'ю» must open /interview')
   assert.equal(hrefByLabel.get('Про нас'), '#about', '«Про нас» must keep its current href')
 })
 
@@ -411,6 +422,9 @@ test('Header renders the exact rubric hrefs for Sport and International', async 
 const categoryRoutes: Array<{ route: string; category: Category }> = [
   { route: '/sport', category: 'Спорт' },
   { route: '/international', category: 'Міжнародні новини' },
+  { route: '/politics', category: 'Політика' },
+  { route: '/regional', category: 'Регіональні новини' },
+  { route: '/interview', category: 'Інтерв\'ю' },
 ]
 
 test('Category routes render their rubric heading and keep the site chrome', async () => {

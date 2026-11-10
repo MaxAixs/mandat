@@ -75,7 +75,6 @@ function toLatestNewsItem(news: PublicNews): LatestNewsItem {
     id: news.slug,
     time: formatDate(news.published_at, timeFormatter),
     source: news.category,
-    important: news.category === 'Інтерв\'ю',
     title: news.title,
   }
 }

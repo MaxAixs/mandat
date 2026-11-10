@@ -34,7 +34,6 @@ export default function Footer() {
         </div>
         <div className="mt-12 pt-6 border-t border-mandat-line flex flex-wrap justify-between text-mandat-muted text-[13px] gap-3">
           <span>© 2026 {SITE_NAME}. Усі права захищено.</span>
-          <span>Чіткість та структура · Мінімалізм · Контраст та ієрархія</span>
         </div>
       </div>
     </footer>

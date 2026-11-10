@@ -2,7 +2,7 @@
 // These mirror what the Go backend will eventually serve.
 
 /** Content rubric shown as a badge on cards. */
-export type Category = 'Новини' | 'Міжнародні новини' | 'Спорт' | 'Інтерв\'ю' | 'Про нас'
+export type Category = 'Новини' | 'Міжнародні новини' | 'Спорт' | 'Інтерв\'ю' | 'Про нас' | 'Політика' | 'Регіональні новини'
 
 /** A news/analytics article card. */
 export interface Article {

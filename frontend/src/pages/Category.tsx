@@ -51,11 +51,11 @@ export default function CategoryPage({ category }: { category: Category }) {
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
       <Header />
       <main className="mx-auto min-h-[60vh] max-w-[1240px] px-6 py-[72px]">
-        <div className="mb-10">
-          <div className="mb-2 text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">
-            КАТЕГОРІЯ
-          </div>
-          <h1 className="text-[30px] font-bold tracking-[1px] md:text-[42px]">{category}</h1>
+        <div className="mb-6">
+          <h1 className="text-[30px] font-bold tracking-[1px] md:text-[42px]">
+            <span className="inline-block w-2 h-8 bg-mandat-red-bright mr-3.5 align-middle md:h-10" />
+            {category}
+          </h1>
         </div>
 
         {loading ? (

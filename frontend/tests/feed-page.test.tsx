@@ -97,8 +97,15 @@ function buttons(html: string): ButtonElement[] {
   }))
 }
 
-function buttonLabels(html: string): string[] {
-  return buttons(html).map((button) => visibleText(button.content))
+function filterLabels(html: string): string[] {
+  const openingTag = /<div\b[^>]*\baria-label="Фільтр новин"[^>]*>/i.exec(html)
+  assert.ok(openingTag, `expected the feed filter group in:\n${html}`)
+
+  const start = openingTag.index + openingTag[0].length
+  const end = html.indexOf('</div>', start)
+  assert.ok(end > start, `expected the feed filter group to be closed in:\n${html}`)
+
+  return buttons(html.slice(start, end)).map((button) => visibleText(button.content))
 }
 
 test('Feed page default-exports a component that renders the site feed', async () => {
@@ -108,15 +115,21 @@ test('Feed page default-exports a component that renders the site feed', async (
   assert.ok(html.length > 0, 'the feed page must render markup')
 })
 
-test('Feed page renders the three feed filter buttons', async () => {
+test('Feed page renders a filter button for every news rubric except «Про нас»', async () => {
   const Feed = await loadFeed()
   const html = renderFeed(Feed)
-  const labels = buttonLabels(html)
 
-  for (const label of ['Всі новини', 'Міжнародні новини', 'Спорт']) {
-    assert.ok(
-      labels.some((candidate) => candidate.includes(label)),
-      `expected a «${label}» filter button, got ${JSON.stringify(labels)} in:\n${html}`,
-    )
-  }
+  assert.deepEqual(
+    filterLabels(html),
+    [
+      'Всі новини',
+      'Новини',
+      'Міжнародні новини',
+      'Спорт',
+      'Інтерв\'ю',
+      'Політика',
+      'Регіональні новини',
+    ],
+    `expected «Всі новини» plus every news rubric except «Про нас» as feed filters:\n${html}`,
+  )
 })
