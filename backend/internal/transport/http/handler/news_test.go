@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/testsupport"
 	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
@@ -130,10 +131,36 @@ func TestCreate_MissingTitleReturns400(t *testing.T) {
 func TestCreate_UnknownCategoryReturns400(t *testing.T) {
 	router, _ := setupRouter()
 
-	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Політика","title":"Тест","text":"Текст"}`)
+	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Фантастика","title":"Тест","text":"Текст"}`)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Equal(t, `unknown category "Політика"`, decodeError(t, rec.Body.Bytes()).Error.Message)
+	assert.Equal(t, `unknown category "Фантастика"`, decodeError(t, rec.Body.Bytes()).Error.Message)
+}
+
+func TestCreate_AcceptsNewCategories(t *testing.T) {
+	tests := []struct {
+		name     string
+		category models.Category
+	}{
+		{"politics", models.CategoryPolitics},
+		{"regional", models.CategoryRegional},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, repo := setupRouter()
+
+			body := fmt.Sprintf(`{"category":%q,"title":"Тестова стаття","text":"Повний текст"}`, tt.category)
+			rec := doRequest(t, router, http.MethodPost, "/api/admin/news", body)
+
+			require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+			require.Len(t, repo.Items, 1)
+			for _, item := range repo.Items {
+				assert.Equal(t, tt.category, item.Category,
+					"the stored article must keep the requested rubric")
+			}
+		})
+	}
 }
 
 func TestCreate_ConflictReturns409(t *testing.T) {

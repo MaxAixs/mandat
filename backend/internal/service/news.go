@@ -496,7 +496,6 @@ func (s *NewsService) storeImg(ctx context.Context, news *models.News, cover *Co
 	return news, nil
 }
 
-
 // buildNews maps validated input onto a domain article.
 func buildNews(input NewsInput) *models.News {
 	status := models.StatusDraft

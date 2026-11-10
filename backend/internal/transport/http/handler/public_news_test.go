@@ -197,6 +197,31 @@ func TestPublicList_CategoryFilterMatchesExactRubric(t *testing.T) {
 	assert.Equal(t, string(models.CategoryAnalytics), payload.Items[0]["category"])
 }
 
+func TestPublicList_NewCategoriesAreValidFilters(t *testing.T) {
+	tests := []struct {
+		name     string
+		category string
+	}{
+		{"politics", "Політика"},
+		{"regional", "Регіональні новини"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, repo := setupPublicRouter()
+			storePublished(t, repo, "new-rubric-article", models.Category(tt.category), time.Now())
+
+			rec := doRequest(t, router, http.MethodGet,
+				"/api/news?category="+url.QueryEscape(tt.category), "")
+
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			payload := decodePublicList(t, rec.Body.Bytes())
+			require.Len(t, payload.Items, 1, "a new rubric must pass validation and reach the repository")
+			assert.Equal(t, tt.category, payload.Items[0]["category"])
+		})
+	}
+}
+
 func TestPublicList_WithoutCategoryRemainsUnfiltered(t *testing.T) {
 	router, _ := setupPublicRouter()
 	sportSlug := createArticle(t, router, publishedSportBody)
@@ -224,7 +249,7 @@ func TestPublicList_UnknownCategoryReturns400(t *testing.T) {
 		name     string
 		category string
 	}{
-		{"unknown rubric", "Політика"},
+		{"unknown rubric", "Фантастика"},
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
 	}
@@ -474,7 +499,7 @@ func TestList_UnknownCategoryReturns400(t *testing.T) {
 	router, _ := setupRouter()
 	createAdminArticle(t, router, "Спорт", "Спортивна новина", "draft")
 
-	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+categoryQuery("Політика"), "")
+	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+categoryQuery("Фантастика"), "")
 
 	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	assert.Equal(t, "Invalid input", decodeError(t, rec.Body.Bytes()).Error.Message)

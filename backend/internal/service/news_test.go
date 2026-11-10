@@ -148,7 +148,7 @@ func TestCreate_Validation(t *testing.T) {
 		mutate func(input *NewsInput)
 	}{
 		{"empty title", func(in *NewsInput) { in.Title = "" }},
-		{"unknown category", func(in *NewsInput) { in.Category = models.Category("Політика") }},
+		{"unknown category", func(in *NewsInput) { in.Category = models.Category("Фантастика") }},
 		{"unknown status", func(in *NewsInput) { in.Status = models.Status("archived") }},
 		{"published without text", func(in *NewsInput) { in.Status = models.StatusPublished; in.Text = "" }},
 	}
@@ -191,6 +191,30 @@ func TestCreate_AllowsDraftWithoutText(t *testing.T) {
 	created, err := svc.Create(context.Background(), input)
 	require.NoError(t, err)
 	assert.Equal(t, models.StatusDraft, created.Status)
+}
+
+func TestCreate_AcceptsNewCategories(t *testing.T) {
+	tests := []struct {
+		name     string
+		category models.Category
+	}{
+		{"politics", models.CategoryPolitics},
+		{"regional", models.CategoryRegional},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, repo := newTestService()
+
+			input := validInput()
+			input.Category = tt.category
+
+			created, err := svc.Create(context.Background(), input)
+			require.NoError(t, err, "a new rubric must pass category validation")
+			assert.Equal(t, tt.category, created.Category)
+			assert.Contains(t, repo.Items, created.ID)
+		})
+	}
 }
 
 func TestCreate_PublishSetsPublishedAt(t *testing.T) {
@@ -636,6 +660,8 @@ func TestListPublished_ValidCategoryReachesFilter(t *testing.T) {
 		{"sport", models.CategoryInsides},
 		{"interview", models.CategoryImportant},
 		{"about", models.CategoryInvestigation},
+		{"politics", models.CategoryPolitics},
+		{"regional", models.CategoryRegional},
 	}
 
 	for _, tt := range tests {
@@ -670,7 +696,7 @@ func TestListPublished_RejectsUnknownCategory(t *testing.T) {
 		name     string
 		category string
 	}{
-		{"unknown rubric", "Політика"},
+		{"unknown rubric", "Фантастика"},
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
 		{"arbitrary text", "unknown"},
@@ -695,7 +721,7 @@ func TestListPublished_UnknownCategorySkipsRepositoryEvenOnFailure(t *testing.T)
 	svc, repo := newTestService()
 	repo.ListPublishedErr = cause
 
-	_, err := svc.ListPublished(context.Background(), 1, 10, "Політика")
+	_, err := svc.ListPublished(context.Background(), 1, 10, "Фантастика")
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)
@@ -715,6 +741,8 @@ func TestList_ValidCategoryReachesFilter(t *testing.T) {
 		{"sport", models.CategoryInsides},
 		{"interview", models.CategoryImportant},
 		{"about", models.CategoryInvestigation},
+		{"politics", models.CategoryPolitics},
+		{"regional", models.CategoryRegional},
 	}
 
 	for _, tt := range tests {
@@ -751,7 +779,7 @@ func TestList_RejectsUnknownCategory(t *testing.T) {
 		name     string
 		category string
 	}{
-		{"unknown rubric", "Політика"},
+		{"unknown rubric", "Фантастика"},
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
 		{"arbitrary text", "unknown"},
@@ -792,7 +820,7 @@ func TestList_UnknownCategorySkipsRepositoryEvenOnFailure(t *testing.T) {
 	svc, repo := newTestService()
 	repo.ListErr = cause
 
-	_, err := svc.List(context.Background(), 1, 10, "", "Політика")
+	_, err := svc.List(context.Background(), 1, 10, "", "Фантастика")
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)

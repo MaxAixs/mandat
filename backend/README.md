@@ -77,14 +77,14 @@ moderator session cookie. Cross-origin frontend requests must include credential
 
 `page` starts at 1, `limit` defaults to 20 and is capped at 100.
 `status` accepts `draft` or `published`. `category` accepts `Новини`,
-`Міжнародні новини`, `Спорт`, `Інтерв'ю`, or `Про нас`; an unknown value
-returns `400 Invalid input`.
+`Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Про нас`, `Політика`, or
+`Регіональні новини`; an unknown value returns `400 Invalid input`.
 
 ## Public API
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/news?page=&limit=` | Paginated published articles for the public site |
+| `GET` | `/api/news?page=&limit=&category=` | Paginated published articles for the public site (same `category` values as the admin API) |
 | `GET` | `/api/news/search?q=&limit=` | Live title suggestions over published articles, newest first (default limit 7, max 20; empty `q` returns an empty list) |
 | `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
 | `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |

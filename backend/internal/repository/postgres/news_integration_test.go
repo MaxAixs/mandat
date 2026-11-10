@@ -168,6 +168,12 @@ func requireSinglePublishedMainEvent(t *testing.T, repo *newsrepo.NewsRepo, want
 // pgUniqueViolationCode is the PostgreSQL SQLSTATE for unique constraint violations.
 const pgUniqueViolationCode = "23505"
 
+// pgCheckViolationCode is the PostgreSQL SQLSTATE for CHECK constraint violations.
+const pgCheckViolationCode = "23514"
+
+// newsCategoryCheckConstraint guards the fixed rubric list at the database layer.
+const newsCategoryCheckConstraint = "news_category_check"
+
 // indexNewsSinglePublishedMainEventPerCategory is the partial unique index that
 // enforces one published main event per category.
 const indexNewsSinglePublishedMainEventPerCategory = "idx_news_single_published_main_event_per_category"
@@ -248,6 +254,56 @@ func TestNewsRepo_CreateAndGetByID(t *testing.T) {
 	assert.True(t, got.Featured)
 	assert.Equal(t, "https://example.com/cover.jpg", got.ImageUrl)
 	assert.Nil(t, got.PublishedAt)
+}
+
+func TestNewsRepo_Create_NewRubricsPassCategoryCheck(t *testing.T) {
+	tests := []struct {
+		name     string
+		category models.Category
+		slug     string
+	}{
+		{"politics", models.CategoryPolitics, "category-politics"},
+		{"regional", models.CategoryRegional, "category-regional"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+
+			news := draftNews(tt.slug)
+			news.Category = tt.category
+
+			require.NoError(t, repo.Create(ctx, news),
+				"the 00010 CHECK must accept the %q rubric", tt.category)
+
+			got, err := repo.GetByID(ctx, news.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tt.category, got.Category,
+				"the stored article must keep the new rubric")
+		})
+	}
+}
+
+func TestNewsRepo_Create_UnknownRubricViolatesCategoryCheck(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	news := draftNews("category-fantastika")
+	news.Category = models.Category("Фантастика")
+
+	err := repo.Create(ctx, news)
+	require.Error(t, err, "the 00010 CHECK must reject an unknown rubric")
+
+	var pgErr *pgconn.PgError
+	require.True(t, errors.As(err, &pgErr), "expected a PostgreSQL error, got %v", err)
+	assert.Equal(t, pgCheckViolationCode, pgErr.Code)
+	assert.Equal(t, newsCategoryCheckConstraint, pgErr.ConstraintName,
+		"the rubric must be rejected by news_category_check")
+
+	_, err = repo.GetBySlug(ctx, news.Slug)
+	assert.True(t, errors.Is(err, errs.ErrNewsNotFound),
+		"the rejected insert must not leave a row behind, got %v", err)
 }
 
 func TestNewsRepo_MainEventRoundTrip(t *testing.T) {
