@@ -122,20 +122,6 @@ export const mockLatestNews: LatestNewsItem[] = [
   },
 ]
 
-/** Headlines for the scrolling ticker. */
-export const mockTickerItems: string[] = [
-  'Уряд схвалив новий бюджет на 2026 рік',
-  'НБУ змінив облікову ставку',
-  'Тіньові потоки: як працюють схеми в держтендерах',
-]
-
-/** Exchange rates for the scrolling ticker (dev fallback without backend). */
-export const mockExchangeRates: string[] = [
-  'UAH -> EUR = 50.48',
-  'UAH -> USD = 45.32',
-  'UAH -> PLN = 11.47',
-]
-
 /** "Цифра дня" statistics. */
 export const mockStats: StatItem[] = [
   { value: '7,8', unit: 'млрд грн', caption: 'направлено на відновлення регіонів станом на жовтень 2026' },

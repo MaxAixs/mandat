@@ -9,7 +9,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
 
-import Ticker from '../src/sections/Ticker'
+import Ticker, { type TickerRate } from '../src/sections/Ticker'
 
 // Test harness only: tsx reads the cwd tsconfig.json (no "jsx" option), so the imported
 // component is compiled with the classic transform and resolves `React` from the global scope.
@@ -76,17 +76,37 @@ function decodeText(markup: string): string {
   return markup.replace(/&(?:amp|lt|gt|quot|#x27);/g, (entity) => HTML_ENTITIES[entity] ?? entity)
 }
 
-function renderTicker(items: string[]): string {
+function renderTicker(items: TickerRate[]): string {
   return renderToStaticMarkup(createElement(MemoryRouter, null, createElement(Ticker, { items })))
 }
 
-test('ticker renders each exchange rate string', () => {
-  const markup = renderTicker(['UAH -> EUR = 50.48', 'UAH -> USD = 45.32'])
+test('ticker renders rich rate cards', () => {
+  const markup = renderTicker([
+    { code: 'EUR', name: 'Євро', flag: '🇪🇺', value: '51.08' },
+    { code: 'USD', name: 'Долар США', flag: '🇺🇸', value: '45.50' },
+  ])
   const text = decodeText(markup)
 
-  for (const rate of ['UAH -> EUR = 50.48', 'UAH -> USD = 45.32']) {
-    assert.ok(text.includes(rate), `expected the ticker markup to include ${rate}:\n${markup}`)
+  // Every part of a rate card reaches the DOM: flag, name, code, value, unit.
+  for (const part of ['Євро', 'EUR', '51.08', '🇪🇺', '₴', 'Долар США', 'USD', '45.50', '🇺🇸']) {
+    assert.ok(text.includes(part), `expected the ticker markup to include ${part}:\n${markup}`)
   }
+
+  // The accessible label carries the full sentence, not just the bare value.
+  assert.ok(
+    text.includes('aria-label="Євро (EUR): 51.08 гривень"'),
+    `expected the ticker markup to expose the EUR rate aria-label:\n${markup}`,
+  )
+  assert.ok(
+    text.includes('aria-label="Долар США (USD): 45.50 гривень"'),
+    `expected the ticker markup to expose the USD rate aria-label:\n${markup}`,
+  )
+
+  // The old flat "UAH -> EUR = ..." strings are gone.
+  assert.ok(
+    !text.includes('UAH ->'),
+    `expected the ticker to drop the literal "UAH ->" text:\n${markup}`,
+  )
 })
 
 test('ticker renders nothing for empty rates', () => {

@@ -75,7 +75,7 @@ function sameDeps(
 }
 
 interface ExchangeRatesState {
-  items: string[]
+  rates: ExchangeRateItem[]
   date: string
   loading: boolean
   error: string | null
@@ -285,10 +285,8 @@ interface ExchangeRatesResponse {
 }
 
 type FetchExchangeRates = () => Promise<ExchangeRatesResponse>
-type FormatRateText = (code: string, rate: number) => string
 
 let fetchExchangeRates: FetchExchangeRates | undefined
-let formatRateText: FormatRateText | undefined
 let useExchangeRates: ExchangeHook | undefined
 
 before(async () => {
@@ -300,19 +298,16 @@ before(async () => {
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     assert.fail(
-      'src/api/exchange must exist and export fetchExchangeRates and formatRateText, ' +
+      'src/api/exchange must exist and export fetchExchangeRates, ' +
         `but importing it failed: ${reason}`,
     )
   }
 
   const fetchFn = exchangeModule.fetchExchangeRates
-  const formatFn = exchangeModule.formatRateText
 
   assert.equal(typeof fetchFn, 'function', 'src/api/exchange must export fetchExchangeRates')
-  assert.equal(typeof formatFn, 'function', 'src/api/exchange must export formatRateText')
 
   fetchExchangeRates = fetchFn as FetchExchangeRates
-  formatRateText = formatFn as FormatRateText
 })
 
 before(async () => {
@@ -373,13 +368,10 @@ afterEach(() => {
   globalThis.fetch = originalFetch
 })
 
-function requireApi(): { fetchExchangeRates: FetchExchangeRates; formatRateText: FormatRateText } {
-  assert.ok(
-    fetchExchangeRates && formatRateText,
-    'src/api/exchange must export fetchExchangeRates and formatRateText',
-  )
+function requireApi(): { fetchExchangeRates: FetchExchangeRates } {
+  assert.ok(fetchExchangeRates, 'src/api/exchange must export fetchExchangeRates')
 
-  return { fetchExchangeRates, formatRateText }
+  return { fetchExchangeRates }
 }
 
 function requireHook(): ExchangeHook {
@@ -442,10 +434,6 @@ test('fetchExchangeRates maps items', async () => {
   assert.equal(requestUrls[0], EXCHANGE_RATES_URL)
 })
 
-test('formatRateText pins 2 decimals', () => {
-  assert.equal(requireApi().formatRateText('EUR', 50.4823), 'UAH -> EUR = 50.48')
-})
-
 test('fetchExchangeRates throws connection error when backend is down', async () => {
   stubFailingFetch()
 
@@ -457,33 +445,33 @@ test('fetchExchangeRates throws connection error when backend is down', async ()
   })
 })
 
-test('useExchangeRates returns formatted items in response order', async () => {
+test('useExchangeRates returns raw rates in response order', async () => {
   stubJsonFetch({
     base: 'UAH',
     date: '12.11.2026',
     items: [
       { code: 'EUR', rate: 50.4823 },
-      { code: 'USD', rate: 45.32 },
-      { code: 'PLN', rate: 11.47 },
+      { code: 'USD', rate: 45.3222 },
+      { code: 'PLN', rate: 11.4678 },
     ],
   })
 
   const driver = await mount()
 
-  assert.deepEqual(stateOf(driver).items, [
-    'UAH -> EUR = 50.48',
-    'UAH -> USD = 45.32',
-    'UAH -> PLN = 11.47',
+  assert.deepEqual(stateOf(driver).rates, [
+    { code: 'EUR', rate: 50.4823 },
+    { code: 'USD', rate: 45.3222 },
+    { code: 'PLN', rate: 11.4678 },
   ])
 })
 
-test('useExchangeRates returns empty items when rates fail', async () => {
+test('useExchangeRates returns empty rates when rates fail', async () => {
   stubFailingFetch()
 
   const driver = await mount()
   const state = stateOf(driver)
 
-  assert.deepEqual(state.items, [])
+  assert.deepEqual(state.rates, [])
   assert.equal(typeof state.error, 'string')
   assert.ok(state.error && state.error.length > 0, 'the hook must report a non-empty error message')
 })

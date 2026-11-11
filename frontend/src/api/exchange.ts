@@ -17,10 +17,6 @@ interface ApiErrorPayload {
   }
 }
 
-export function formatRateText(code: string, rate: number): string {
-  return `UAH -> ${code} = ${rate.toFixed(2)}`
-}
-
 export async function fetchExchangeRates(): Promise<ExchangeRatesResponse> {
   let response: Response
 

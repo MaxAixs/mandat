@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { fetchExchangeRates, formatRateText, getExchangeErrorMessage } from '@/api/exchange'
+import { fetchExchangeRates, getExchangeErrorMessage } from '@/api/exchange'
+import type { ExchangeRateItem } from '@/api/exchange'
 
-const emptyItems: string[] = []
+const emptyRates: ExchangeRateItem[] = []
 
 export default function useExchangeRates() {
-  const [items, setItems] = useState<string[]>(emptyItems)
+  const [rates, setRates] = useState<ExchangeRateItem[]>(emptyRates)
   const [date, setDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -19,12 +20,12 @@ export default function useExchangeRates() {
     try {
       const result = await fetchExchangeRates()
       if (currentRequest === requestId.current) {
-        setItems(result.items.map((item) => formatRateText(item.code, item.rate)))
+        setRates(result.items)
         setDate(result.date)
       }
     } catch (loadError) {
       if (currentRequest === requestId.current) {
-        setItems(emptyItems)
+        setRates(emptyRates)
         setDate('')
         setError(getExchangeErrorMessage(loadError))
       }
@@ -37,5 +38,5 @@ export default function useExchangeRates() {
     void loadRates()
   }, [loadRates])
 
-  return { items, date, loading, error, retry: loadRates }
+  return { rates, date, loading, error, retry: loadRates }
 }
