@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -74,6 +75,43 @@ type PublicNewsDetailResponse struct {
 // HealthResponse is the successful response of a health probe.
 type HealthResponse struct {
 	Status string `json:"status"`
+}
+
+// ExchangeRateResponse is one currency rate against the hryvnia.
+type ExchangeRateResponse struct {
+	Code string  `json:"code"`
+	Rate float64 `json:"rate"`
+}
+
+// ExchangeRatesResponse is the NBU rate table served to the public site.
+type ExchangeRatesResponse struct {
+	Base  string                 `json:"base"`
+	Date  string                 `json:"date"`
+	Items []ExchangeRateResponse `json:"items"`
+}
+
+// ExchangeToRatesResponse maps domain rates onto the public payload,
+// rounding each rate to two decimals in EUR, USD, PLN order.
+func ExchangeToRatesResponse(rates []*models.ExchangeRate) ExchangeRatesResponse {
+	items := make([]ExchangeRateResponse, 0, len(rates))
+
+	date := ""
+	for _, rate := range rates {
+		if rate == nil {
+			continue
+		}
+
+		if date == "" {
+			date = rate.Date
+		}
+
+		items = append(items, ExchangeRateResponse{
+			Code: rate.Code,
+			Rate: math.Round(rate.Rate*100) / 100,
+		})
+	}
+
+	return ExchangeRatesResponse{Base: "UAH", Date: date, Items: items}
 }
 
 // NewsToPublicResponse maps a domain article onto its public card payload.

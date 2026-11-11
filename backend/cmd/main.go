@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/maxaixs/mandat/backend/internal/config"
 	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
@@ -20,6 +21,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
 	"github.com/maxaixs/mandat/backend/migrations"
 	pgdb "github.com/maxaixs/mandat/backend/pkg/database/postgres"
+	"github.com/maxaixs/mandat/backend/pkg/httpclient"
 	"github.com/maxaixs/mandat/backend/pkg/logger"
 	redisclient "github.com/maxaixs/mandat/backend/pkg/redis"
 	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
@@ -96,6 +98,23 @@ func run() error {
 	viewHandler := handler.NewViewHandler(viewService, viewerMiddleware)
 	healthHandler := handler.NewHealthHandler(service.NewHealthService(pool, log))
 
+	nbuAPI := httpclient.New(httpclient.NewSharedClient(10 * time.Second))
+	exchangeStore := redisrepo.NewExchangeStore(redisClient)
+	exchangeService := service.NewExchangeService(nbuAPI, exchangeStore, log)
+
+	// The warmup runs in the background: with retries a cold NBU can take
+	// over a minute, far beyond the startup timeout. Until it lands,
+	// the endpoint serves 503 from the empty store.
+	go func() {
+		if err := exchangeService.Refresh(ctx); err != nil {
+			log.ErrorContext(ctx, "exchange rates unavailable at startup, serving 503 until first refresh", "error", err)
+		}
+	}()
+
+	go exchangeService.StartAutoRefresh(ctx, 24*time.Hour)
+
+	exchangeHandler := handler.NewExchangeHandler(exchangeService)
+
 	return httptransport.New(
 		cfg.HTTP,
 		authHandler,
@@ -103,5 +122,6 @@ func run() error {
 		publicNewsHandler,
 		viewHandler,
 		healthHandler,
+		exchangeHandler,
 	).Serve(ctx)
 }

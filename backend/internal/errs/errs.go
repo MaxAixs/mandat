@@ -16,6 +16,8 @@ var (
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrForbidden          = errors.New("forbidden")
 	ErrTooManyRequests    = errors.New("too many requests")
+
+	ErrExchangeRatesNotFound = errors.New("exchange rates not found")
 )
 
 // ValidationError describes a rejected input field.
