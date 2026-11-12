@@ -21,7 +21,7 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'Регіональні новини', href: '/regional' },
   { label: 'Спорт', href: '/sport' },
   { label: 'Інтерв\'ю', href: '/interview' },
-  { label: 'Про нас', href: '#about' },
+  { label: 'Про нас', href: '/about' },
 ]
 
 /** Footer link columns. The "Розділи" column mirrors the header navigation. */
@@ -33,7 +33,7 @@ export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
   {
     title: 'Про проєкт',
     links: [
-      { label: 'Про нас', href: '#about' },
+      { label: 'Про нас', href: '/about' },
       { label: 'Редакційна політика', href: '#' },
       { label: 'Реклама', href: '#' },
       { label: 'Контакти', href: '#' },

@@ -125,11 +125,11 @@ export const mockLatestNews: LatestNewsItem[] = [
 
 /** Fuel prices for the scrolling ticker (dev fallback without backend). */
 export const mockFuelRates: TickerRate[] = [
-  { code: 'A95', name: 'А-95', flag: '⛽', value: '88.74', unit: '₴/л' },
-  { code: 'A92', name: 'А-92', flag: '⛽', value: '84.68', unit: '₴/л' },
-  { code: 'A98', name: 'А-98', flag: '⛽', value: '92.48', unit: '₴/л' },
-  { code: 'DIESEL', name: 'Дизель', flag: '🛢️', value: '104.31', unit: '₴/л' },
-  { code: 'LPG', name: 'Автогаз', flag: '🚗', value: '61.15', unit: '₴/л' },
+  { code: 'A95', name: 'А-95', icon: 'fuel', value: '88.74', unit: '₴/л' },
+  { code: 'A92', name: 'А-92', icon: 'fuel', value: '84.68', unit: '₴/л' },
+  { code: 'A98', name: 'А-98', icon: 'fuel', value: '92.48', unit: '₴/л' },
+  { code: 'DIESEL', name: 'Дизель', icon: 'droplet', value: '104.31', unit: '₴/л' },
+  { code: 'LPG', name: 'Автогаз', icon: 'flame', value: '61.15', unit: '₴/л' },
 ]
 
 /** "Цифра дня" statistics. */

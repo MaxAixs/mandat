@@ -136,3 +136,31 @@ test('ticker defaults unit to hryvnia sign', () => {
   assert.ok(text.includes('₴'), `expected the default ₴ unit in the ticker markup:\n${markup}`)
   assert.ok(!text.includes('₴/л'), `expected no custom ₴/л unit by default:\n${markup}`)
 })
+
+test('ticker renders section label at group boundary', () => {
+  const markup = renderTicker([
+    { code: 'EUR', name: 'Євро', flag: '🇪🇺', value: '51.08', group: 'Курс валют' },
+    { code: 'USD', name: 'Долар США', flag: '🇺🇸', value: '45.50', group: 'Курс валют' },
+    { code: 'A95', name: 'А-95', flag: '⛽', value: '88.74', unit: '₴/л', group: 'Паливо' },
+  ])
+  const text = decodeText(markup)
+  const currencyIndex = text.indexOf('Курс валют')
+  const fuelIndex = text.indexOf('Паливо')
+
+  assert.ok(currencyIndex !== -1, `expected the 'Курс валют' section label:\n${markup}`)
+  assert.ok(fuelIndex !== -1, `expected the 'Паливо' section label:\n${markup}`)
+  // The fuel group starts after the currency group, so its label comes later.
+  assert.ok(
+    currencyIndex < fuelIndex,
+    `expected 'Паливо' to follow 'Курс валют' (${currencyIndex} < ${fuelIndex}):\n${markup}`,
+  )
+})
+
+test('ticker renders no labels without groups', () => {
+  const markup = renderTicker([{ code: 'EUR', name: 'Євро', flag: '🇪🇺', value: '51.08' }])
+  const text = decodeText(markup)
+
+  // Without any group metadata the ticker must stay label-free.
+  assert.ok(!text.includes('Курс валют'), `expected no 'Курс валют' label without groups:\n${markup}`)
+  assert.ok(!text.includes('Паливо'), `expected no 'Паливо' label without groups:\n${markup}`)
+})
