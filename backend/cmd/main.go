@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -98,9 +99,11 @@ func run() error {
 	viewHandler := handler.NewViewHandler(viewService, viewerMiddleware)
 	healthHandler := handler.NewHealthHandler(service.NewHealthService(pool, log))
 
-	nbuAPI := httpclient.New(httpclient.NewSharedClient(10 * time.Second))
+	sharedHTTP := httpclient.New(&http.Client{Timeout: 10 * time.Second}, log)
 	exchangeStore := redisrepo.NewExchangeStore(redisClient)
-	exchangeService := service.NewExchangeService(nbuAPI, exchangeStore, log)
+	exchangeService := service.NewExchangeService(sharedHTTP, exchangeStore, log, cfg.Rates.NBUURL)
+	fuelStore := redisrepo.NewFuelStore(redisClient)
+	fuelService := service.NewFuelService(sharedHTTP, fuelStore, log, cfg.Rates.FuelURL)
 
 	// The warmup runs in the background: with retries a cold NBU can take
 	// over a minute, far beyond the startup timeout. Until it lands,
@@ -109,11 +112,16 @@ func run() error {
 		if err := exchangeService.Refresh(ctx); err != nil {
 			log.ErrorContext(ctx, "exchange rates unavailable at startup, serving 503 until first refresh", "error", err)
 		}
+
+		if err := fuelService.Refresh(ctx); err != nil {
+			log.ErrorContext(ctx, "fuel rates unavailable at startup, serving 503 until first refresh", "error", err)
+		}
 	}()
 
 	go exchangeService.StartAutoRefresh(ctx, 24*time.Hour)
+	go fuelService.StartAutoRefresh(ctx, 24*time.Hour)
 
-	exchangeHandler := handler.NewExchangeHandler(exchangeService)
+	runningLineHandler := handler.NewRunningLineHandler(exchangeService, fuelService)
 
 	return httptransport.New(
 		cfg.HTTP,
@@ -122,6 +130,6 @@ func run() error {
 		publicNewsHandler,
 		viewHandler,
 		healthHandler,
-		exchangeHandler,
+		runningLineHandler,
 	).Serve(ctx)
 }

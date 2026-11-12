@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	neturl "net/url"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
+	"github.com/maxaixs/mandat/backend/pkg/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,12 +24,18 @@ import (
 // fastRetryDelays keeps the retry path instant in tests.
 var fastRetryDelays = [3]time.Duration{time.Millisecond, time.Millisecond, time.Millisecond}
 
+// nbuRatesURL is the default NBU exchange endpoint without query parameters;
+// production now injects it from config (rates.nbu_url).
+const nbuRatesURL = "https://bank.gov.ua/NBU_Exchange/exchange"
+
 // errConnectionRefused is what the fake NBU endpoint returns when unreachable.
 var errConnectionRefused = errors.New("connection refused")
 
 // stubJSONClient serves raw NBU JSON per date and counts every GetJSON call.
 type stubJSONClient struct {
 	bodies    map[string]string
+	logger    *slog.Logger
+	urls      []string
 	failCalls int
 	calls     int
 }
@@ -38,6 +46,7 @@ var _ HTTPClient = (*stubJSONClient)(nil)
 // query date; a date without a canned body behaves like an unreachable day.
 func (c *stubJSONClient) GetJSON(_ context.Context, url string, out any) error {
 	c.calls++
+	c.urls = append(c.urls, url)
 
 	if c.calls <= c.failCalls {
 		return errConnectionRefused
@@ -55,6 +64,23 @@ func (c *stubJSONClient) GetJSON(_ context.Context, url string, out any) error {
 	return nil
 }
 
+// FetchWithRetries delegates to the real client so attempt budget, timing,
+// cancellation and retry logging stay production-faithful. The logger is
+// parameterised so service-level tests can observe the client's retry records.
+func (c *stubJSONClient) FetchWithRetries(
+	ctx context.Context,
+	delays [3]time.Duration,
+	errorContext string,
+	fn func(context.Context) error,
+) error {
+	logger := c.logger
+	if logger == nil {
+		logger = discardLogger()
+	}
+
+	return httpclient.New(&http.Client{}, logger).FetchWithRetries(ctx, delays, errorContext, fn)
+}
+
 // nbuQueryDate extracts the NBU date query parameter from url.
 func nbuQueryDate(rawURL string) string {
 	parsed, err := neturl.Parse(rawURL)
@@ -67,14 +93,14 @@ func nbuQueryDate(rawURL string) string {
 
 // stubExchangeStore is a map-backed ExchangeStore keyed by calendar day.
 type stubExchangeStore struct {
-	saved     map[string][]*models.ExchangeRate
+	saved     map[string][]*models.Rate
 	saveErr   error
 	latestErr error
 	saveCalls int
 }
 
 // Save records the rates for the day unless saveErr forces a failure.
-func (s *stubExchangeStore) Save(_ context.Context, date time.Time, rates []*models.ExchangeRate) error {
+func (s *stubExchangeStore) Save(_ context.Context, date time.Time, rates []*models.Rate) error {
 	s.saveCalls++
 
 	if s.saveErr != nil {
@@ -82,7 +108,7 @@ func (s *stubExchangeStore) Save(_ context.Context, date time.Time, rates []*mod
 	}
 
 	if s.saved == nil {
-		s.saved = make(map[string][]*models.ExchangeRate, 1)
+		s.saved = make(map[string][]*models.Rate, 1)
 	}
 
 	s.saved[dayKey(date)] = rates
@@ -91,7 +117,7 @@ func (s *stubExchangeStore) Save(_ context.Context, date time.Time, rates []*mod
 }
 
 // Latest returns the newest saved day, or ErrExchangeRatesNotFound when empty.
-func (s *stubExchangeStore) Latest(_ context.Context) ([]*models.ExchangeRate, time.Time, error) {
+func (s *stubExchangeStore) Latest(_ context.Context) ([]*models.Rate, time.Time, error) {
 	if s.latestErr != nil {
 		return nil, time.Time{}, fmt.Errorf("exchangeStore_Latest: %w", s.latestErr)
 	}
@@ -119,10 +145,10 @@ func discardLogger() *slog.Logger {
 func TestGetRates_ServesRedisWithoutFetching(t *testing.T) {
 	now := time.Now()
 	client := &stubJSONClient{}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(now): wantedRates(now),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -140,7 +166,7 @@ func TestGetRates_RetryThenSuccess(t *testing.T) {
 		failCalls: 2,
 	}
 	store := &stubExchangeStore{}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -156,16 +182,80 @@ func TestGetRates_RetryThenSuccess(t *testing.T) {
 	assertWantedRates(t, rates, nbuDate(now))
 }
 
+// TestRefresh_UsesConfiguredBaseURL pins that the injected base URL is the one
+// the service fetches from, so the endpoint is configurable at runtime.
+func TestRefresh_UsesConfiguredBaseURL(t *testing.T) {
+	const configuredBase = "https://nbu.test/exchange"
+
+	now := time.Now()
+	client := &stubJSONClient{bodies: map[string]string{nbuDate(now): fullBody(now)}}
+	store := &stubExchangeStore{}
+	svc := NewExchangeService(client, store, discardLogger(), configuredBase)
+	svc.now = func() time.Time { return now }
+	svc.retryDelays = fastRetryDelays
+
+	err := svc.Refresh(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, client.urls, 1, "one successful attempt must issue exactly one request")
+	assert.True(
+		t,
+		strings.HasPrefix(client.urls[0], configuredBase),
+		"expected a request to %q, got %q",
+		configuredBase,
+		client.urls[0],
+	)
+	assert.Equal(t, nbuDate(now), nbuQueryDate(client.urls[0]), "the request must still carry the date query")
+	require.Len(t, store.saved[dayKey(now)], 3, "the fetched day must be persisted")
+}
+
+// TestRefresh_BaseURLTrailingSlash pins the URL join: a trailing slash on the
+// configured base URL must not produce a double slash or drop the producer's
+// query format.
+func TestRefresh_BaseURLTrailingSlash(t *testing.T) {
+	now := time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC)
+	client := &stubJSONClient{bodies: map[string]string{nbuDate(now): fullBody(now)}}
+	store := &stubExchangeStore{}
+	svc := NewExchangeService(client, store, discardLogger(), "https://nbu.test/exchange/")
+	svc.now = func() time.Time { return now }
+	svc.retryDelays = fastRetryDelays
+
+	err := svc.Refresh(context.Background())
+
+	require.NoError(t, err)
+	require.Len(t, client.urls, 1, "one successful attempt must issue exactly one request")
+	assert.Equal(t, "https://nbu.test/exchange?json&date=12.11.2026", client.urls[0],
+		"the trailing slash must collapse into a single slash before the query")
+	require.Len(t, store.saved[dayKey(now)], 3, "the fetched day must be persisted")
+}
+
+// TestRefresh_BlankBaseURLFails pins that an empty injected endpoint fails the
+// refresh before any write instead of requesting a relative URL.
+func TestRefresh_BlankBaseURLFails(t *testing.T) {
+	now := time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC)
+	store := &stubExchangeStore{}
+	svc := NewExchangeService(httpclient.New(&http.Client{}, discardLogger()), store, discardLogger(), "")
+	svc.now = func() time.Time { return now }
+	svc.retryDelays = fastRetryDelays
+
+	err := svc.Refresh(context.Background())
+
+	require.Error(t, err, "a blank base URL must not refresh successfully")
+	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable), "expected ErrServiceUnavailable, got %v", err)
+	assert.Contains(t, err.Error(), "no exchange rates available", "the fetch must fail, not the store")
+	assert.Zero(t, store.saveCalls, "a failed refresh must not write anything")
+}
+
 // TestGetRates_NoWalkBackToNBU pins that a failed today refresh never asks NBU
 // for a past date: Redis history is the only fallback.
 func TestGetRates_NoWalkBackToNBU(t *testing.T) {
 	now := time.Now()
 	yesterday := now.AddDate(0, 0, -1)
 	client := &stubJSONClient{failCalls: 4}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(yesterday): wantedRates(yesterday),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -195,10 +285,10 @@ func TestGetRates_IncompleteTodayFallsBackToRedis(t *testing.T) {
 			[2]any{"JPY", 0.3},
 		),
 	}}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(yesterday): wantedRates(yesterday),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -219,10 +309,10 @@ func TestGetRates_StaleRedisReturns503(t *testing.T) {
 	now := time.Now()
 	stale := now.AddDate(0, 0, -4)
 	client := &stubJSONClient{}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(stale): wantedRates(stale),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -237,7 +327,7 @@ func TestGetRates_EmptyStoreReturns503(t *testing.T) {
 	now := time.Now()
 	client := &stubJSONClient{}
 	store := &stubExchangeStore{}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -252,7 +342,7 @@ func TestGetRates_SaveFailureFailsRefresh(t *testing.T) {
 	now := time.Now()
 	client := &stubJSONClient{bodies: map[string]string{nbuDate(now): fullBody(now)}}
 	store := &stubExchangeStore{saveErr: errors.New("store is down")}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -271,16 +361,16 @@ func TestGetRates_SaveFailureFailsRefresh(t *testing.T) {
 func TestGetRates_ParallelReads(t *testing.T) {
 	now := time.Now()
 	client := &stubJSONClient{}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(now): wantedRates(now),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
 	const readers = 16
 
-	results := make([][]*models.ExchangeRate, readers)
+	results := make([][]*models.Rate, readers)
 	errsByReader := make([]error, readers)
 
 	var wg sync.WaitGroup
@@ -310,10 +400,10 @@ func TestGetRates_FutureDatedRedisServed(t *testing.T) {
 	now := time.Now()
 	tomorrow := now.AddDate(0, 0, 1)
 	client := &stubJSONClient{}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(tomorrow): wantedRates(tomorrow),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -324,7 +414,7 @@ func TestGetRates_FutureDatedRedisServed(t *testing.T) {
 	assert.Equal(t, 0, client.calls, "future-dated stored rates must not trigger a fetch")
 }
 
-func assertWantedRates(t *testing.T, rates []*models.ExchangeRate, wantDate string) {
+func assertWantedRates(t *testing.T, rates []*models.Rate, wantDate string) {
 	t.Helper()
 
 	require.Len(t, rates, 3, "only EUR, USD and PLN must be returned")
@@ -376,10 +466,10 @@ func fullBody(date time.Time) string {
 }
 
 // fullRates is a provider response: it carries more codes than are wanted.
-func fullRates(date time.Time) []*models.ExchangeRate {
+func fullRates(date time.Time) []*models.Rate {
 	day := dayKey(date)
 
-	return []*models.ExchangeRate{
+	return []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: day},
 		{Code: "USD", Rate: 45.1, Date: day},
 		{Code: "PLN", Rate: 11.1, Date: day},
@@ -388,10 +478,10 @@ func fullRates(date time.Time) []*models.ExchangeRate {
 }
 
 // wantedRates is what production persists: the wanted codes in display order.
-func wantedRates(date time.Time) []*models.ExchangeRate {
+func wantedRates(date time.Time) []*models.Rate {
 	day := dayKey(date)
 
-	return []*models.ExchangeRate{
+	return []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: day},
 		{Code: "USD", Rate: 45.1, Date: day},
 		{Code: "PLN", Rate: 11.1, Date: day},
@@ -417,10 +507,10 @@ func TestGetRates_WindowIgnoresServerTimezone(t *testing.T) {
 	now := time.Date(2026, 11, 11, 20, 0, 0, 0, time.FixedZone("EST", -5*3600))
 	day3 := now.AddDate(0, 0, -3)
 	client := &stubJSONClient{}
-	store := &stubExchangeStore{saved: map[string][]*models.ExchangeRate{
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
 		dayKey(day3): fullRates(day3),
 	}}
-	svc := NewExchangeService(client, store, discardLogger())
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -437,7 +527,7 @@ func TestGetRates_AbsentLogsWarnNotError(t *testing.T) {
 	now := time.Now()
 	handler := &captureHandler{}
 	store := &stubExchangeStore{}
-	svc := NewExchangeService(&stubJSONClient{}, store, slog.New(handler))
+	svc := NewExchangeService(&stubJSONClient{}, store, slog.New(handler), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -455,7 +545,7 @@ func TestGetRates_StoreFailureLogsError(t *testing.T) {
 	now := time.Now()
 	handler := &captureHandler{}
 	store := &stubExchangeStore{latestErr: errors.New("redis is down")}
-	svc := NewExchangeService(&stubJSONClient{}, store, slog.New(handler))
+	svc := NewExchangeService(&stubJSONClient{}, store, slog.New(handler), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -471,7 +561,7 @@ func TestGetRates_StoreFailureLogsError(t *testing.T) {
 func TestGetRates_LatestStoreErrorReturns503(t *testing.T) {
 	now := time.Now()
 	store := &stubExchangeStore{latestErr: errors.New("redis is down")}
-	svc := NewExchangeService(&stubJSONClient{}, store, discardLogger())
+	svc := NewExchangeService(&stubJSONClient{}, store, discardLogger(), nbuRatesURL)
 	svc.now = func() time.Time { return now }
 	svc.retryDelays = fastRetryDelays
 
@@ -480,6 +570,45 @@ func TestGetRates_LatestStoreErrorReturns503(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, rates)
 	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable), "expected ErrServiceUnavailable, got %v", err)
+}
+
+// TestRefresh_TotalFailureLogsFCChain pins that the caller's fc reaches the
+// logged error chain, while the client's retry records stay service-fc-free.
+func TestRefresh_TotalFailureLogsFCChain(t *testing.T) {
+	now := time.Now()
+	handler := &captureHandler{}
+	client := &stubJSONClient{failCalls: 4, logger: slog.New(handler)}
+	store := &stubExchangeStore{}
+	svc := NewExchangeService(client, store, slog.New(handler), nbuRatesURL)
+	svc.now = func() time.Time { return now }
+	svc.retryDelays = fastRetryDelays
+
+	err := svc.Refresh(context.Background())
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable), "expected ErrServiceUnavailable, got %v", err)
+	assert.Equal(t, 4, client.calls, "a total failure must spend the full attempt budget of one attempt plus three retries")
+	assert.Zero(t, store.saveCalls, "a failed refresh must not write anything")
+	matchedErr := assertSomeErrorLogContains(
+		t,
+		handler,
+		"exchangeService_fetchWithRetry",
+		"exchangeService_fetchDay",
+	)
+	assert.Equal(
+		t,
+		1,
+		strings.Count(matchedErr, "exchangeService_fetchWithRetry"),
+		"the caller must wrap its fc exactly once, got %q",
+		matchedErr,
+	)
+
+	assertRetryLogs(
+		t,
+		handler,
+		"exchange fetch retry failed",
+		[]int64{2, 3, 4},
+	)
 }
 
 // ctxBlockingJSONClient fails as soon as the context is done.
@@ -492,9 +621,20 @@ func (c *ctxBlockingJSONClient) GetJSON(ctx context.Context, _ string, _ any) er
 	return ctx.Err()
 }
 
+// FetchWithRetries delegates to the real client so the cancellation test
+// exercises the production retry loop.
+func (c *ctxBlockingJSONClient) FetchWithRetries(
+	ctx context.Context,
+	delays [3]time.Duration,
+	errorContext string,
+	fn func(context.Context) error,
+) error {
+	return httpclient.New(&http.Client{}, discardLogger()).FetchWithRetries(ctx, delays, errorContext, fn)
+}
+
 // TestService_RefreshCtxCanceled pins that a canceled context aborts before sleeping.
 func TestService_RefreshCtxCanceled(t *testing.T) {
-	svc := NewExchangeService(&ctxBlockingJSONClient{}, &stubExchangeStore{}, discardLogger())
+	svc := NewExchangeService(&ctxBlockingJSONClient{}, &stubExchangeStore{}, discardLogger(), nbuRatesURL)
 	svc.now = time.Now
 	svc.retryDelays = fastRetryDelays
 

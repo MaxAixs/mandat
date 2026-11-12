@@ -7,6 +7,8 @@ package config
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
@@ -34,8 +36,16 @@ type Config struct {
 	HTTP     httptransport.HTTPConfig `mapstructure:"http"`
 	DB       postgres.DBConfig        `mapstructure:"db"`
 	Redis    redis.Config             `mapstructure:"redis"`
+	Rates    RatesConfig              `mapstructure:"rates"`
 	Storage  r2.Config                `mapstructure:"storage"`
 	Download imgdownloader.Config     `mapstructure:"download"`
+}
+
+// RatesConfig holds the upstream rate provider endpoints.
+// URLs are endpoints without query parameters; the services add their own.
+type RatesConfig struct {
+	NBUURL  string `mapstructure:"nbu_url"`
+	FuelURL string `mapstructure:"fuel_url"`
 }
 
 // Load reads the YAML file at path and validates it.
@@ -96,6 +106,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("redis.addr", "localhost:6379")
 	v.SetDefault("redis.db", 0)
 	v.SetDefault("redis.dial_timeout", 5*time.Second)
+	v.SetDefault("rates.nbu_url", "https://bank.gov.ua/NBU_Exchange/exchange")
+	v.SetDefault("rates.fuel_url", "https://20.com.ua/api/v1/prices")
 	v.SetDefault("download.timeout", 15*time.Second)
 	v.SetDefault("download.max_bytes", 10<<20)
 	v.SetDefault("download.max_redirects", 3)
@@ -113,10 +125,33 @@ func (c *Config) validate() error {
 	case c.DB.Password == "":
 		return fmt.Errorf("%s environment variable is required (the password never lives in the config file)", passwordEnvVar)
 	}
+	if err := validateRateURL("rates.nbu_url", c.Rates.NBUURL); err != nil {
+		return err
+	}
+
+	if err := validateRateURL("rates.fuel_url", c.Rates.FuelURL); err != nil {
+		return err
+	}
+
 	if c.Storage.Configured() {
 		if err := c.Storage.Validate(); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// validateRateURL rejects blank URLs and non-HTTP schemes so a broken
+// rates section fails fast instead of 503ing the ticker forever.
+func validateRateURL(name, raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return fmt.Errorf("%s is required in the config file", name)
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("%s must be a valid http(s) URL, got %q", name, raw)
 	}
 
 	return nil

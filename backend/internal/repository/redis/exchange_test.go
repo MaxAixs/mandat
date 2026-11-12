@@ -77,7 +77,7 @@ func newExchangeFakeCmdable() *exchangeFakeCmdable {
 
 func TestExchangeStore_SaveThenLatest(t *testing.T) {
 	day := time.Date(2026, time.November, 11, 0, 0, 0, 0, time.UTC)
-	rates := []*models.ExchangeRate{
+	rates := []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: "11.11.2026"},
 		{Code: "USD", Rate: 45.1, Date: "11.11.2026"},
 		{Code: "PLN", Rate: 11.1, Date: "11.11.2026"},
@@ -149,7 +149,7 @@ func TestExchangeStore_SaveError(t *testing.T) {
 	err := store.Save(
 		context.Background(),
 		time.Date(2026, time.November, 11, 0, 0, 0, 0, time.UTC),
-		[]*models.ExchangeRate{{Code: "EUR", Rate: 50.1, Date: "11.11.2026"}},
+		[]*models.Rate{{Code: "EUR", Rate: 50.1, Date: "11.11.2026"}},
 	)
 
 	require.Error(t, err)
@@ -180,7 +180,7 @@ func TestExchangeStore_SaveSecondSetFails(t *testing.T) {
 	err := store.Save(
 		context.Background(),
 		time.Date(2026, time.November, 11, 0, 0, 0, 0, time.UTC),
-		[]*models.ExchangeRate{{Code: "EUR", Rate: 50.1, Date: "11.11.2026"}},
+		[]*models.Rate{{Code: "EUR", Rate: 50.1, Date: "11.11.2026"}},
 	)
 
 	require.Error(t, err, "a failed latest pointer must fail Save")

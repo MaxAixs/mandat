@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
+	"github.com/maxaixs/mandat/backend/pkg/httpclient"
 )
 
 const (
@@ -17,28 +19,23 @@ const (
 	// growing pauses. Past days are never refetched: Redis already holds the
 	// last three days. Requests never fetch: they only read the Redis snapshot.
 	exchangeMaxFallbackDays = 3
-
-	// nbuBaseURL is the NBU exchange endpoint without query parameters.
-	nbuBaseURL = "https://bank.gov.ua/NBU_Exchange/exchange"
 )
 
 // exchangeWantedCodes lists the ticker currencies in display order.
 var exchangeWantedCodes = [3]string{"EUR", "USD", "PLN"}
 
-// exchangeRetryDelays spaces the three retries of the daily fetch.
-var exchangeRetryDelays = [3]time.Duration{5 * time.Second, 10 * time.Second, 15 * time.Second}
-
 // ExchangeStore persists dated rate snapshots and serves the newest one.
 // The service owns this contract; internal/repository/redis implements it.
 type ExchangeStore interface {
-	Save(ctx context.Context, date time.Time, rates []*models.ExchangeRate) error
-	Latest(ctx context.Context) ([]*models.ExchangeRate, time.Time, error)
+	Save(ctx context.Context, date time.Time, rates []*models.Rate) error
+	Latest(ctx context.Context) ([]*models.Rate, time.Time, error)
 }
 
 // HTTPClient is the JSON-over-HTTP contract the exchange refresh needs.
 // *httpclient.Client implements it; tests use fakes.
 type HTTPClient interface {
 	GetJSON(ctx context.Context, url string, out any) error
+	FetchWithRetries(ctx context.Context, delays [3]time.Duration, errorContext string, fn func(context.Context) error) error
 }
 
 // ExchangeService refreshes NBU rates into Redis and serves them from it.
@@ -48,6 +45,7 @@ type ExchangeService struct {
 	logger      *slog.Logger
 	now         func() time.Time
 	retryDelays [3]time.Duration
+	baseURL     string
 
 	refreshMu sync.Mutex
 }
@@ -57,13 +55,15 @@ func NewExchangeService(
 	httpClient HTTPClient,
 	store ExchangeStore,
 	logger *slog.Logger,
+	baseURL string,
 ) *ExchangeService {
 	return &ExchangeService{
 		http:        httpClient,
 		store:       store,
 		logger:      logger,
 		now:         time.Now,
-		retryDelays: exchangeRetryDelays,
+		retryDelays: httpclient.DefaultDelays,
+		baseURL:     baseURL,
 	}
 }
 
@@ -126,49 +126,46 @@ func (s *ExchangeService) Refresh(ctx context.Context) error {
 }
 
 // fetchWithRetry tries date once, then retries with growing pauses.
-func (s *ExchangeService) fetchWithRetry(ctx context.Context, date time.Time) ([]*models.ExchangeRate, error) {
+func (s *ExchangeService) fetchWithRetry(ctx context.Context, date time.Time) ([]*models.Rate, error) {
 	const fc = "exchangeService_fetchWithRetry"
 
-	rates, err := s.fetchDay(ctx, date)
-	if err == nil {
-		return rates, nil
+	var rates []*models.Rate
+
+	fetchErr := s.http.FetchWithRetries(
+		ctx,
+		s.retryDelays,
+		"exchange fetch retry failed",
+		func(fnCtx context.Context) error {
+			var err error
+			rates, err = s.fetchDay(fnCtx, date)
+
+			return err
+		},
+	)
+	if fetchErr != nil {
+		return nil, fmt.Errorf("%s: %w", fc, fetchErr)
 	}
 
-	for i, pause := range s.retryDelays {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("%s: %w", fc, ctx.Err())
-		case <-time.After(pause):
-		}
-
-		rates, err = s.fetchDay(ctx, date)
-		if err == nil {
-			return rates, nil
-		}
-
-		s.logger.ErrorContext(ctx, "exchange fetch retry failed", "fc", fc, "attempt", i+2, "error", err)
-	}
-
-	return nil, fmt.Errorf("%s: %w", fc, err)
+	return rates, nil
 }
 
 // fetchDay returns per-unit UAH rates for date (Amount divided by Units).
-func (s *ExchangeService) fetchDay(ctx context.Context, date time.Time) ([]*models.ExchangeRate, error) {
+func (s *ExchangeService) fetchDay(ctx context.Context, date time.Time) ([]*models.Rate, error) {
 	const fc = "exchangeService_fetchDay"
 
 	var items []exchangeItem
-	url := nbuBaseURL + "?json&date=" + date.Format("02.01.2006")
+	url := strings.TrimSuffix(s.baseURL, "/") + "?json&date=" + date.Format("02.01.2006")
 	if err := s.http.GetJSON(ctx, url, &items); err != nil {
 		return nil, fmt.Errorf("%s: fetch nbu rates: %w", fc, err)
 	}
 
-	rates := make([]*models.ExchangeRate, 0, len(items))
+	rates := make([]*models.Rate, 0, len(items))
 	for _, item := range items {
 		if item.Units <= 0 {
 			continue
 		}
 
-		rates = append(rates, &models.ExchangeRate{
+		rates = append(rates, &models.Rate{
 			Code: item.CurrencyCode,
 			Rate: item.Amount / float64(item.Units),
 			Date: item.StartDate,
@@ -180,7 +177,7 @@ func (s *ExchangeService) fetchDay(ctx context.Context, date time.Time) ([]*mode
 
 // GetRates returns the newest Redis snapshot inside the three-day window.
 // It never fetches from NBU: a missing or expired snapshot is a 503.
-func (s *ExchangeService) GetRates(ctx context.Context) ([]*models.ExchangeRate, error) {
+func (s *ExchangeService) GetRates(ctx context.Context) ([]*models.Rate, error) {
 	const fc = "exchangeService_GetRates"
 
 	rates, date, err := s.store.Latest(ctx)
@@ -206,13 +203,13 @@ func (s *ExchangeService) GetRates(ctx context.Context) ([]*models.ExchangeRate,
 
 // selectRates picks the wanted currencies in display order.
 // It returns nil unless every wanted currency is present.
-func selectRates(rates []*models.ExchangeRate) []*models.ExchangeRate {
-	byCode := make(map[string]*models.ExchangeRate, len(rates))
+func selectRates(rates []*models.Rate) []*models.Rate {
+	byCode := make(map[string]*models.Rate, len(rates))
 	for _, rate := range rates {
 		byCode[rate.Code] = rate
 	}
 
-	selected := make([]*models.ExchangeRate, 0, len(exchangeWantedCodes))
+	selected := make([]*models.Rate, 0, len(exchangeWantedCodes))
 	for _, code := range exchangeWantedCodes {
 		rate, ok := byCode[code]
 		if !ok {

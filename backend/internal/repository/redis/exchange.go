@@ -52,7 +52,7 @@ type exchangeRecordItem struct {
 }
 
 // Save stores the rates for date and moves the latest pointer onto it.
-func (s *ExchangeStore) Save(ctx context.Context, date time.Time, rates []*models.ExchangeRate) error {
+func (s *ExchangeStore) Save(ctx context.Context, date time.Time, rates []*models.Rate) error {
 	const fc = "exchangeStore_Save"
 
 	items := make([]exchangeRecordItem, 0, len(rates))
@@ -85,7 +85,7 @@ func (s *ExchangeStore) Save(ctx context.Context, date time.Time, rates []*model
 }
 
 // Latest returns the newest snapshot or errs.ErrExchangeRatesNotFound.
-func (s *ExchangeStore) Latest(ctx context.Context) ([]*models.ExchangeRate, time.Time, error) {
+func (s *ExchangeStore) Latest(ctx context.Context) ([]*models.Rate, time.Time, error) {
 	const fc = "exchangeStore_Latest"
 
 	day, err := s.client.Get(ctx, exchangeLatestKey).Result()
@@ -116,9 +116,9 @@ func (s *ExchangeStore) Latest(ctx context.Context) ([]*models.ExchangeRate, tim
 		return nil, time.Time{}, fmt.Errorf("%s: decode rates: %w", fc, errs.ErrExchangeRatesNotFound)
 	}
 
-	rates := make([]*models.ExchangeRate, 0, len(record.Items))
+	rates := make([]*models.Rate, 0, len(record.Items))
 	for _, item := range record.Items {
-		rates = append(rates, &models.ExchangeRate{
+		rates = append(rates, &models.Rate{
 			Code: item.Code,
 			Rate: item.Rate,
 			Date: record.Date,

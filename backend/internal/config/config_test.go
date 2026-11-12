@@ -120,6 +120,20 @@ func TestShippedConfig_UsesComposeServiceNames(t *testing.T) {
 	assert.Equal(t, 0, cfg.Redis.DB)
 	assert.Equal(t, 5*time.Second, cfg.Redis.DialTimeout)
 	assert.Equal(t, 8080, cfg.HTTP.Port)
+
+	// A mistyped key (e.g. "nbu-url:") silently falls back to the defaults, so
+	// pin both the keys and the values actually shipped in config.yaml.
+	assert.Equal(t, "https://bank.gov.ua/NBU_Exchange/exchange", cfg.Rates.NBUURL,
+		"config.yaml must set rates.nbu_url to the NBU exchange endpoint")
+	assert.Equal(t, "https://20.com.ua/api/v1/prices", cfg.Rates.FuelURL,
+		"config.yaml must set rates.fuel_url to the 20.com.ua prices endpoint")
+
+	content, err := os.ReadFile(shippedConfigPath(t))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "nbu_url:",
+		"config.yaml must spell the rates key nbu_url, not a variant")
+	assert.Contains(t, string(content), "fuel_url:",
+		"config.yaml must spell the rates key fuel_url, not a variant")
 }
 
 // The shipped config must stay secret-free: without DB_PASSWORD the service
@@ -382,6 +396,124 @@ download:
 	assert.Equal(t, 1, cfg.Download.MaxRedirects)
 	assert.False(t, cfg.Download.AllowPrivate,
 		"allowprivate in a config file must not lift the SSRF guard")
+}
+
+// Upstream rates URLs are configuration now: omitting the rates section must
+// keep the production endpoints as viper defaults.
+func TestLoad_RatesDefaults(t *testing.T) {
+	const ratesMinimalYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+	cfg, err := config.Load(writeConfig(t, ratesMinimalYAML), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "https://bank.gov.ua/NBU_Exchange/exchange", cfg.Rates.NBUURL,
+		"rates.nbu_url must default to the NBU exchange endpoint")
+	assert.Equal(t, "https://20.com.ua/api/v1/prices", cfg.Rates.FuelURL,
+		"rates.fuel_url must default to the 20.com.ua prices endpoint")
+}
+
+// An explicit rates section in the file must win over the defaults.
+func TestLoad_RatesOverrides(t *testing.T) {
+	const ratesYAML = `
+db:
+  host: localhost
+  user: mandat
+  database: mandat
+rates:
+  nbu_url: https://nbu.test/exchange
+  fuel_url: https://fuel.test/api/v1/prices
+`
+
+	cfg, err := config.Load(writeConfig(t, ratesYAML), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "https://nbu.test/exchange", cfg.Rates.NBUURL,
+		"rates.nbu_url from the file must override the default")
+	assert.Equal(t, "https://fuel.test/api/v1/prices", cfg.Rates.FuelURL,
+		"rates.fuel_url from the file must override the default")
+}
+
+// Upstream rates URLs are required configuration now: a blank or non-http(s)
+// value must fail startup instead of leaving the refresh ticker 503ing forever.
+func TestLoad_RatesValidation(t *testing.T) {
+	const baseYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+	const (
+		validNBU  = "rates:\n  nbu_url: https://nbu.test/exchange\n"
+		validFuel = "  fuel_url: https://fuel.test/api/v1/prices\n"
+	)
+
+	tests := []struct {
+		name    string
+		rates   string
+		wantKey string
+		wantMsg string
+	}{
+		{
+			name:    "blank nbu url",
+			rates:   "rates:\n  nbu_url: \"\"\n" + validFuel,
+			wantKey: "rates.nbu_url",
+			wantMsg: "rates.nbu_url is required in the config file",
+		},
+		{
+			name:    "whitespace nbu url",
+			rates:   "rates:\n  nbu_url: \"   \"\n" + validFuel,
+			wantKey: "rates.nbu_url",
+			wantMsg: "rates.nbu_url is required in the config file",
+		},
+		{
+			name:    "scheme-less nbu url",
+			rates:   "rates:\n  nbu_url: nbu.test/exchange\n" + validFuel,
+			wantKey: "rates.nbu_url",
+			wantMsg: `rates.nbu_url must be a valid http(s) URL, got "nbu.test/exchange"`,
+		},
+		{
+			name:    "non-http nbu url",
+			rates:   "rates:\n  nbu_url: ftp://x\n" + validFuel,
+			wantKey: "rates.nbu_url",
+			wantMsg: `rates.nbu_url must be a valid http(s) URL, got "ftp://x"`,
+		},
+		{
+			name:    "blank fuel url",
+			rates:   validNBU + "  fuel_url: \"\"\n",
+			wantKey: "rates.fuel_url",
+			wantMsg: "rates.fuel_url is required in the config file",
+		},
+		{
+			name:    "whitespace fuel url",
+			rates:   validNBU + "  fuel_url: \"   \"\n",
+			wantKey: "rates.fuel_url",
+			wantMsg: "rates.fuel_url is required in the config file",
+		},
+		{
+			name:    "scheme-less fuel url",
+			rates:   validNBU + "  fuel_url: fuel.test/api/v1/prices\n",
+			wantKey: "rates.fuel_url",
+			wantMsg: `rates.fuel_url must be a valid http(s) URL, got "fuel.test/api/v1/prices"`,
+		},
+		{
+			name:    "non-http fuel url",
+			rates:   validNBU + "  fuel_url: ftp://x\n",
+			wantKey: "rates.fuel_url",
+			wantMsg: `rates.fuel_url must be a valid http(s) URL, got "ftp://x"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.Load(
+				writeConfig(t, baseYAML+tt.rates),
+				envMap(map[string]string{"DB_PASSWORD": "secret"}),
+			)
+
+			require.Error(t, err, "a broken rates section must fail startup")
+			assert.Nil(t, cfg)
+			assert.Contains(t, err.Error(), tt.wantKey, "the error must name the offending key")
+			assert.Equal(t, tt.wantMsg, err.Error())
+		})
+	}
 }
 
 func TestDockerfileSourcesAreNotDockerignored(t *testing.T) {

@@ -1,4 +1,5 @@
 import type { Article, LatestNewsItem, StatItem } from '@/types'
+import type { TickerRate } from '@/sections/Ticker'
 
 /**
  * Mock content used until the Go backend is ready.
@@ -120,6 +121,15 @@ export const mockLatestNews: LatestNewsItem[] = [
     source: 'Економіка',
     title: 'Нафта подорожчала понад 110 доларів за барель',
   },
+]
+
+/** Fuel prices for the scrolling ticker (dev fallback without backend). */
+export const mockFuelRates: TickerRate[] = [
+  { code: 'A95', name: 'А-95', flag: '⛽', value: '88.74', unit: '₴/л' },
+  { code: 'A92', name: 'А-92', flag: '⛽', value: '84.68', unit: '₴/л' },
+  { code: 'A98', name: 'А-98', flag: '⛽', value: '92.48', unit: '₴/л' },
+  { code: 'DIESEL', name: 'Дизель', flag: '🛢️', value: '104.31', unit: '₴/л' },
+  { code: 'LPG', name: 'Автогаз', flag: '🚗', value: '61.15', unit: '₴/л' },
 ]
 
 /** "Цифра дня" statistics. */

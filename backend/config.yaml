@@ -31,6 +31,10 @@ redis:                # admin sessions; the local Compose Redis has no password
   db: 0
   dial_timeout: 5s
 
+rates:                # upstream rate providers (keep in sync with config.go defaults)
+  nbu_url: "https://bank.gov.ua/NBU_Exchange/exchange" # endpoint without query parameters
+  fuel_url: "https://20.com.ua/api/v1/prices"
+
 storage:              # Cloudflare R2; keys come from R2_ACCESS_KEY_ID /
   endpoint: ""        # R2_SECRET_ACCESS_KEY (or set R2_ACCOUNT_ID to derive it)
   bucket: ""         # or R2_ENDPOINT / R2_BUCKET env overrides

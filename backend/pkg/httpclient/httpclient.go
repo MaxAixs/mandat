@@ -1,35 +1,34 @@
-// Package httpclient provides one shared HTTP client for the whole
-// application plus a JSON client for trusted outbound calls.
-// The shared client owns the connection pool; services declare the
-// narrow interface they need and the client implements it.
-// Cases with special security needs (SSRF guards, body limits)
-// keep their own clients.
+// Package httpclient provides a JSON client for trusted outbound calls
+// over a shared HTTP client. Services declare the narrow interface they
+// need and the client implements it. Cases with special security needs
+// (SSRF guards, body limits) keep their own clients.
 package httpclient
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
-// NewSharedClient creates one client for the whole application with
-// the given per-request timeout. Sharing a client reuses connections;
-// build it once in main and inject it everywhere instead of creating
-// a client per use case.
-func NewSharedClient(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout}
-}
+// DefaultDelays spaces the three retries of a fetch.
+var DefaultDelays = [3]time.Duration{5 * time.Second, 10 * time.Second, 15 * time.Second}
 
 // Client is a JSON API client over a shared HTTP client.
 type Client struct {
-	http *http.Client
+	http   *http.Client
+	logger *slog.Logger
 }
 
-// New creates a Client over httpClient.
-func New(httpClient *http.Client) *Client {
-	return &Client{http: httpClient}
+// New creates a Client over httpClient. A nil logger defaults to slog.Default.
+func New(httpClient *http.Client, logger *slog.Logger) *Client {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	return &Client{http: httpClient, logger: logger}
 }
 
 // GetJSON performs a GET request to url and decodes a 2xx JSON response
@@ -55,4 +54,38 @@ func (c *Client) GetJSON(ctx context.Context, url string, out any) error {
 	}
 
 	return nil
+}
+
+// FetchWithRetries runs fn once, then retries it once per delay.
+// Aborted waits return ctx.Err(), discarding the attempt error. Failures
+// report the 1-based failed attempt (2,3,4) via the log; fn runs synchronously
+// in the caller's goroutine, so closures capturing results are safe.
+// Errors return unwrapped for the caller to wrap.
+func (c *Client) FetchWithRetries(
+	ctx context.Context,
+	delays [3]time.Duration,
+	errorContext string,
+	fn func(context.Context) error,
+) error {
+	err := fn(ctx)
+	if err == nil {
+		return nil
+	}
+
+	for i, pause := range delays {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pause):
+		}
+
+		err = fn(ctx)
+		if err == nil {
+			return nil
+		}
+
+		c.logger.ErrorContext(ctx, errorContext, "attempt", i+2, "error", err)
+	}
+
+	return err
 }

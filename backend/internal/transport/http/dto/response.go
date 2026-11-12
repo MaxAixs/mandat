@@ -92,7 +92,7 @@ type ExchangeRatesResponse struct {
 
 // ExchangeToRatesResponse maps domain rates onto the public payload,
 // rounding each rate to two decimals in EUR, USD, PLN order.
-func ExchangeToRatesResponse(rates []*models.ExchangeRate) ExchangeRatesResponse {
+func ExchangeToRatesResponse(rates []*models.Rate) ExchangeRatesResponse {
 	items := make([]ExchangeRateResponse, 0, len(rates))
 
 	date := ""
@@ -112,6 +112,44 @@ func ExchangeToRatesResponse(rates []*models.ExchangeRate) ExchangeRatesResponse
 	}
 
 	return ExchangeRatesResponse{Base: "UAH", Date: date, Items: items}
+}
+
+// FuelRateResponse is one fuel price per liter.
+type FuelRateResponse struct {
+	Code string  `json:"code"`
+	Rate float64 `json:"rate"`
+}
+
+// FuelRatesResponse is the fuel price table served to the public site.
+type FuelRatesResponse struct {
+	Base  string             `json:"base"`
+	Unit  string             `json:"unit"`
+	Date  string             `json:"date"`
+	Items []FuelRateResponse `json:"items"`
+}
+
+// FuelToRatesResponse maps domain rates onto the public payload,
+// rounding each price to two decimals in pinned order.
+func FuelToRatesResponse(rates []*models.Rate) FuelRatesResponse {
+	items := make([]FuelRateResponse, 0, len(rates))
+
+	date := ""
+	for _, rate := range rates {
+		if rate == nil {
+			continue
+		}
+
+		if date == "" {
+			date = rate.Date
+		}
+
+		items = append(items, FuelRateResponse{
+			Code: rate.Code,
+			Rate: math.Round(rate.Rate*100) / 100,
+		})
+	}
+
+	return FuelRatesResponse{Base: "UAH", Unit: "liter", Date: date, Items: items}
 }
 
 // NewsToPublicResponse maps a domain article onto its public card payload.

@@ -3,6 +3,7 @@ export interface TickerRate {
   name: string
   flag: string
   value: string
+  unit?: string
 }
 
 export default function Ticker({ items }: { items: TickerRate[] }) {
@@ -34,7 +35,7 @@ export default function Ticker({ items }: { items: TickerRate[] }) {
             <span className="font-display text-lg font-semibold tabular-nums text-mandat-text">
               {rate.value}
             </span>
-            <span className="self-start pt-0.5 font-display text-[11px] text-mandat-muted">₴</span>
+            <span className="self-start pt-0.5 font-display text-[11px] text-mandat-muted">{rate.unit ?? '₴'}</span>
             <span aria-hidden="true" className="ml-5 h-5 w-px bg-mandat-line" />
           </div>
         ))}

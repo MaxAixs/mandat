@@ -112,3 +112,27 @@ test('ticker renders rich rate cards', () => {
 test('ticker renders nothing for empty rates', () => {
   assert.equal(renderTicker([]), '')
 })
+
+test('ticker renders unit after value', () => {
+  const markup = renderTicker([
+    { code: 'A95', name: 'А-95', flag: '⛽', value: '88.74', unit: '₴/л' },
+  ])
+  const text = decodeText(markup)
+  const valueIndex = text.indexOf('88.74')
+  const unitIndex = text.indexOf('₴/л')
+
+  assert.ok(valueIndex !== -1, `expected the ticker markup to include 88.74:\n${markup}`)
+  assert.ok(unitIndex !== -1, `expected the ticker markup to include the ₴/л unit:\n${markup}`)
+  assert.ok(
+    valueIndex < unitIndex,
+    `expected the unit to follow the value (88.74 < ₴/л):\n${markup}`,
+  )
+})
+
+test('ticker defaults unit to hryvnia sign', () => {
+  const markup = renderTicker([{ code: 'EUR', name: 'Євро', flag: '🇪🇺', value: '51.08' }])
+  const text = decodeText(markup)
+
+  assert.ok(text.includes('₴'), `expected the default ₴ unit in the ticker markup:\n${markup}`)
+  assert.ok(!text.includes('₴/л'), `expected no custom ₴/л unit by default:\n${markup}`)
+})

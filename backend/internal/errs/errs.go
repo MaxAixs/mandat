@@ -18,6 +18,7 @@ var (
 	ErrTooManyRequests    = errors.New("too many requests")
 
 	ErrExchangeRatesNotFound = errors.New("exchange rates not found")
+	ErrFuelRatesNotFound     = errors.New("fuel rates not found")
 )
 
 // ValidationError describes a rejected input field.
