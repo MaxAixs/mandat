@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/maxaixs/mandat/backend/internal/errs"
-	"github.com/maxaixs/mandat/backend/internal/transport/http/handler"
 )
 
 // DefaultMaxBodyBytes is the maximum accepted request body size.
@@ -19,8 +17,9 @@ const (
 )
 
 // uploadPathPrefix marks the admin routes that accept cover files.
-// It mirrors handler.AdminNewsPrefix so route changes stay in one place.
-const uploadPathPrefix = handler.AdminNewsPrefix
+// It mirrors the admin news routes in the handler package: importing them
+// would cycle through httptransport, so the prefix is repeated here.
+const uploadPathPrefix = "/api/admin/news"
 
 // LimitBodySize rejects request bodies larger than limit.
 func LimitBodySize(limit int64) gin.HandlerFunc {
@@ -31,7 +30,11 @@ func LimitBodySize(limit int64) gin.HandlerFunc {
 		}
 
 		if c.Request.ContentLength > effective {
-			handler.WriteError(c, errs.ErrPayloadTooLarge)
+			// Same wire format as WriteError for ErrPayloadTooLarge.
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error": gin.H{
+				"status":  http.StatusRequestEntityTooLarge,
+				"message": "Request payload too large",
+			}})
 
 			return
 		}

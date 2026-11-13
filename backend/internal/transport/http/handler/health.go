@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/service"
+	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 )
 
@@ -33,7 +34,7 @@ func (h *HealthHandler) Live(c *gin.Context) {
 // Ready handles GET /health/ready and checks required dependencies.
 func (h *HealthHandler) Ready(c *gin.Context) {
 	if err := h.svc.Ready(c.Request.Context()); err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}

@@ -331,7 +331,7 @@ The HTTP layer must return consistent JSON error responses.
 
 The error payload carries a client-facing message only; clients classify failures by the HTTP status code. Client-facing messages must not disclose internal implementation details.
 
-The mapping from application errors to responses lives in one place — the `errResps` table in `internal/transport/http/handler/errors.go`. Each entry maps a sentinel error onto its HTTP status and message (`ErrResp`). Add new client-facing errors as a single table entry; do not branch on error types inside handlers.
+The mapping from application errors to responses lives in one place — the `errResps` table in `internal/transport/http/errors.go`. Each entry maps a sentinel error onto its HTTP status and message (`ErrResp`). Add new client-facing errors as a single table entry; do not branch on error types inside handlers.
 
 ## 6. Logging
 

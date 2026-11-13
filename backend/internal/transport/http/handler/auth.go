@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/service"
+	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 )
 
@@ -58,14 +59,14 @@ func (h *AuthHandler) Register(r *gin.RouterGroup) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		WriteError(c, bindError(err))
+		httptransport.WriteError(c, bindError(err))
 
 		return
 	}
 
 	result, err := h.svc.Login(c.Request.Context(), req.Login, req.Password)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -78,13 +79,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	token, err := c.Cookie(dto.AdminSessionCookie)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
 
 	if err := h.svc.Logout(c.Request.Context(), token); err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}

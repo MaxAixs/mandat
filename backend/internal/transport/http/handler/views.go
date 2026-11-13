@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 )
 
@@ -49,7 +50,7 @@ func (h *ViewHandler) Record(c *gin.Context) {
 
 	views, err := h.svc.RecordView(c.Request.Context(), c.Param("slug"), anonymousID)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}

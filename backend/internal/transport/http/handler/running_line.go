@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/models"
+	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 )
 
@@ -35,7 +36,7 @@ func (h *RunningLineHandler) Register(r *gin.RouterGroup) {
 func (h *RunningLineHandler) GetExchangeRates(c *gin.Context) {
 	rates, err := h.exchange.GetRates(c.Request.Context())
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -47,7 +48,7 @@ func (h *RunningLineHandler) GetExchangeRates(c *gin.Context) {
 func (h *RunningLineHandler) GetFuelRates(c *gin.Context) {
 	rates, err := h.fuel.GetRates(c.Request.Context())
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}

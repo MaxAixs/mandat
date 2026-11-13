@@ -14,6 +14,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/service"
+	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
 )
@@ -66,7 +67,7 @@ func (h *NewsHandler) Register(r *gin.RouterGroup) {
 func (h *NewsHandler) Create(c *gin.Context) {
 	input, err := h.bindInput(c)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -74,7 +75,7 @@ func (h *NewsHandler) Create(c *gin.Context) {
 
 	news, err := h.svc.Create(c.Request.Context(), input)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -86,21 +87,21 @@ func (h *NewsHandler) Create(c *gin.Context) {
 func (h *NewsHandler) List(c *gin.Context) {
 	page, err := queryInt(c, "page", 1)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
 
 	limit, err := queryInt(c, "limit", service.DefaultPageLimit)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
 
 	result, err := h.svc.List(c.Request.Context(), page, limit, c.Query("status"), c.Query("category"))
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -121,7 +122,7 @@ func (h *NewsHandler) List(c *gin.Context) {
 func (h *NewsHandler) GetBySlug(c *gin.Context) {
 	news, err := h.svc.GetBySlug(c.Request.Context(), c.Param("slug"))
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -133,14 +134,14 @@ func (h *NewsHandler) GetBySlug(c *gin.Context) {
 func (h *NewsHandler) Update(c *gin.Context) {
 	input, err := h.bindInput(c)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 		return
 	}
 	defer closeCover(input.Cover)
 
 	news, err := h.svc.Update(c.Request.Context(), c.Param("slug"), input)
 	if err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
@@ -151,7 +152,7 @@ func (h *NewsHandler) Update(c *gin.Context) {
 // Delete handles DELETE /api/admin/news/:slug.
 func (h *NewsHandler) Delete(c *gin.Context) {
 	if err := h.svc.Delete(c.Request.Context(), c.Param("slug")); err != nil {
-		WriteError(c, err)
+		httptransport.WriteError(c, err)
 
 		return
 	}
