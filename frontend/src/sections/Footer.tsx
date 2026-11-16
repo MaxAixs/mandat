@@ -1,43 +1,12 @@
-import { AtSign, Instagram, Send } from 'lucide-react'
-
-import logoUrl from '@/assets/logo-mandat.png'
-import { FOOTER_LINKS, SITE_NAME, SITE_TAGLINE, SOCIAL_LINKS } from '@/constants'
-
-const SOCIAL_ICONS: Record<string, typeof Instagram> = {
-  instagram: Instagram,
-  threads: AtSign,
-  telegram: Send,
-}
+import MandatLogo from '@/components/MandatLogo'
+import SocialIcon from '@/components/SocialIcon'
+import { FOOTER_COPYRIGHT, FOOTER_LINKS, FOOTER_USAGE_NOTICE, SOCIAL_LINKS } from '@/constants'
 
 export default function Footer() {
   return (
-    <footer className="border-t border-mandat-line py-14 pb-8 bg-mandat-surface">
+    <footer className="border-t border-mandat-line bg-mandat-surface pt-14 pb-12">
       <div className="mx-auto max-w-[1240px] px-6">
-        <div className="flex flex-col items-center text-center">
-          <img src={logoUrl} alt={SITE_NAME} className="h-14 w-auto mix-blend-screen" />
-          <p className="text-mandat-muted text-[14px] mt-4">
-            Про владу, рішення, гроші та вплив. {SITE_TAGLINE}.
-          </p>
-          <div className="mt-6 flex items-center gap-4">
-            {SOCIAL_LINKS.map((social) => {
-              const Icon = SOCIAL_ICONS[social.id]
-              return (
-                <a
-                  key={social.id}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="grid size-11 place-items-center rounded-full border border-mandat-line text-mandat-muted transition-colors hover:border-mandat-red-bright hover:text-mandat-red-bright no-underline"
-                >
-                  <Icon className="size-5" aria-hidden="true" />
-                </a>
-              )
-            })}
-          </div>
-          <p className="mt-6 text-mandat-muted text-[13px]">
-            © 2026 {SITE_NAME}. Усі права захищено.
-          </p>
-        </div>
-        <div className="mt-8 pt-6 border-t border-mandat-line grid grid-cols-1 sm:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
           {FOOTER_LINKS.map((column) => (
             <div key={column.title}>
               <h4 className="font-display text-[14px] tracking-[2px] uppercase mb-4">{column.title}</h4>
@@ -55,6 +24,35 @@ export default function Footer() {
               </ul>
             </div>
           ))}
+        </div>
+
+        <div className="mt-12 flex flex-col items-center border-t border-mandat-line pt-12 text-center">
+          <a href="/" className="no-underline">
+            <MandatLogo className="text-[44px] sm:text-[56px]" />
+          </a>
+
+          <p className="mt-7 text-[13px] font-medium uppercase tracking-[0.04em] text-white/85">
+            {FOOTER_COPYRIGHT}
+          </p>
+
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            {SOCIAL_LINKS.map((social) => (
+              <a
+                key={social.id}
+                href={social.href}
+                aria-label={social.label}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="grid size-12 place-items-center rounded-full border-2 border-white/80 text-white/90 no-underline transition-colors hover:border-mandat-red-bright hover:text-mandat-red-bright"
+              >
+                <SocialIcon id={social.id} className="size-[22px]" />
+              </a>
+            ))}
+          </div>
+
+          <p className="mt-8 max-w-[640px] text-[13px] leading-relaxed text-mandat-muted">
+            {FOOTER_USAGE_NOTICE}
+          </p>
         </div>
       </div>
     </footer>

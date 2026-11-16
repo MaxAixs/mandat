@@ -10,6 +10,11 @@ export const TELEGRAM_CHANNEL = {
   subscribers: '42 728',
 }
 
+/** Legal lines shown at the very bottom of the footer. */
+export const FOOTER_COPYRIGHT = `© ${new Date().getFullYear()}, ${SITE_NAME}. Усі права захищено.`
+export const FOOTER_USAGE_NOTICE =
+  'Використання матеріалів сайту лише за умови посилання (для інтернет-видань — гіперпосилання) на «Мандат» не нижче третього абзацу.'
+
 /** Social profiles linked from the footer. */
 export const SOCIAL_LINKS = [
   { id: 'instagram', label: 'Instagram', href: '#' },
