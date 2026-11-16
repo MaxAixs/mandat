@@ -3,8 +3,8 @@ import { Search, X } from 'lucide-react'
 import { Link } from 'react-router'
 
 import SearchBox from '@/components/SearchBox'
-import logoUrl from '@/assets/logo-mandat.png'
-import { NAV_LINKS, SITE_NAME } from '@/constants'
+import MandatLogo from '@/components/MandatLogo'
+import { NAV_LINKS } from '@/constants'
 
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
@@ -15,17 +15,17 @@ export default function Header() {
       style={{ background: 'rgba(23,25,28,0.92)', backdropFilter: 'blur(12px)' }}
     >
       <div className="w-full px-8">
-        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 lg:gap-x-6 h-[95px]">
+        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 lg:gap-x-6 h-[95px]">
           <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-start">
-            <img src={logoUrl} alt={SITE_NAME} className="h-[76px] w-auto mix-blend-screen" />
+            <MandatLogo className="h-9 shrink-0" />
           </Link>
 
-          <nav className="hidden lg:flex min-w-0 gap-2.5 xl:gap-6 justify-self-center">
+          <nav className="hidden lg:flex min-w-0 gap-2 xl:gap-4 min-[1440px]:gap-5 min-[1680px]:gap-7 justify-self-center">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.label}
                 to={link.href}
-                className="relative font-header text-[14px] xl:text-[18px] font-medium tracking-[0.5px] xl:tracking-[1px] uppercase whitespace-nowrap py-2.5 group text-mandat-text"
+                className="relative font-header text-[14px] min-[1440px]:text-[16px] min-[1680px]:text-[18px] font-medium tracking-[0.5px] min-[1680px]:tracking-[1px] uppercase whitespace-nowrap py-2.5 group text-mandat-text"
               >
                 {link.label}
                 <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-mandat-red-bright transition-all duration-250 group-hover:w-full" />

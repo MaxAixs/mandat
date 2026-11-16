@@ -28,7 +28,7 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center border-t border-mandat-line pt-12 text-center">
           <a href="/" className="no-underline">
-            <MandatLogo className="text-[44px] sm:text-[56px]" />
+            <MandatLogo className="h-14 sm:h-[72px]" />
           </a>
 
           <p className="mt-7 text-[13px] font-medium uppercase tracking-[0.04em] text-white/85">
