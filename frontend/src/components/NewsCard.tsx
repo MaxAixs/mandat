@@ -3,7 +3,15 @@ import { Link } from 'react-router'
 
 import type { Article } from '@/types'
 
-export default function NewsCard({ article, large }: { article: Article; large?: boolean }) {
+export default function NewsCard({
+  article,
+  large,
+  showCategory = true,
+}: {
+  article: Article
+  large?: boolean
+  showCategory?: boolean
+}) {
   const featured = article.featured ?? false
   const prominent = large ?? featured
 
@@ -47,9 +55,11 @@ export default function NewsCard({ article, large }: { article: Article; large?:
               />
             </>
           )}
-          <span className="absolute top-3.5 left-3.5 z-10 font-display text-[11px] tracking-[2px] uppercase px-3 py-1 bg-mandat-red text-mandat-text">
-            {article.category}
-          </span>
+          {showCategory && (
+            <span className="absolute top-3.5 left-3.5 z-10 font-display text-[11px] tracking-[2px] uppercase px-3 py-1 bg-mandat-red text-mandat-text">
+              {article.category}
+            </span>
+          )}
         </div>
         <div className={prominent ? 'p-5 pb-4 flex flex-col' : 'p-5 pb-4 flex flex-col flex-1'}>
           <h3 className={`font-semibold leading-[1.15] tracking-[0.01em] ${prominent ? 'text-[24px]' : 'text-[17px]'}`}>

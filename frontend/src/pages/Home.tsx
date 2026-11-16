@@ -3,7 +3,6 @@ import Hero from '@/sections/Hero'
 import Ticker from '@/sections/Ticker'
 import News from '@/sections/News'
 import LatestNews from '@/sections/LatestNews'
-import Telegram from '@/sections/Telegram'
 import Footer from '@/sections/Footer'
 import usePublicNews from '@/hooks/use-public-news'
 import useExchangeRates from '@/hooks/use-exchange-rates'
@@ -64,7 +63,7 @@ export default function Home() {
       <Header />
       <Hero mainEvent={mainEvent} />
       {hasTicker && (
-        <div className="mt-16 border-y border-mandat-line bg-mandat-surface">
+        <div className="border-b border-mandat-line bg-mandat-surface">
           <Ticker items={currencyCards} ariaLabel="Курс валют" />
           {currencyCards.length > 0 && fuelCards.length > 0 && (
             <div aria-hidden="true" className="h-px bg-mandat-line" />
@@ -74,7 +73,6 @@ export default function Home() {
       )}
       <News />
       <LatestNews items={latestNews.slice(0, LATEST_NEWS_COUNT)} />
-      <Telegram />
       <Footer />
     </div>
   )

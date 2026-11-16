@@ -4,12 +4,16 @@ module.exports = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
-      // PT Serif carries body text and article copy (`font-sans` is the default
-      // family); Inter is used for headings (see the base layer in index.css)
-      // and UI labels/captions via `font-display`.
+      // IBM Plex Sans is the site family (`font-sans`, the default)
+      // as well as headings and UI labels/captions (`font-display`).
+      // IBM Plex Sans is the site family. Weights by role: headings 700,
+      // subheadings 600, body 400, header nav 500 (`font-header`).
+      // Unbounded ExtraBold 800 is scoped to text logos (`font-logo`).
       fontFamily: {
-        sans: ['PT Serif', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
-        display: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+        display: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+        header: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+        logo: ['Unbounded', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

@@ -5,8 +5,8 @@ export default function Analytics() {
     <section id="analytics" className="border-y border-mandat-line bg-mandat-surface">
       <div className="mx-auto max-w-[1240px] px-6 py-[72px]">
         <div className="flex items-baseline justify-between mb-10">
-          <h2 className="text-[20px] sm:text-[30px] tracking-[1px] font-bold">
-            <span className="inline-block w-2 h-7 bg-mandat-red-bright mr-3.5 align-middle" />
+          <h2 className="text-[20px] sm:text-[30px] tracking-[1px] font-semibold">
+            <span className="inline-block w-2 h-[1cap] bg-mandat-red-bright mr-3.5 align-baseline" />
             Цифра дня
           </h2>
           <a

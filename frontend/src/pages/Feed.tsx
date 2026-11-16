@@ -39,7 +39,7 @@ export default function Feed() {
       <main className="mx-auto min-h-[60vh] max-w-[1240px] px-6 py-[72px]">
         <div className="mb-10">
           <h1 className="text-[30px] font-bold tracking-[1px] md:text-[42px]">
-            <span className="inline-block w-2 h-8 bg-mandat-red-bright mr-3.5 align-middle md:h-10" />
+            <span className="inline-block w-2 h-[1cap] bg-mandat-red-bright mr-3.5 align-baseline" />
             {filter ?? 'Всі новини'}
           </h1>
         </div>

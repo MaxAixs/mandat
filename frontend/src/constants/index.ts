@@ -10,6 +10,13 @@ export const TELEGRAM_CHANNEL = {
   subscribers: '42 728',
 }
 
+/** Social profiles linked from the footer. */
+export const SOCIAL_LINKS = [
+  { id: 'instagram', label: 'Instagram', href: '#' },
+  { id: 'threads', label: 'Threads', href: '#' },
+  { id: 'telegram', label: 'Telegram', href: TELEGRAM_CHANNEL.url },
+]
+
 /** Categories available for news articles. */
 export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас', 'Політика', 'Регіональні новини']
 

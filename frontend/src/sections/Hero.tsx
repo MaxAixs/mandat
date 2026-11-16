@@ -32,7 +32,7 @@ export default function Hero({ mainEvent }: HeroProps) {
             {mainEvent ? (
               <Link
                 to={`/news/${encodeURIComponent(mainEvent.id)}`}
-                className="inline-block text-inherit no-underline transition-colors hover:text-mandat-red-bright focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mandat-red-bright"
+                className="inline-block origin-left text-inherit no-underline transition-transform duration-300 hover:scale-[1.02] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mandat-red-bright"
               >
                 <h1 className={mainEventHeadingClassName}>{mainEvent.title}</h1>
               </Link>

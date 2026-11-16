@@ -11,11 +11,11 @@ export default function News() {
     useCategoryNews(null, HOME_NEWS_PAGE_LIMIT)
 
   return (
-    <section id="news" className="py-[72px]">
+    <section id="news" className="pt-9 pb-4">
       <div className="mx-auto max-w-[1240px] px-6">
         <div className="flex items-baseline justify-between mb-6">
-          <h2 className="text-[20px] sm:text-[30px] tracking-[1px] font-bold">
-            <span className="inline-block w-2 h-7 bg-mandat-red-bright mr-3.5 align-middle" />
+          <h2 className="text-[22px] sm:text-[34px] tracking-[1px] font-semibold">
+            <span className="inline-block w-2 h-[1cap] bg-mandat-red-bright mr-3.5 align-baseline" />
             Головні новини
           </h2>
         </div>

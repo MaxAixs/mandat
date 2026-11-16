@@ -244,7 +244,7 @@ export default function Admin() {
               М
             </div>
             <div>
-              <div className="font-display text-xl font-semibold leading-none tracking-[0.14em]">МАНДАТ</div>
+              <div className="font-logo text-xl font-extrabold leading-none tracking-[0.14em]">МАНДАТ</div>
               <div className="mt-1 text-[9px] tracking-[0.25em] text-mandat-muted">АДМІНПАНЕЛЬ</div>
             </div>
           </div>
@@ -275,7 +275,7 @@ export default function Admin() {
           <header className="flex h-20 items-center justify-between border-b border-mandat-line bg-mandat-surface/50 px-4 md:px-8">
             <div className="flex items-center gap-3 lg:hidden">
               <div className="flex size-8 items-center justify-center bg-mandat-red font-display font-bold text-white">М</div>
-              <span className="font-display text-lg tracking-widest">МАНДАТ</span>
+              <span className="font-logo text-lg tracking-widest">МАНДАТ</span>
             </div>
             <div className="hidden items-center gap-2 text-sm text-mandat-muted lg:flex">
               <LayoutDashboard className="size-4" />

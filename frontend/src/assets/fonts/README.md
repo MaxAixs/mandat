@@ -6,9 +6,9 @@ downloaded by the browser.
 
 | File family | Role | CSS / Tailwind |
 |---|---|---|
-| `inter-*.woff2` (variable, 100–900) | Headings and UI labels, captions, badges, buttons | `h1`–`h6` (base layer), `font-display` |
-| `pt-serif-400-*.woff2`, `pt-serif-700-*.woff2` | Body text and article copy | base font, `font-sans` |
+| `ibm-plex-sans-*-*.woff2` (400/500/600/700) | The site family, weights by role: headings 700, subheadings 600, body 400, header nav 500 | base font, `font-sans`, `h1`–`h6` (base layer), `font-display`, `font-header` |
+| `unbounded-800-*.woff2` | Text logos | `font-logo` |
 
-- Inter: https://fonts.google.com/specimen/Inter
-- PT Serif: https://fonts.google.com/specimen/PT+Serif
+- IBM Plex Sans: https://fonts.google.com/specimen/IBM+Plex+Sans
+- Unbounded: https://fonts.google.com/specimen/Unbounded
 - License: SIL Open Font License 1.1; see `OFL.txt`.
