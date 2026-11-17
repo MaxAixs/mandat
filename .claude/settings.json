@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(**/*_test.go)",
+      "Write(**/*_test.go)",
+      "Edit(**/*.test.ts)",
+      "Write(**/*.test.ts)",
+      "Edit(**/*.test.tsx)",
+      "Write(**/*.test.tsx)",
+      "Edit(**/*.spec.ts)",
+      "Write(**/*.spec.ts)",
+      "Edit(**/*.spec.tsx)",
+      "Write(**/*.spec.tsx)",
+      "Edit(**/testdata/**)",
+      "Write(**/testdata/**)"
+    ]
+  }
+}
