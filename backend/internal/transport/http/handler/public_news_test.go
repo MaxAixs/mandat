@@ -46,14 +46,16 @@ type publicListPayload struct {
 }
 
 // setupPublicRouter assembles the admin and public news handlers over one router.
-func setupPublicRouter() (http.Handler, *testsupport.StubRepo) {
+func setupPublicRouter(t *testing.T) (http.Handler, *testsupport.StubRepo) {
+	t.Helper()
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
-	httpSrv := httptransport.New(httptransport.HTTPConfig{
+	httpSrv, err := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},
-	}, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc))
+	}, nil, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc))
+	require.NoError(t, err)
 
 	return httpSrv.Handler(), repo
 }
@@ -68,7 +70,7 @@ func decodePublicList(t *testing.T, body []byte) publicListPayload {
 }
 
 func TestPublicList_ReturnsOnlyPublishedArticles(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	createArticle(t, router, validBody) // draft
 	publishedSlug := createArticle(t, router, publishedBody)
 
@@ -83,7 +85,7 @@ func TestPublicList_ReturnsOnlyPublishedArticles(t *testing.T) {
 }
 
 func TestPublicList_ReturnsPublicFieldsOnly(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	slug := createArticle(t, router, publishedBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
@@ -108,7 +110,7 @@ func TestPublicList_ReturnsPublicFieldsOnly(t *testing.T) {
 }
 
 func TestPublicList_ReturnsMainEvent(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	slug := createArticle(t, router, publishedMainEventBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
@@ -121,7 +123,7 @@ func TestPublicList_ReturnsMainEvent(t *testing.T) {
 }
 
 func TestPublicList_IgnoresStatusQuery(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	createArticle(t, router, validBody) // draft
 	publishedSlug := createArticle(t, router, publishedBody)
 
@@ -134,7 +136,7 @@ func TestPublicList_IgnoresStatusQuery(t *testing.T) {
 }
 
 func TestPublicList_DraftOnlyReturnsEmptyList(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
@@ -146,7 +148,7 @@ func TestPublicList_DraftOnlyReturnsEmptyList(t *testing.T) {
 }
 
 func TestPublicList_InvalidPaginationReturns400(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 
 	for _, query := range []string{"?page=abc", "?page=0", "?page=-1", "?limit=abc", "?limit=0", "?limit=-1"} {
 		rec := doRequest(t, router, http.MethodGet, "/api/news"+query, "")
@@ -157,7 +159,7 @@ func TestPublicList_InvalidPaginationReturns400(t *testing.T) {
 }
 
 func TestPublicList_ClampsLimit(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news?limit=1000000", "")
 
@@ -167,7 +169,7 @@ func TestPublicList_ClampsLimit(t *testing.T) {
 }
 
 func TestPublicList_CategoryFilterReturnsOnlyMatchingPublishedArticles(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	sportSlug := createArticle(t, router, publishedSportBody)
 	createArticle(t, router, publishedBody) // international
 	createArticle(t, router, draftSportBody)
@@ -183,7 +185,7 @@ func TestPublicList_CategoryFilterReturnsOnlyMatchingPublishedArticles(t *testin
 }
 
 func TestPublicList_CategoryFilterMatchesExactRubric(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	createArticle(t, router, publishedSportBody)
 	internationalSlug := createArticle(t, router, publishedBody)
 
@@ -202,13 +204,14 @@ func TestPublicList_NewCategoriesAreValidFilters(t *testing.T) {
 		name     string
 		category string
 	}{
+		{"economics", "Економіка"},
 		{"politics", "Політика"},
 		{"regional", "Регіональні новини"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, repo := setupPublicRouter()
+			router, repo := setupPublicRouter(t)
 			storePublished(t, repo, "new-rubric-article", models.Category(tt.category), time.Now())
 
 			rec := doRequest(t, router, http.MethodGet,
@@ -223,7 +226,7 @@ func TestPublicList_NewCategoriesAreValidFilters(t *testing.T) {
 }
 
 func TestPublicList_WithoutCategoryRemainsUnfiltered(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	sportSlug := createArticle(t, router, publishedSportBody)
 	internationalSlug := createArticle(t, router, publishedBody)
 	createArticle(t, router, draftSportBody)
@@ -252,11 +255,12 @@ func TestPublicList_UnknownCategoryReturns400(t *testing.T) {
 		{"unknown rubric", "Фантастика"},
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
+		{"old investigation rubric", "Про нас"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, _ := setupPublicRouter()
+			router, _ := setupPublicRouter(t)
 
 			rec := doRequest(t, router, http.MethodGet,
 				"/api/news?category="+url.QueryEscape(tt.category), "")
@@ -293,7 +297,7 @@ func storePublished(
 }
 
 func TestPublicList_CategoryFilterAppliesBeforePagination(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	base := time.Date(2026, time.October, 1, 12, 0, 0, 0, time.UTC)
 
 	storePublished(t, repo, "sport-older", models.CategoryInsides, base)
@@ -316,7 +320,7 @@ func TestPublicList_CategoryFilterAppliesBeforePagination(t *testing.T) {
 }
 
 func TestPublicList_RepoFailureReturnsGeneric500(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	repo.ListPublishedErr = errors.New(`pq: relation "news" does not exist`)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news", "")
@@ -349,7 +353,7 @@ func decodePublicDetail(t *testing.T, body []byte) map[string]any {
 }
 
 func TestPublicDetail_ReturnsPublishedArticle(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	slug := createArticle(t, router, publishedDetailBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news/"+slug, "")
@@ -378,7 +382,7 @@ func TestPublicDetail_ReturnsPublishedArticle(t *testing.T) {
 }
 
 func TestPublicDetail_ReturnsMainEvent(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	slug := createArticle(t, router, publishedMainEventBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news/"+slug, "")
@@ -390,7 +394,7 @@ func TestPublicDetail_ReturnsMainEvent(t *testing.T) {
 }
 
 func TestPublicDetail_DraftAndMissingReturn404(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 	draftSlug := createArticle(t, router, validBody)
 
 	draftRec := doRequest(t, router, http.MethodGet, "/api/news/"+draftSlug, "")
@@ -408,7 +412,7 @@ func TestPublicDetail_DraftAndMissingReturn404(t *testing.T) {
 }
 
 func TestPublicDetail_RepoFailureReturnsGeneric500(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	repo.GetErr = errors.New(`pq: relation "news" does not exist`)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/news/missing-article", "")
@@ -465,7 +469,7 @@ func categoryQuery(category string) string {
 }
 
 func TestList_CategoryFilterReturnsOnlyMatchingArticles(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	createAdminArticle(t, router, "Спорт", "Спортивна новина", "draft")
 	createAdminArticle(t, router, "Новини", "Звичайна новина", "draft")
 
@@ -479,7 +483,7 @@ func TestList_CategoryFilterReturnsOnlyMatchingArticles(t *testing.T) {
 }
 
 func TestList_CombinedStatusAndCategoryFiltersBoth(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	createAdminArticle(t, router, "Спорт", "Спортивна чернетка", "draft")
 	createAdminArticle(t, router, "Спорт", "Спортивна опублікована", "published")
 	createAdminArticle(t, router, "Новини", "Звичайна опублікована", "published")
@@ -496,7 +500,7 @@ func TestList_CombinedStatusAndCategoryFiltersBoth(t *testing.T) {
 }
 
 func TestList_UnknownCategoryReturns400(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	createAdminArticle(t, router, "Спорт", "Спортивна новина", "draft")
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+categoryQuery("Фантастика"), "")
@@ -538,20 +542,22 @@ func seedSearchNews(
 
 // setupPublicRouterWithViewer mirrors the production wiring: the viewer
 // middleware guards the detail route only, never the search route.
-func setupPublicRouterWithViewer() (http.Handler, *testsupport.StubRepo) {
+func setupPublicRouterWithViewer(t *testing.T) (http.Handler, *testsupport.StubRepo) {
+	t.Helper()
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
-	httpSrv := httptransport.New(httptransport.HTTPConfig{
+	httpSrv, err := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},
-	}, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc, middleware.EnsureViewer(false)))
+	}, nil, handler.NewNewsHandler(svc), handler.NewPublicNewsHandler(svc, middleware.EnsureViewer(false)))
+	require.NoError(t, err)
 
 	return httpSrv.Handler(), repo
 }
 
 func TestPublicSearch_RepoErrorMapsTo500(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	repo.SearchErr = errors.New("boom")
 
 	rec := doRequest(t, router, http.MethodGet,
@@ -566,7 +572,7 @@ func TestPublicSearch_RepoErrorMapsTo500(t *testing.T) {
 }
 
 func TestPublicSearch_LimitClampedOverMax(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	seedSearchNews(t, repo, "search-limit", "Тестова стаття про ліміт",
 		models.CategoryNews, models.StatusPublished, time.Now())
 
@@ -583,7 +589,7 @@ func TestPublicSearch_LimitClampedOverMax(t *testing.T) {
 }
 
 func TestPublicSearch_SetsNoViewerCookie(t *testing.T) {
-	router, repo := setupPublicRouterWithViewer()
+	router, repo := setupPublicRouterWithViewer(t)
 	seedSearchNews(t, repo, "search-no-cookie", "Тестова стаття без cookie",
 		models.CategoryNews, models.StatusPublished, time.Now())
 
@@ -603,7 +609,7 @@ func TestPublicSearch_SetsNoViewerCookie(t *testing.T) {
 }
 
 func TestPublicSearch_ReturnsEnvelope(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	base := time.Date(2026, time.November, 3, 10, 0, 0, 0, time.UTC)
 
 	seedSearchNews(t, repo, "search-older", "Перша пошукова стаття",
@@ -645,7 +651,7 @@ func TestPublicSearch_ReturnsEnvelope(t *testing.T) {
 }
 
 func TestPublicSearch_EmptyQueryReturnsEmptyItems(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	seedSearchNews(t, repo, "search-published", "Пошукова стаття",
 		models.CategoryNews, models.StatusPublished, time.Now())
 
@@ -670,7 +676,7 @@ func TestPublicSearch_InvalidLimit400(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, _ := setupPublicRouter()
+			router, _ := setupPublicRouter(t)
 
 			rec := doRequest(t, router, http.MethodGet,
 				"/api/news/search?q="+url.QueryEscape("пошук")+"&limit="+tt.limit, "")
@@ -682,7 +688,7 @@ func TestPublicSearch_InvalidLimit400(t *testing.T) {
 }
 
 func TestPublicSearch_LongQuery400(t *testing.T) {
-	router, _ := setupPublicRouter()
+	router, _ := setupPublicRouter(t)
 
 	rec := doRequest(t, router, http.MethodGet,
 		"/api/news/search?q="+url.QueryEscape(strings.Repeat("а", 101)), "")
@@ -692,7 +698,7 @@ func TestPublicSearch_LongQuery400(t *testing.T) {
 }
 
 func TestPublicSearch_ExcludesDrafts(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	base := time.Date(2026, time.November, 3, 12, 0, 0, 0, time.UTC)
 
 	seedSearchNews(t, repo, "search-published", "Опублікована пошукова стаття",
@@ -711,7 +717,7 @@ func TestPublicSearch_ExcludesDrafts(t *testing.T) {
 }
 
 func TestPublicSearch_SearchRouteBeatsSlug(t *testing.T) {
-	router, repo := setupPublicRouter()
+	router, repo := setupPublicRouter(t)
 	seedSearchNews(t, repo, "search", "Пошукова стаття зі слагом search",
 		models.CategoryNews, models.StatusPublished, time.Now())
 

@@ -174,7 +174,7 @@ func TestGetRates_RetryThenSuccess(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 3, client.calls, "one attempt plus two retries must succeed")
-	require.Len(t, store.saved[dayKey(now)], 3, "the fetched day must be persisted")
+	require.Len(t, store.saved[dayKey(now)], 4, "the fetched day must be persisted")
 
 	rates, err := svc.GetRates(context.Background())
 
@@ -206,7 +206,7 @@ func TestRefresh_UsesConfiguredBaseURL(t *testing.T) {
 		client.urls[0],
 	)
 	assert.Equal(t, nbuDate(now), nbuQueryDate(client.urls[0]), "the request must still carry the date query")
-	require.Len(t, store.saved[dayKey(now)], 3, "the fetched day must be persisted")
+	require.Len(t, store.saved[dayKey(now)], 4, "the fetched day must be persisted")
 }
 
 // TestRefresh_BaseURLTrailingSlash pins the URL join: a trailing slash on the
@@ -226,7 +226,7 @@ func TestRefresh_BaseURLTrailingSlash(t *testing.T) {
 	require.Len(t, client.urls, 1, "one successful attempt must issue exactly one request")
 	assert.Equal(t, "https://nbu.test/exchange?json&date=12.11.2026", client.urls[0],
 		"the trailing slash must collapse into a single slash before the query")
-	require.Len(t, store.saved[dayKey(now)], 3, "the fetched day must be persisted")
+	require.Len(t, store.saved[dayKey(now)], 4, "the fetched day must be persisted")
 }
 
 // TestRefresh_BlankBaseURLFails pins that an empty injected endpoint fails the
@@ -298,6 +298,40 @@ func TestGetRates_IncompleteTodayFallsBackToRedis(t *testing.T) {
 	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable), "expected ErrServiceUnavailable, got %v", err)
 	assert.Equal(t, 1, client.calls, "incomplete data is not retried and must not walk back")
 	assert.Zero(t, store.saveCalls, "an incomplete day must not overwrite the Redis snapshot")
+
+	rates, err := svc.GetRates(context.Background())
+
+	require.NoError(t, err, "Redis history must still serve the last stored day")
+	assertWantedRates(t, rates, dayKey(yesterday))
+}
+
+// TestGetRates_MissingOnlyGBPIsIncomplete pins that a day with EUR, USD and PLN
+// but without GBP is still incomplete: selectRates returns nil unless all four
+// wanted currencies are present.
+func TestGetRates_MissingOnlyGBPIsIncomplete(t *testing.T) {
+	now := time.Now()
+	yesterday := now.AddDate(0, 0, -1)
+	client := &stubJSONClient{bodies: map[string]string{
+		nbuDate(now): nbuBody(now,
+			[2]any{"EUR", 50.1},
+			[2]any{"USD", 45.1},
+			[2]any{"PLN", 11.1},
+			[2]any{"JPY", 0.3},
+		),
+	}}
+	store := &stubExchangeStore{saved: map[string][]*models.Rate{
+		dayKey(yesterday): wantedRates(yesterday),
+	}}
+	svc := NewExchangeService(client, store, discardLogger(), nbuRatesURL)
+	svc.now = func() time.Time { return now }
+	svc.retryDelays = fastRetryDelays
+
+	err := svc.Refresh(context.Background())
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable), "expected ErrServiceUnavailable, got %v", err)
+	assert.Equal(t, 1, client.calls, "incomplete data is not retried and must not walk back")
+	assert.Zero(t, store.saveCalls, "a day missing only GBP must not overwrite the Redis snapshot")
 
 	rates, err := svc.GetRates(context.Background())
 
@@ -417,13 +451,13 @@ func TestGetRates_FutureDatedRedisServed(t *testing.T) {
 func assertWantedRates(t *testing.T, rates []*models.Rate, wantDate string) {
 	t.Helper()
 
-	require.Len(t, rates, 3, "only EUR, USD and PLN must be returned")
+	require.Len(t, rates, 4, "only EUR, USD, GBP and PLN must be returned")
 
-	wantCodes := []string{"EUR", "USD", "PLN"}
-	wantValues := []float64{50.1, 45.1, 11.1}
+	wantCodes := []string{"EUR", "USD", "GBP", "PLN"}
+	wantValues := []float64{50.1, 45.1, 58.2, 11.1}
 
 	for i, code := range wantCodes {
-		assert.Equal(t, code, rates[i].Code, "rates must be ordered EUR, USD, PLN")
+		assert.Equal(t, code, rates[i].Code, "rates must be ordered EUR, USD, GBP, PLN")
 		assert.InDelta(t, wantValues[i], rates[i].Rate, 1e-9)
 		assert.Equal(t, wantDate, rates[i].Date)
 	}
@@ -460,6 +494,7 @@ func fullBody(date time.Time) string {
 	return nbuBody(date,
 		[2]any{"EUR", 50.1},
 		[2]any{"USD", 45.1},
+		[2]any{"GBP", 58.2},
 		[2]any{"PLN", 11.1},
 		[2]any{"JPY", 0.3},
 	)
@@ -472,6 +507,7 @@ func fullRates(date time.Time) []*models.Rate {
 	return []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: day},
 		{Code: "USD", Rate: 45.1, Date: day},
+		{Code: "GBP", Rate: 58.2, Date: day},
 		{Code: "PLN", Rate: 11.1, Date: day},
 		{Code: "JPY", Rate: 0.3, Date: day},
 	}
@@ -484,6 +520,7 @@ func wantedRates(date time.Time) []*models.Rate {
 	return []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: day},
 		{Code: "USD", Rate: 45.1, Date: day},
+		{Code: "GBP", Rate: 58.2, Date: day},
 		{Code: "PLN", Rate: 11.1, Date: day},
 	}
 }
@@ -517,7 +554,7 @@ func TestGetRates_WindowIgnoresServerTimezone(t *testing.T) {
 	rates, err := svc.GetRates(context.Background())
 
 	require.NoError(t, err, "a three-day-old snapshot must be served regardless of server timezone")
-	require.Len(t, rates, 4, "the stored snapshot must be returned as persisted")
+	require.Len(t, rates, 5, "the stored snapshot must be returned as persisted")
 	assert.Equal(t, dayKey(day3), rates[0].Date)
 	assert.Equal(t, 0, client.calls, "serving stored rates must not fetch")
 }

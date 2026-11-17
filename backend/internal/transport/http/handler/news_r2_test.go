@@ -121,12 +121,14 @@ func r2Article(input service.NewsInput) *models.News {
 }
 
 // setupRecordingRouter assembles the admin routes over the recording stub.
-func setupRecordingRouter() (http.Handler, *recordingNewsService) {
+func setupRecordingRouter(t *testing.T) (http.Handler, *recordingNewsService) {
+	t.Helper()
 	stub := &recordingNewsService{}
 
-	httpSrv := httptransport.New(httptransport.HTTPConfig{
+	httpSrv, err := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},
-	}, handler.NewNewsHandler(stub))
+	}, nil, handler.NewNewsHandler(stub))
+	require.NoError(t, err)
 
 	return httpSrv.Handler(), stub
 }
@@ -227,7 +229,7 @@ func doMultipartRequest(
 // TestAdminCreate_MultipartCover_PassesBytesToService verifies that a
 // multipart create maps every text field and forwards the cover file.
 func TestAdminCreate_MultipartCover_PassesBytesToService(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	coverBytes := []byte("fake-jpeg-bytes")
 	body, contentType := buildMultipartBody(t,
@@ -270,7 +272,7 @@ func TestAdminCreate_MultipartCover_PassesBytesToService(t *testing.T) {
 // TestAdminCreate_JSONWithoutCover_StillWorks verifies the existing JSON path
 // is untouched and does not invent a cover.
 func TestAdminCreate_JSONWithoutCover_StillWorks(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news",
 		`{"category":"Новини","title":"JSON стаття","text":"Текст"}`)
@@ -292,7 +294,7 @@ func TestAdminCreate_JSONWithoutCover_StillWorks(t *testing.T) {
 // TestAdminUpdate_MultipartCover_PassesBytesToService verifies that a
 // multipart update forwards the cover file to the service.
 func TestAdminUpdate_MultipartCover_PassesBytesToService(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	coverBytes := []byte("fake-png-bytes")
 	body, contentType := buildMultipartBody(t,
@@ -332,7 +334,7 @@ func TestAdminUpdate_MultipartCover_PassesBytesToService(t *testing.T) {
 // TestAdminCreate_InvalidBoolField_Rejected verifies a non-boolean form flag
 // is a client error rather than being silently treated as false.
 func TestAdminCreate_InvalidBoolField_Rejected(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	body, contentType := buildMultipartBody(t,
 		[]multipartField{
@@ -353,7 +355,7 @@ func TestAdminCreate_InvalidBoolField_Rejected(t *testing.T) {
 // TestAdminCreate_MultipartWithoutCover_Works verifies a multipart create
 // without a file part is still valid and does not invent a cover.
 func TestAdminCreate_MultipartWithoutCover_Works(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	body, contentType := buildMultipartBody(t,
 		[]multipartField{
@@ -382,7 +384,7 @@ func TestAdminCreate_MultipartWithoutCover_Works(t *testing.T) {
 // are enforced for multipart requests too. Validation lives in the service, so
 // the request reaches it and its error is mapped centrally onto the envelope.
 func TestAdminCreate_MultipartMissingTitle_Rejected(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 	// The real service rejects an empty title with this field-scoped error.
 	stub.createErr = errs.NewValidationError("title", "title is required")
 
@@ -410,7 +412,7 @@ func TestAdminCreate_MultipartMissingTitle_Rejected(t *testing.T) {
 // TestAdminCreate_MultipartTooLarge_Rejected verifies an oversized multipart
 // body is rejected as a payload error before reaching the service.
 func TestAdminCreate_MultipartTooLarge_Rejected(t *testing.T) {
-	router, stub := setupRecordingRouter()
+	router, stub := setupRecordingRouter(t)
 
 	body, contentType := buildMultipartBody(t,
 		[]multipartField{

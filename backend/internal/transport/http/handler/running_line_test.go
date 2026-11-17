@@ -58,6 +58,7 @@ func TestRunningLineHandler_GetExchangeRates(t *testing.T) {
 	exchangeSvc := &stubRunningLineService{rates: []*models.Rate{
 		{Code: "EUR", Rate: 50.4823, Date: "10.11.2026"},
 		{Code: "USD", Rate: 45.322, Date: "10.11.2026"},
+		{Code: "GBP", Rate: 58.423, Date: "10.11.2026"},
 		{Code: "PLN", Rate: 11.4678, Date: "10.11.2026"},
 	}}
 	// The fuel service deliberately returns different data: each route must
@@ -76,13 +77,13 @@ func TestRunningLineHandler_GetExchangeRates(t *testing.T) {
 
 	assert.Equal(t, "UAH", payload.Base)
 	assert.Equal(t, "10.11.2026", payload.Date)
-	require.Len(t, payload.Items, 3)
+	require.Len(t, payload.Items, 4)
 
-	wantCodes := []string{"EUR", "USD", "PLN"}
-	wantRates := []float64{50.48, 45.32, 11.47}
+	wantCodes := []string{"EUR", "USD", "GBP", "PLN"}
+	wantRates := []float64{50.48, 45.32, 58.42, 11.47}
 
 	for i, code := range wantCodes {
-		assert.Equal(t, code, payload.Items[i].Code, "rates must be ordered EUR, USD, PLN")
+		assert.Equal(t, code, payload.Items[i].Code, "rates must be ordered EUR, USD, GBP, PLN")
 		assert.InDelta(t, wantRates[i], payload.Items[i].Rate, 1e-9, "rates must be rounded to 2 decimals")
 	}
 }

@@ -24,20 +24,20 @@ func (s Status) Valid() bool {
 type Category string
 
 const (
-	CategoryNews          Category = "Новини"
-	CategoryAnalytics     Category = "Міжнародні новини"
-	CategoryInsides       Category = "Спорт"
-	CategoryImportant     Category = "Інтерв'ю"
-	CategoryInvestigation Category = "Про нас"
-	CategoryPolitics      Category = "Політика"
-	CategoryRegional      Category = "Регіональні новини"
+	CategoryNews      Category = "Новини"
+	CategoryAnalytics Category = "Міжнародні новини"
+	CategoryInsides   Category = "Спорт"
+	CategoryImportant Category = "Інтерв'ю"
+	CategoryEconomics Category = "Економіка"
+	CategoryPolitics  Category = "Політика"
+	CategoryRegional  Category = "Регіональні новини"
 )
 
 // Valid reports whether c is one of the fixed rubrics.
 func (c Category) Valid() bool {
 	switch c {
 	case CategoryNews, CategoryAnalytics, CategoryInsides,
-		CategoryImportant, CategoryInvestigation,
+		CategoryImportant, CategoryEconomics,
 		CategoryPolitics, CategoryRegional:
 		return true
 	}

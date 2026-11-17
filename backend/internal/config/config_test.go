@@ -558,3 +558,121 @@ func TestDockerfileSourcesAreNotDockerignored(t *testing.T) {
 		}
 	}
 }
+
+// The global per-IP limit ships with a CGNAT-aware default: 300 requests per
+// minute, keyed by client IP, reading the real client behind Cloudflare.
+func TestLoad_RateLimitDefaults(t *testing.T) {
+	const minimalYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+	cfg, err := config.Load(writeConfig(t, minimalYAML), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.RateLimit.Enabled, "the global rate limit must be on by default")
+	assert.Equal(t, int64(300), cfg.RateLimit.Requests)
+	assert.Equal(t, time.Minute, cfg.RateLimit.Window)
+	assert.Equal(t, []string{"CF-Connecting-IP"}, cfg.HTTP.ClientIPHeaders,
+		"the client IP must come from Cloudflare's header by default")
+	assert.Empty(t, cfg.HTTP.TrustedProxies, "nobody is trusted by default")
+}
+
+// rate_limit.requests, rate_limit.window and http.trusted_proxies must fail
+// startup when they cannot work: the window and request validations only
+// apply while the limiter is enabled, trusted proxies are validated always
+// because the login limiter keys on the same client IP.
+func TestLoad_RateLimitValidation(t *testing.T) {
+	const baseYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+	tests := []struct {
+		name    string
+		section string
+		wantErr string
+	}{
+		{
+			name:    "zero requests",
+			section: "rate_limit:\n  requests: 0\n",
+			wantErr: "rate_limit.requests",
+		},
+		{
+			name:    "negative requests",
+			section: "rate_limit:\n  requests: -5\n",
+			wantErr: "rate_limit.requests",
+		},
+		{
+			name:    "window below one second",
+			section: "rate_limit:\n  window: 500ms\n",
+			wantErr: "rate_limit.window",
+		},
+		{
+			name:    "invalid trusted proxy",
+			section: "http:\n  trusted_proxies:\n    - not-a-cidr\n",
+			wantErr: "trusted_proxies",
+		},
+		{
+			name:    "invalid trusted proxy while disabled",
+			section: "rate_limit:\n  enabled: false\nhttp:\n  trusted_proxies:\n    - not-a-cidr\n",
+			wantErr: "trusted_proxies",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.Load(
+				writeConfig(t, baseYAML+tt.section),
+				envMap(map[string]string{"DB_PASSWORD": "secret"}),
+			)
+
+			require.Error(t, err, "a broken limit section must fail startup")
+			assert.Nil(t, cfg)
+			assert.Contains(t, err.Error(), tt.wantErr,
+				"the error must name the offending key")
+		})
+	}
+}
+
+// Switching the limiter off must not require sane tuning values, but an
+// invalid trusted proxy still fails because the client IP stays in use.
+func TestLoad_RateLimitDisabledSkipsTuningValidation(t *testing.T) {
+	const baseYAML = "db:\n  host: localhost\n  user: mandat\n  database: mandat\n"
+
+	tests := []struct {
+		name    string
+		section string
+	}{
+		{"zero requests", "rate_limit:\n  enabled: false\n  requests: 0\n"},
+		{"negative requests", "rate_limit:\n  enabled: false\n  requests: -1\n"},
+		{"tiny window", "rate_limit:\n  enabled: false\n  window: 500ms\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.Load(
+				writeConfig(t, baseYAML+tt.section),
+				envMap(map[string]string{"DB_PASSWORD": "secret"}),
+			)
+
+			require.NoError(t, err, "tuning values must be ignored while disabled")
+			require.NotNil(t, cfg)
+			assert.False(t, cfg.RateLimit.Enabled)
+		})
+	}
+}
+
+// A production Cloudflare setup — explicit CIDRs plus a plain IP — must load.
+func TestLoad_TrustedProxiesValidEntries(t *testing.T) {
+	const proxyYAML = `db:
+  host: localhost
+  user: mandat
+  database: mandat
+http:
+  trusted_proxies:
+    - 10.0.0.0/8
+    - 203.0.113.9
+`
+
+	cfg, err := config.Load(writeConfig(t, proxyYAML), envMap(map[string]string{"DB_PASSWORD": "secret"}))
+
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	assert.Equal(t, []string{"10.0.0.0/8", "203.0.113.9"}, cfg.HTTP.TrustedProxies)
+}

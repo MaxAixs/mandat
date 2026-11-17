@@ -28,11 +28,13 @@ func (p *stubPinger) Ping(context.Context) error {
 	return p.err
 }
 
-func setupHealthRouter(pinger service.Pinger) http.Handler {
+func setupHealthRouter(t *testing.T, pinger service.Pinger) http.Handler {
+	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.NewHealthService(pinger, logger)
 
-	httpSrv := httptransport.New(httptransport.HTTPConfig{}, handler.NewHealthHandler(svc))
+	httpSrv, err := httptransport.New(httptransport.HTTPConfig{}, nil, handler.NewHealthHandler(svc))
+	require.NoError(t, err)
 
 	return httpSrv.Handler()
 }
@@ -50,7 +52,7 @@ func decodeHealthStatus(t *testing.T, body []byte) string {
 
 func TestHealthLive_Returns200WithoutCheckingDependencies(t *testing.T) {
 	pinger := &stubPinger{err: errors.New("database is down")}
-	router := setupHealthRouter(pinger)
+	router := setupHealthRouter(t, pinger)
 
 	rec := doRequest(t, router, http.MethodGet, "/health/live", "")
 
@@ -61,7 +63,7 @@ func TestHealthLive_Returns200WithoutCheckingDependencies(t *testing.T) {
 
 func TestHealthReady_Returns200WhenDependencyIsUp(t *testing.T) {
 	pinger := &stubPinger{}
-	router := setupHealthRouter(pinger)
+	router := setupHealthRouter(t, pinger)
 
 	rec := doRequest(t, router, http.MethodGet, "/health/ready", "")
 
@@ -72,7 +74,7 @@ func TestHealthReady_Returns200WhenDependencyIsUp(t *testing.T) {
 
 func TestHealthReady_Returns503WhenDependencyIsDown(t *testing.T) {
 	pinger := &stubPinger{err: errors.New("dial tcp 10.0.0.5:5432: connection refused")}
-	router := setupHealthRouter(pinger)
+	router := setupHealthRouter(t, pinger)
 
 	rec := doRequest(t, router, http.MethodGet, "/health/ready", "")
 

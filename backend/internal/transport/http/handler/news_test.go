@@ -21,14 +21,16 @@ import (
 
 const allowedOrigin = "http://localhost:5173"
 
-func setupRouter() (http.Handler, *testsupport.StubRepo) {
+func setupRouter(t *testing.T) (http.Handler, *testsupport.StubRepo) {
+	t.Helper()
 	repo := testsupport.NewStubRepo()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.NewNewsService(repo, logger, nil, "", nil)
 
-	httpSrv := httptransport.New(httptransport.HTTPConfig{
+	httpSrv, err := httptransport.New(httptransport.HTTPConfig{
 		AllowedOrigins: []string{allowedOrigin},
-	}, handler.NewNewsHandler(svc))
+	}, nil, handler.NewNewsHandler(svc))
+	require.NoError(t, err)
 	return httpSrv.Handler(), repo
 }
 
@@ -80,7 +82,7 @@ const validBody = `{"category":"Новини","title":"Уряд схвалив �
 const mainEventBody = `{"category":"Новини","title":"Головна подія дня","text":"Повний текст","main_event":true}`
 
 func TestCreate_Returns201WithArticle(t *testing.T) {
-	router, repo := setupRouter()
+	router, repo := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", validBody)
 
@@ -96,7 +98,7 @@ func TestCreate_Returns201WithArticle(t *testing.T) {
 }
 
 func TestCreate_MapsMainEventJSON(t *testing.T) {
-	router, repo := setupRouter()
+	router, repo := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", mainEventBody)
 
@@ -111,7 +113,7 @@ func TestCreate_MapsMainEventJSON(t *testing.T) {
 }
 
 func TestCreate_InvalidJSONReturns400(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"title":`)
 
@@ -120,7 +122,7 @@ func TestCreate_InvalidJSONReturns400(t *testing.T) {
 }
 
 func TestCreate_MissingTitleReturns400(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Новини"}`)
 
@@ -129,7 +131,7 @@ func TestCreate_MissingTitleReturns400(t *testing.T) {
 }
 
 func TestCreate_UnknownCategoryReturns400(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPost, "/api/admin/news", `{"category":"Фантастика","title":"Тест","text":"Текст"}`)
 
@@ -142,13 +144,14 @@ func TestCreate_AcceptsNewCategories(t *testing.T) {
 		name     string
 		category models.Category
 	}{
+		{"economics", models.CategoryEconomics},
 		{"politics", models.CategoryPolitics},
 		{"regional", models.CategoryRegional},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, repo := setupRouter()
+			router, repo := setupRouter(t)
 
 			body := fmt.Sprintf(`{"category":%q,"title":"Тестова стаття","text":"Повний текст"}`, tt.category)
 			rec := doRequest(t, router, http.MethodPost, "/api/admin/news", body)
@@ -164,7 +167,7 @@ func TestCreate_AcceptsNewCategories(t *testing.T) {
 }
 
 func TestCreate_ConflictReturns409(t *testing.T) {
-	router, repo := setupRouter()
+	router, repo := setupRouter(t)
 	// The slug comes from the title; block every retry suffix to surface the conflict.
 	repo.Conflicts["test"] = true
 	for attempt := 2; attempt <= 10; attempt++ {
@@ -178,7 +181,7 @@ func TestCreate_ConflictReturns409(t *testing.T) {
 }
 
 func TestCreate_OversizedBodyReturns413(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	huge := strings.Repeat("a", 2<<20)
 	body := `{"category":"Новини","title":"` + huge + `","text":"Текст"}`
@@ -190,7 +193,7 @@ func TestCreate_OversizedBodyReturns413(t *testing.T) {
 }
 
 func TestList_ReturnsEnvelope(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	require.Equal(t, http.StatusCreated, doRequest(t, router, http.MethodPost, "/api/admin/news", validBody).Code)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news", "")
@@ -208,7 +211,7 @@ func TestList_ReturnsEnvelope(t *testing.T) {
 }
 
 func TestList_ReturnsMainEvent(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	createArticle(t, router, mainEventBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news", "")
@@ -223,7 +226,7 @@ func TestList_ReturnsMainEvent(t *testing.T) {
 }
 
 func TestList_InvalidPaginationReturns400(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	for _, query := range []string{"?page=abc", "?page=0", "?limit=0"} {
 		rec := doRequest(t, router, http.MethodGet, "/api/admin/news"+query, "")
@@ -233,7 +236,7 @@ func TestList_InvalidPaginationReturns400(t *testing.T) {
 }
 
 func TestList_ClampsLimit(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news?limit=1000000", "")
 
@@ -246,7 +249,7 @@ func TestList_ClampsLimit(t *testing.T) {
 }
 
 func TestGetBySlug_Returns200(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news/"+slug, "")
@@ -256,7 +259,7 @@ func TestGetBySlug_Returns200(t *testing.T) {
 }
 
 func TestGetBySlug_ReturnsMainEvent(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	slug := createArticle(t, router, mainEventBody)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news/"+slug, "")
@@ -268,7 +271,7 @@ func TestGetBySlug_ReturnsMainEvent(t *testing.T) {
 }
 
 func TestGetBySlug_NotFoundReturns404(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodGet, "/api/admin/news/missing-article", "")
 
@@ -279,7 +282,7 @@ func TestGetBySlug_NotFoundReturns404(t *testing.T) {
 }
 
 func TestUpdate_Returns200WithChangedFields(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodPut, "/api/admin/news/"+slug,
@@ -291,7 +294,7 @@ func TestUpdate_Returns200WithChangedFields(t *testing.T) {
 }
 
 func TestUpdate_MapsMainEventJSON(t *testing.T) {
-	router, repo := setupRouter()
+	router, repo := setupRouter(t)
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodPut, "/api/admin/news/"+slug, mainEventBody)
@@ -307,7 +310,7 @@ func TestUpdate_MapsMainEventJSON(t *testing.T) {
 }
 
 func TestUpdate_NotFoundReturns404(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodPut, "/api/admin/news/missing-article", validBody)
 
@@ -316,7 +319,7 @@ func TestUpdate_NotFoundReturns404(t *testing.T) {
 }
 
 func TestDelete_Returns200(t *testing.T) {
-	router, repo := setupRouter()
+	router, repo := setupRouter(t)
 	slug := createArticle(t, router, validBody)
 
 	rec := doRequest(t, router, http.MethodDelete, "/api/admin/news/"+slug, "")
@@ -326,7 +329,7 @@ func TestDelete_Returns200(t *testing.T) {
 }
 
 func TestDelete_NotFoundReturns404(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	rec := doRequest(t, router, http.MethodDelete, "/api/admin/news/missing-article", "")
 
@@ -335,7 +338,7 @@ func TestDelete_NotFoundReturns404(t *testing.T) {
 }
 
 func TestCORS_AllowedOriginIsEchoed(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/news", nil)
 	req.Header.Set("Origin", allowedOrigin)
@@ -346,7 +349,7 @@ func TestCORS_AllowedOriginIsEchoed(t *testing.T) {
 }
 
 func TestCORS_PreflightReturns204(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/admin/news", nil)
 	req.Header.Set("Origin", allowedOrigin)
@@ -359,7 +362,7 @@ func TestCORS_PreflightReturns204(t *testing.T) {
 }
 
 func TestCORS_DisallowedOriginHasNoHeader(t *testing.T) {
-	router, _ := setupRouter()
+	router, _ := setupRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/news", nil)
 	req.Header.Set("Origin", "https://evil.example")

@@ -198,6 +198,7 @@ func TestCreate_AcceptsNewCategories(t *testing.T) {
 		name     string
 		category models.Category
 	}{
+		{"economics", models.CategoryEconomics},
 		{"politics", models.CategoryPolitics},
 		{"regional", models.CategoryRegional},
 	}
@@ -659,7 +660,7 @@ func TestListPublished_ValidCategoryReachesFilter(t *testing.T) {
 		{"international", models.CategoryAnalytics},
 		{"sport", models.CategoryInsides},
 		{"interview", models.CategoryImportant},
-		{"about", models.CategoryInvestigation},
+		{"economics", models.CategoryEconomics},
 		{"politics", models.CategoryPolitics},
 		{"regional", models.CategoryRegional},
 	}
@@ -700,6 +701,7 @@ func TestListPublished_RejectsUnknownCategory(t *testing.T) {
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
 		{"arbitrary text", "unknown"},
+		{"old investigation rubric", "Про нас"},
 	}
 
 	for _, tt := range tests {
@@ -740,7 +742,7 @@ func TestList_ValidCategoryReachesFilter(t *testing.T) {
 		{"international", models.CategoryAnalytics},
 		{"sport", models.CategoryInsides},
 		{"interview", models.CategoryImportant},
-		{"about", models.CategoryInvestigation},
+		{"economics", models.CategoryEconomics},
 		{"politics", models.CategoryPolitics},
 		{"regional", models.CategoryRegional},
 	}
@@ -783,6 +785,7 @@ func TestList_RejectsUnknownCategory(t *testing.T) {
 		{"lowercase sport", "спорт"},
 		{"trailing space", "Спорт "},
 		{"arbitrary text", "unknown"},
+		{"old investigation rubric", "Про нас"},
 	}
 
 	for _, tt := range tests {

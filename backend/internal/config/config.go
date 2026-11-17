@@ -7,11 +7,13 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
+	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/pkg/database/postgres"
 	"github.com/maxaixs/mandat/backend/pkg/redis"
@@ -28,17 +30,21 @@ const (
 	r2EndpointEnvVar    = "R2_ENDPOINT"
 	r2BucketEnvVar      = "R2_BUCKET"
 	r2PublicBaseEnvVar  = "R2_PUBLIC_BASE_URL"
+
+	// minRateLimitWindow is the shortest window that still makes sense for a limit.
+	minRateLimitWindow = time.Second
 )
 
 // Config is the full application configuration.
 type Config struct {
-	LogLevel string                   `mapstructure:"log_level"`
-	HTTP     httptransport.HTTPConfig `mapstructure:"http"`
-	DB       postgres.DBConfig        `mapstructure:"db"`
-	Redis    redis.Config             `mapstructure:"redis"`
-	Rates    RatesConfig              `mapstructure:"rates"`
-	Storage  r2.Config                `mapstructure:"storage"`
-	Download imgdownloader.Config     `mapstructure:"download"`
+	LogLevel  string                   `mapstructure:"log_level"`
+	HTTP      httptransport.HTTPConfig `mapstructure:"http"`
+	DB        postgres.DBConfig        `mapstructure:"db"`
+	Redis     redis.Config             `mapstructure:"redis"`
+	Rates     RatesConfig              `mapstructure:"rates"`
+	Storage   r2.Config                `mapstructure:"storage"`
+	Download  imgdownloader.Config     `mapstructure:"download"`
+	RateLimit service.RateLimitConfig  `mapstructure:"rate_limit"`
 }
 
 // RatesConfig holds the upstream rate provider endpoints.
@@ -111,6 +117,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("download.timeout", 15*time.Second)
 	v.SetDefault("download.max_bytes", 10<<20)
 	v.SetDefault("download.max_redirects", 3)
+	v.SetDefault("http.client_ip_headers", []string{"CF-Connecting-IP"})
+	v.SetDefault("rate_limit.enabled", true)
+	v.SetDefault("rate_limit.requests", 300)
+	v.SetDefault("rate_limit.window", time.Minute)
 }
 
 // validate fails fast on missing required settings.
@@ -137,6 +147,42 @@ func (c *Config) validate() error {
 		if err := c.Storage.Validate(); err != nil {
 			return err
 		}
+	}
+
+	if err := validateTrustedProxies(c.HTTP.TrustedProxies); err != nil {
+		return err
+	}
+
+	return c.validateRateLimit()
+}
+
+// validateTrustedProxies accepts only IP addresses and CIDR ranges,
+// so a typo cannot silently widen or drop the trusted proxy set.
+func validateTrustedProxies(proxies []string) error {
+	for _, proxy := range proxies {
+		if _, err := netip.ParsePrefix(proxy); err == nil {
+			continue
+		}
+		if _, err := netip.ParseAddr(proxy); err != nil {
+			return fmt.Errorf("http.trusted_proxies: %q is neither an IP nor a CIDR", proxy)
+		}
+	}
+
+	return nil
+}
+
+// validateRateLimit checks the limit tuning; a disabled limit is not validated.
+func (c *Config) validateRateLimit() error {
+	if !c.RateLimit.Enabled {
+		return nil
+	}
+
+	if c.RateLimit.Requests <= 0 {
+		return fmt.Errorf("rate_limit.requests must be positive")
+	}
+
+	if c.RateLimit.Window < minRateLimitWindow {
+		return fmt.Errorf("rate_limit.window must be at least %s", minRateLimitWindow)
 	}
 
 	return nil

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/config"
 	"github.com/maxaixs/mandat/backend/internal/imgdownloader"
 	"github.com/maxaixs/mandat/backend/internal/models"
@@ -123,13 +124,21 @@ func run() error {
 
 	runningLineHandler := handler.NewRunningLineHandler(exchangeService, fuelService)
 
-	return httptransport.New(
+	rateLimitService := service.NewRateLimitService(redisrepo.NewRateLimitStore(redisClient), log, cfg.RateLimit)
+
+	server, err := httptransport.New(
 		cfg.HTTP,
+		[]gin.HandlerFunc{middleware.RateLimit(rateLimitService)},
 		authHandler,
 		newsHandler,
 		publicNewsHandler,
 		viewHandler,
 		healthHandler,
 		runningLineHandler,
-	).Serve(ctx)
+	)
+	if err != nil {
+		return fmt.Errorf("build http server: %w", err)
+	}
+
+	return server.Serve(ctx)
 }

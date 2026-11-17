@@ -22,7 +22,7 @@ const (
 )
 
 // exchangeWantedCodes lists the ticker currencies in display order.
-var exchangeWantedCodes = [3]string{"EUR", "USD", "PLN"}
+var exchangeWantedCodes = [4]string{"EUR", "USD", "GBP", "PLN"}
 
 // ExchangeStore persists dated rate snapshots and serves the newest one.
 // The service owns this contract; internal/repository/redis implements it.

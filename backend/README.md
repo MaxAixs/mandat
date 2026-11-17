@@ -77,7 +77,7 @@ moderator session cookie. Cross-origin frontend requests must include credential
 
 `page` starts at 1, `limit` defaults to 20 and is capped at 100.
 `status` accepts `draft` or `published`. `category` accepts `Новини`,
-`Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Про нас`, `Політика`, or
+`Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Економіка`, `Політика`, or
 `Регіональні новини`; an unknown value returns `400 Invalid input`.
 
 ## Public API
@@ -109,6 +109,33 @@ fields. `page` starts at 1, `limit` defaults to 20 and is capped at 100.
 
 Both return `200 OK` with `{ "status": "ok" }` on success. Readiness returns
 `503 Service Unavailable` when PostgreSQL is unreachable.
+
+## Rate limiting
+
+Every API request counts toward a global per-client limit kept in Redis
+(`ratelimit:global:<client>` keys, fixed window, atomic Lua `INCR`+`PEXPIRE`).
+The client is its IPv4 address or its IPv6 `/64` prefix. Over the limit the API
+answers `429 Too Many Requests` with a `Retry-After` header (seconds) and
+`{ "error": { "status": 429, "message": "Too many requests" } }`.
+`OPTIONS` preflights and `/health/*` probes are never limited. When Redis is
+unreachable requests are allowed and the failure is logged (fail open).
+
+```yaml
+rate_limit:
+  enabled: true      # false switches the limit off
+  requests: 300      # per client per window
+  window: 1m         # at least 1s
+```
+
+**Client IP behind Cloudflare.** The real IP is read from `http.client_ip_headers`
+(default `CF-Connecting-IP`; an empty list honours no header) only when the TCP
+peer is in `http.trusted_proxies`.
+The default empty list trusts nobody, so the peer address is used and spoofed
+`CF-Connecting-IP` / `X-Forwarded-For` headers are ignored. The shipped `config.yaml` lists the
+Cloudflare ranges (https://www.cloudflare.com/ips/); add the address of any reverse
+proxy between Cloudflare and the API, and refresh the list if Cloudflare changes it —
+otherwise traffic from unlisted edges shares the limit of the edge IP.
+The same client IP drives the login attempt limit.
 
 Errors are returned as:
 

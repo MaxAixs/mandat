@@ -91,7 +91,7 @@ type ExchangeRatesResponse struct {
 }
 
 // ExchangeToRatesResponse maps domain rates onto the public payload,
-// rounding each rate to two decimals in EUR, USD, PLN order.
+// rounding each rate to two decimals in EUR, USD, GBP, PLN order.
 func ExchangeToRatesResponse(rates []*models.Rate) ExchangeRatesResponse {
 	items := make([]ExchangeRateResponse, 0, len(rates))
 

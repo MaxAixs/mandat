@@ -80,6 +80,7 @@ func TestExchangeStore_SaveThenLatest(t *testing.T) {
 	rates := []*models.Rate{
 		{Code: "EUR", Rate: 50.1, Date: "11.11.2026"},
 		{Code: "USD", Rate: 45.1, Date: "11.11.2026"},
+		{Code: "GBP", Rate: 58.2, Date: "11.11.2026"},
 		{Code: "PLN", Rate: 11.1, Date: "11.11.2026"},
 	}
 
@@ -101,10 +102,10 @@ func TestExchangeStore_SaveThenLatest(t *testing.T) {
 	got, gotDay, err := store.Latest(context.Background())
 
 	require.NoError(t, err)
-	require.Len(t, got, 3, "Latest must return the stored rates")
+	require.Len(t, got, 4, "Latest must return the stored rates")
 
-	wantCodes := []string{"EUR", "USD", "PLN"}
-	wantRates := []float64{50.1, 45.1, 11.1}
+	wantCodes := []string{"EUR", "USD", "GBP", "PLN"}
+	wantRates := []float64{50.1, 45.1, 58.2, 11.1}
 
 	for i, code := range wantCodes {
 		assert.Equal(t, code, got[i].Code, "rates must keep the stored order")

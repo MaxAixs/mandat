@@ -15,4 +15,10 @@ type HTTPConfig struct {
 	AllowedOrigins    []string      `mapstructure:"allowed_origins"`
 	SecureCookies     bool          `mapstructure:"secure_cookies"`
 	SessionTTL        time.Duration `mapstructure:"session_ttl"`
+
+	// TrustedProxies lists the IPs/CIDRs whose client IP headers are honoured;
+	// empty means the client IP is always the TCP peer address.
+	TrustedProxies []string `mapstructure:"trusted_proxies"`
+	// ClientIPHeaders carry the real client IP behind a trusted proxy.
+	ClientIPHeaders []string `mapstructure:"client_ip_headers"`
 }
