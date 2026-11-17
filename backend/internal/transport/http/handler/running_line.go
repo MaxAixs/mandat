@@ -8,6 +8,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
 
 // RunningLineService is the rate table behavior used by RunningLineHandler.
@@ -28,8 +29,8 @@ func NewRunningLineHandler(exchange, fuel RunningLineService) *RunningLineHandle
 
 // Register binds the running line routes.
 func (h *RunningLineHandler) Register(r *gin.RouterGroup) {
-	r.GET("/api/exchange/rates", h.GetExchangeRates)
-	r.GET("/api/fuel/rates", h.GetFuelRates)
+	r.GET(routes.API+"/exchange/rates", h.GetExchangeRates)
+	r.GET(routes.API+"/fuel/rates", h.GetFuelRates)
 }
 
 // GetExchangeRates handles GET /api/exchange/rates and returns the rate table.

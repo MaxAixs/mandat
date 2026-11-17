@@ -121,10 +121,10 @@ func TestService_Create_UploadsCoverByFinalSlug(t *testing.T) {
 	baseSlug := slugify(input.Title)
 	repo.Conflicts[baseSlug] = true
 	input.Cover = &CoverUpload{
-		Body:        strings.NewReader("bytes"),
+		Body:        strings.NewReader(string(fetchTestJPEG)),
 		Filename:    "Cat.JPG",
 		ContentType: "image/jpeg",
-		Size:        int64(len("bytes")),
+		Size:        int64(len(fetchTestJPEG)),
 	}
 
 	created, err := svc.Create(context.Background(), input)
@@ -134,12 +134,12 @@ func TestService_Create_UploadsCoverByFinalSlug(t *testing.T) {
 	assert.Equal(t, baseSlug+"-2", created.Slug)
 	assert.Equal(t, 2, repo.CreateCalls, "the slug conflict must be retried once")
 	require.Len(t, storage.uploadKeys, 1)
-	assert.Equal(t, "covers/"+baseSlug+"-2.jpg", storage.uploadKeys[0],
-		"the cover key must use the final slug and a lowercased extension")
+	assertCoverKey(t, storage.uploadKeys[0], baseSlug+"-2", "jpg",
+		"the cover key must use the final slug, a unique suffix and a lowercased extension")
 	assert.Equal(t, "image/jpeg", storage.uploadTypes[0])
-	assert.Equal(t, []byte("bytes"), storage.uploadBody, "the upload must receive the cover body")
-	assert.Equal(t, storage.uploadURL, created.ImageUrl)
-	assert.Equal(t, storage.uploadURL, repo.Items[created.ID].ImageUrl,
+	assert.Equal(t, fetchTestJPEG, storage.uploadBody, "the upload must receive the cover body")
+	assert.Equal(t, storage.uploadURL, created.ImageURL)
+	assert.Equal(t, storage.uploadURL, repo.Items[created.ID].ImageURL,
 		"the uploaded cover URL must be persisted on the article")
 }
 
@@ -174,7 +174,7 @@ func TestService_Update_NewCoverReplacesOldKey(t *testing.T) {
 
 	seed := validInput()
 	seed.Title = "old-news"
-	seed.ImageUrl = coverTestPublicBaseURL + "/covers/old-news.png"
+	seed.ImageURL = coverTestPublicBaseURL + "/covers/old-news.png"
 	existing, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 	require.Equal(t, "old-news", existing.Slug)
@@ -182,10 +182,10 @@ func TestService_Update_NewCoverReplacesOldKey(t *testing.T) {
 
 	update := seed
 	update.Cover = &CoverUpload{
-		Body:        strings.NewReader("webp-bytes"),
+		Body:        strings.NewReader(string(coverTestWEBP)),
 		Filename:    "new.webp",
 		ContentType: "image/webp",
-		Size:        int64(len("webp-bytes")),
+		Size:        int64(len(coverTestWEBP)),
 	}
 
 	updated, err := svc.Update(ctx, existing.Slug, update)
@@ -193,9 +193,9 @@ func TestService_Update_NewCoverReplacesOldKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	require.Len(t, storage.uploadKeys, 1)
-	assert.Equal(t, "covers/old-news.webp", storage.uploadKeys[0])
-	assert.Equal(t, storage.uploadURL, updated.ImageUrl)
-	assert.Equal(t, storage.uploadURL, repo.Items[updated.ID].ImageUrl,
+	assertCoverKey(t, storage.uploadKeys[0], "old-news", "webp")
+	assert.Equal(t, storage.uploadURL, updated.ImageURL)
+	assert.Equal(t, storage.uploadURL, repo.Items[updated.ID].ImageURL,
 		"the new cover URL must be persisted")
 	assert.Equal(t, []string{"covers/old-news.png"}, storage.deleteKeys,
 		"the replaced cover must be removed from our bucket")
@@ -208,7 +208,7 @@ func TestService_Delete_RemovesCoverBestEffort(t *testing.T) {
 	ctx := context.Background()
 
 	seed := validInput()
-	seed.ImageUrl = coverTestPublicBaseURL + "/covers/pic.jpg"
+	seed.ImageURL = coverTestPublicBaseURL + "/covers/pic.jpg"
 	created, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 
@@ -229,7 +229,7 @@ func TestService_Delete_ExternalURLSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	seed := validInput()
-	seed.ImageUrl = "https://other.example/pic.jpg"
+	seed.ImageURL = "https://other.example/pic.jpg"
 	created, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 
@@ -242,68 +242,59 @@ func TestService_Delete_ExternalURLSkipped(t *testing.T) {
 	assert.NotContains(t, repo.Items, created.ID)
 }
 
-func TestService_Create_UploadFailureKeepsArticle(t *testing.T) {
+func TestService_Create_UploadFailureRemovesRow(t *testing.T) {
 	storage := &fakeImageStorage{uploadErr: errors.New("storage is down")}
 	repo := &deleteCountingRepo{StubRepo: testsupport.NewStubRepo()}
 	svc := newCoverTestService(repo, storage)
 
 	input := validInput()
 	input.Cover = &CoverUpload{
-		Body:        strings.NewReader("bytes"),
+		Body:        strings.NewReader(string(fetchTestJPEG)),
 		Filename:    "cover.jpg",
 		ContentType: "image/jpeg",
-		Size:        int64(len("bytes")),
+		Size:        int64(len(fetchTestJPEG)),
 	}
 
 	created, err := svc.Create(context.Background(), input)
 
-	require.NoError(t, err, "a failed cover upload must not fail the create")
-	require.NotNil(t, created, "the article must be returned even without its cover")
-	require.Len(t, repo.createIDs, 1)
-	assert.Equal(t, repo.createIDs[0], created.ID,
-		"the returned article must be the row that was just created")
-	assert.Empty(t, created.ImageUrl, "the article must be returned without a cover URL")
-	assert.Zero(t, repo.deleteCalls, "a failed cover upload must not delete the created row")
-	assert.Contains(t, repo.Items, created.ID, "the coverless article must survive")
+	require.Error(t, err, "a failed cover upload must fail the create after the row was inserted")
+	assert.Nil(t, created, "no article may be returned without its cover")
+	assert.True(t, errors.Is(err, errs.ErrServiceUnavailable),
+		"a failed cover upload must surface ErrServiceUnavailable, got %v", err)
+	require.Len(t, repo.createIDs, 1, "the row must have been inserted before the upload")
+	assert.Equal(t, 1, repo.deleteCalls, "the inserted row must be removed")
+	assert.Empty(t, repo.Items, "no orphan row may survive a failed cover upload")
 	require.Len(t, storage.uploadKeys, 1, "the cover upload must be attempted once")
+	assertCoverKey(t, storage.uploadKeys[0], slugify(input.Title), "jpg")
 }
 
-func TestService_Create_URLSaveFailureKeepsArticle(t *testing.T) {
-	const preUploadURL = "https://pics.example/legacy.jpg"
-
+func TestService_Create_URLSaveFailureRemovesRowAndObject(t *testing.T) {
 	storage := &fakeImageStorage{uploadURL: coverTestPublicBaseURL + "/covers/saved-url.jpg"}
 	repo := &deleteCountingRepo{StubRepo: testsupport.NewStubRepo()}
 	svc := newCoverTestService(repo, storage)
 
 	input := validInput()
-	input.ImageUrl = preUploadURL
 	input.Cover = &CoverUpload{
-		Body:        strings.NewReader("bytes"),
+		Body:        strings.NewReader(string(fetchTestJPEG)),
 		Filename:    "cover.jpg",
 		ContentType: "image/jpeg",
-		Size:        int64(len("bytes")),
+		Size:        int64(len(fetchTestJPEG)),
 	}
 
 	repo.UpdateErr = errors.New("database is down")
 
 	created, err := svc.Create(context.Background(), input)
 
-	require.NoError(t, err, "a failed cover URL save must not fail the create")
-	require.NotNil(t, created)
-	require.Len(t, repo.createIDs, 1)
-	assert.Equal(t, repo.createIDs[0], created.ID,
-		"the returned article must be the row that was just created")
+	require.Error(t, err, "a failed cover URL save must fail the create")
+	assert.Nil(t, created, "no article may be returned when its cover URL was not saved")
+	require.Len(t, repo.createIDs, 1, "the row must have been inserted before the upload")
 	require.Len(t, storage.uploadKeys, 1)
 	uploadedKey := storage.uploadKeys[0]
-	assert.Equal(t, "covers/"+slugify(input.Title)+".jpg", uploadedKey)
+	assertCoverKey(t, uploadedKey, slugify(input.Title), "jpg")
 	assert.Equal(t, []string{uploadedKey}, storage.deleteKeys,
 		"the object uploaded for the failed URL save must be deleted")
-	assert.Equal(t, preUploadURL, created.ImageUrl,
-		"the returned article must get its pre-upload image URL back")
-	assert.Zero(t, repo.deleteCalls, "a failed cover URL save must not delete the created row")
-	assert.Contains(t, repo.Items, created.ID, "the article must survive the failed URL save")
-	assert.Equal(t, preUploadURL, repo.Items[created.ID].ImageUrl,
-		"the stored article must keep its pre-upload image URL")
+	assert.Equal(t, 1, repo.deleteCalls, "the inserted row must be removed")
+	assert.Empty(t, repo.Items, "no orphan row may survive a failed cover URL save")
 }
 
 func TestService_Update_UploadFailureWritesNothing(t *testing.T) {
@@ -320,10 +311,10 @@ func TestService_Update_UploadFailureWritesNothing(t *testing.T) {
 
 	input := validInput()
 	input.Cover = &CoverUpload{
-		Body:        strings.NewReader("bytes"),
+		Body:        strings.NewReader(string(fetchTestPNG)),
 		Filename:    "cover.png",
 		ContentType: "image/png",
-		Size:        int64(len("bytes")),
+		Size:        int64(len(fetchTestPNG)),
 	}
 
 	updated, err := svc.Update(ctx, existing.Slug, input)
@@ -342,7 +333,7 @@ func TestService_Update_RepoFailureCleansObject(t *testing.T) {
 
 	seed := validInput()
 	seed.Title = "cleanup-article"
-	seed.ImageUrl = coverTestPublicBaseURL + "/covers/cleanup-article.webp"
+	seed.ImageURL = coverTestPublicBaseURL + "/covers/cleanup-article.webp"
 	existing, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 
@@ -350,23 +341,32 @@ func TestService_Update_RepoFailureCleansObject(t *testing.T) {
 
 	input := seed
 	input.Cover = &CoverUpload{
-		Body:        strings.NewReader("png-bytes"),
+		Body:        strings.NewReader(string(fetchTestPNG)),
 		Filename:    "new.png",
 		ContentType: "image/png",
-		Size:        int64(len("png-bytes")),
+		Size:        int64(len(fetchTestPNG)),
 	}
 
 	updated, err := svc.Update(ctx, existing.Slug, input)
 
 	require.Error(t, err)
 	assert.Nil(t, updated)
-	require.Equal(t, []string{"covers/cleanup-article.png"}, storage.deleteKeys,
-		"an object uploaded for a failed update must be cleaned up")
-	assert.Equal(t, existing.ImageUrl, repo.Items[existing.ID].ImageUrl,
+	require.Len(t, storage.uploadKeys, 1, "the replacement cover must be uploaded before the update")
+	assertCoverKey(t, storage.uploadKeys[0], "cleanup-article", "png")
+	require.Len(t, storage.deleteKeys, 1,
+		"only the object uploaded for the failed update may be cleaned up")
+	assertCoverKey(t, storage.deleteKeys[0], "cleanup-article", "png")
+	assert.Equal(t, storage.uploadKeys[0], storage.deleteKeys[0],
+		"only the freshly uploaded object is cleaned up")
+	for _, key := range storage.deleteKeys {
+		assert.NotContains(t, key, "cleanup-article.webp",
+			"the existing cover must survive a failed update")
+	}
+	assert.Equal(t, existing.ImageURL, repo.Items[existing.ID].ImageURL,
 		"the stored article must keep its previous cover after a failed update")
 }
 
-func TestService_Update_PreservesImageUrlWithoutCover(t *testing.T) {
+func TestService_Update_PreservesImageURLWithoutCover(t *testing.T) {
 	storage := &fakeImageStorage{}
 	repo := testsupport.NewStubRepo()
 	svc := newCoverTestService(repo, storage)
@@ -374,19 +374,19 @@ func TestService_Update_PreservesImageUrlWithoutCover(t *testing.T) {
 
 	seed := validInput()
 	seed.Title = "legacy-cover"
-	seed.ImageUrl = coverTestPublicBaseURL + "/covers/legacy-cover.png"
+	seed.ImageURL = coverTestPublicBaseURL + "/covers/legacy-cover.png"
 	existing, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 
 	input := validInput()
 	input.Title = "legacy-cover"
-	input.ImageUrl = ""
+	input.ImageURL = ""
 
 	updated, err := svc.Update(ctx, existing.Slug, input)
 
 	require.NoError(t, err)
 	require.NotNil(t, updated)
-	assert.Equal(t, existing.ImageUrl, updated.ImageUrl,
+	assert.Equal(t, existing.ImageURL, updated.ImageURL,
 		"an update without a new cover must keep the existing image URL")
 	assert.Empty(t, storage.uploadKeys, "no cover upload may happen without a cover")
 	assert.Empty(t, storage.deleteKeys, "an untouched cover must not be deleted")
@@ -427,7 +427,7 @@ func TestService_Create_FetchesExternalURLToR2(t *testing.T) {
 	svc := newCoverTestServiceWithFetcher(repo, storage, fetcher)
 
 	input := validInput()
-	input.ImageUrl = "https://pics.example/photo"
+	input.ImageURL = "https://pics.example/photo"
 
 	created, err := svc.Create(context.Background(), input)
 
@@ -436,12 +436,12 @@ func TestService_Create_FetchesExternalURLToR2(t *testing.T) {
 	require.Len(t, fetcher.calls, 1, "the external cover must be fetched exactly once")
 	assert.Equal(t, "https://pics.example/photo", fetcher.calls[0])
 	require.Len(t, storage.uploadKeys, 1)
-	assert.Equal(t, "covers/"+slugify(input.Title)+".jpg", storage.uploadKeys[0],
+	assertCoverKey(t, storage.uploadKeys[0], slugify(input.Title), "jpg",
 		"the fetched JPEG must be stored under the slug-derived key")
 	assert.Equal(t, fetchTestJPEG, storage.uploadBody, "the fetched bytes must be uploaded")
-	assert.Equal(t, storage.uploadURL, created.ImageUrl,
+	assert.Equal(t, storage.uploadURL, created.ImageURL,
 		"the external URL must be replaced by the stored object URL")
-	assert.Equal(t, storage.uploadURL, repo.Items[created.ID].ImageUrl,
+	assert.Equal(t, storage.uploadURL, repo.Items[created.ID].ImageURL,
 		"the stored cover URL must be persisted on the article")
 }
 
@@ -452,7 +452,7 @@ func TestService_Create_FetchFailureWritesNothing(t *testing.T) {
 	svc := newCoverTestServiceWithFetcher(repo, storage, fetcher)
 
 	input := validInput()
-	input.ImageUrl = "https://pics.example/photo"
+	input.ImageURL = "https://pics.example/photo"
 
 	created, err := svc.Create(context.Background(), input)
 
@@ -471,7 +471,7 @@ func TestService_Create_OwnURLNotRefetched(t *testing.T) {
 
 	ownedURL := coverTestPublicBaseURL + "/covers/x.jpg"
 	input := validInput()
-	input.ImageUrl = ownedURL
+	input.ImageURL = ownedURL
 
 	created, err := svc.Create(context.Background(), input)
 
@@ -479,20 +479,20 @@ func TestService_Create_OwnURLNotRefetched(t *testing.T) {
 	require.NotNil(t, created)
 	assert.Empty(t, fetcher.calls, "a URL under our own bucket must not be refetched")
 	assert.Empty(t, storage.uploadKeys, "no upload may happen without a new cover")
-	assert.Equal(t, ownedURL, created.ImageUrl, "the owned URL must be kept as-is")
+	assert.Equal(t, ownedURL, created.ImageURL, "the owned URL must be kept as-is")
 }
 
 func TestService_Create_LegacyHotlinkWithoutFetcher(t *testing.T) {
 	svc, repo := newTestService()
 
 	input := validInput()
-	input.ImageUrl = "https://pics.example/photo"
+	input.ImageURL = "https://pics.example/photo"
 
 	created, err := svc.Create(context.Background(), input)
 
 	require.NoError(t, err)
 	require.NotNil(t, created)
-	assert.Equal(t, "https://pics.example/photo", created.ImageUrl,
+	assert.Equal(t, "https://pics.example/photo", created.ImageURL,
 		"without a fetcher an external URL must be stored as-is")
 	assert.Equal(t, 1, repo.CreateCalls)
 }
@@ -505,7 +505,7 @@ func TestService_Update_PastedURLReplacesCover(t *testing.T) {
 
 	seed := validInput()
 	seed.Title = "old-news"
-	seed.ImageUrl = coverTestPublicBaseURL + "/covers/old.jpg"
+	seed.ImageURL = coverTestPublicBaseURL + "/covers/old.jpg"
 	existing, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 	require.Empty(t, storage.uploadKeys)
@@ -514,7 +514,7 @@ func TestService_Update_PastedURLReplacesCover(t *testing.T) {
 	svc = newCoverTestServiceWithFetcher(repo, storage, fetcher)
 
 	update := seed
-	update.ImageUrl = "https://pics.example/new-cover"
+	update.ImageURL = "https://pics.example/new-cover"
 	updated, err := svc.Update(ctx, existing.Slug, update)
 
 	require.NoError(t, err)
@@ -522,9 +522,9 @@ func TestService_Update_PastedURLReplacesCover(t *testing.T) {
 	require.Len(t, fetcher.calls, 1)
 	assert.Equal(t, "https://pics.example/new-cover", fetcher.calls[0])
 	require.Len(t, storage.uploadKeys, 1)
-	assert.Equal(t, "covers/old-news.png", storage.uploadKeys[0],
+	assertCoverKey(t, storage.uploadKeys[0], "old-news", "png",
 		"the pasted PNG must be stored under the article slug")
-	assert.Equal(t, storage.uploadURL, updated.ImageUrl,
+	assert.Equal(t, storage.uploadURL, updated.ImageURL,
 		"the pasted URL must be replaced by the stored object URL")
 	assert.Equal(t, []string{"covers/old.jpg"}, storage.deleteKeys,
 		"the replaced cover must be removed from our bucket")
@@ -537,7 +537,7 @@ func TestService_Create_UnsupportedFetchedTypeFails(t *testing.T) {
 	svc := newCoverTestServiceWithFetcher(repo, storage, fetcher)
 
 	input := validInput()
-	input.ImageUrl = "https://pics.example/photo"
+	input.ImageURL = "https://pics.example/photo"
 
 	created, err := svc.Create(context.Background(), input)
 
@@ -556,7 +556,7 @@ func TestService_Delete_NonCoversURLSkipped(t *testing.T) {
 	ctx := context.Background()
 
 	seed := validInput()
-	seed.ImageUrl = coverTestPublicBaseURL + "/static/logo.png"
+	seed.ImageURL = coverTestPublicBaseURL + "/static/logo.png"
 	created, err := svc.Create(ctx, seed)
 	require.NoError(t, err)
 

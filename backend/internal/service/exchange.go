@@ -77,6 +77,8 @@ type exchangeItem struct {
 
 // StartAutoRefresh refreshes rates every interval until ctx is done.
 func (s *ExchangeService) StartAutoRefresh(ctx context.Context, interval time.Duration) {
+	const fc = "exchangeService_StartAutoRefresh"
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -86,7 +88,7 @@ func (s *ExchangeService) StartAutoRefresh(ctx context.Context, interval time.Du
 			return
 		case <-ticker.C:
 			if err := s.Refresh(ctx); err != nil {
-				s.logger.ErrorContext(ctx, "failed to refresh exchange rates", "fc", "exchangeService_StartAutoRefresh", "error", err)
+				s.logger.ErrorContext(ctx, "failed to refresh exchange rates", "fc", fc, "error", err)
 			}
 		}
 	}

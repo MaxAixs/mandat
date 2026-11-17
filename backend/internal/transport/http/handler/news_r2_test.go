@@ -112,7 +112,7 @@ func r2Article(input service.NewsInput) *models.News {
 		Status:      models.StatusDraft,
 		Featured:    input.Featured,
 		MainEvent:   input.MainEvent,
-		ImageUrl:    input.ImageUrl,
+		ImageURL:    input.ImageURL,
 		Source:      input.Source,
 		SourceURL:   input.SourceURL,
 		CreatedAt:   now,

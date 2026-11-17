@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/config"
@@ -18,6 +18,7 @@ import (
 	newsrepo "github.com/maxaixs/mandat/backend/internal/repository/postgres"
 	redisrepo "github.com/maxaixs/mandat/backend/internal/repository/redis"
 	"github.com/maxaixs/mandat/backend/internal/service"
+	"github.com/maxaixs/mandat/backend/internal/storage/r2"
 	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/handler"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
@@ -26,7 +27,6 @@ import (
 	"github.com/maxaixs/mandat/backend/pkg/httpclient"
 	"github.com/maxaixs/mandat/backend/pkg/logger"
 	redisclient "github.com/maxaixs/mandat/backend/pkg/redis"
-	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
 )
 
 const configFile = "config.yaml"
@@ -82,12 +82,15 @@ func run() error {
 	)
 	authRepo := newsrepo.NewAuthRepo(pool)
 	sessionStore := redisrepo.NewSessionStore(redisClient)
-	authService := service.NewAuthService(authRepo, sessionStore, log, cfg.HTTP.SessionTTL)
+	rateLimitStore := redisrepo.NewRateLimitStore(redisClient)
+	loginIPLimiter := service.NewScopedRateLimitService(rateLimitStore, log, cfg.LoginRateLimit, "login:ip")
+	loginUserLimiter := service.NewScopedRateLimitService(rateLimitStore, log, cfg.LoginRateLimit, "login:user")
+	authService := service.NewAuthService(authRepo, sessionStore, loginUserLimiter, log, cfg.HTTP.SessionTTL)
 	authHandler := handler.NewAuthHandler(
 		authService,
 		cfg.HTTP.SecureCookies,
 		middleware.RequireAuth(authService),
-		middleware.NewLoginRateLimiter().Middleware(),
+		middleware.RateLimit(loginIPLimiter),
 	)
 	newsHandler := handler.NewNewsHandler(
 		newsService,
@@ -100,16 +103,24 @@ func run() error {
 	viewHandler := handler.NewViewHandler(viewService, viewerMiddleware)
 	healthHandler := handler.NewHealthHandler(service.NewHealthService(pool, log))
 
-	sharedHTTP := httpclient.New(&http.Client{Timeout: 10 * time.Second}, log)
+	sharedHTTP := httpclient.New(&http.Client{Timeout: cfg.Rates.HTTPTimeout}, log)
 	exchangeStore := redisrepo.NewExchangeStore(redisClient)
 	exchangeService := service.NewExchangeService(sharedHTTP, exchangeStore, log, cfg.Rates.NBUURL)
 	fuelStore := redisrepo.NewFuelStore(redisClient)
 	fuelService := service.NewFuelService(sharedHTTP, fuelStore, log, cfg.Rates.FuelURL)
 
+	// Background jobs are awaited before the deferred Redis/pool closes run,
+	// so none of them touches a closed client during shutdown.
+	var background sync.WaitGroup
+	defer func() {
+		stop()
+		background.Wait()
+	}()
+
 	// The warmup runs in the background: with retries a cold NBU can take
 	// over a minute, far beyond the startup timeout. Until it lands,
 	// the endpoint serves 503 from the empty store.
-	go func() {
+	background.Go(func() {
 		if err := exchangeService.Refresh(ctx); err != nil {
 			log.ErrorContext(ctx, "exchange rates unavailable at startup, serving 503 until first refresh", "error", err)
 		}
@@ -117,14 +128,14 @@ func run() error {
 		if err := fuelService.Refresh(ctx); err != nil {
 			log.ErrorContext(ctx, "fuel rates unavailable at startup, serving 503 until first refresh", "error", err)
 		}
-	}()
+	})
 
-	go exchangeService.StartAutoRefresh(ctx, 24*time.Hour)
-	go fuelService.StartAutoRefresh(ctx, 24*time.Hour)
+	background.Go(func() { exchangeService.StartAutoRefresh(ctx, cfg.Rates.RefreshInterval) })
+	background.Go(func() { fuelService.StartAutoRefresh(ctx, cfg.Rates.RefreshInterval) })
 
 	runningLineHandler := handler.NewRunningLineHandler(exchangeService, fuelService)
 
-	rateLimitService := service.NewRateLimitService(redisrepo.NewRateLimitStore(redisClient), log, cfg.RateLimit)
+	rateLimitService := service.NewRateLimitService(rateLimitStore, log, cfg.RateLimit)
 
 	server, err := httptransport.New(
 		cfg.HTTP,

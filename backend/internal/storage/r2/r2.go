@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/maxaixs/mandat/backend/internal/errs"
+	"github.com/maxaixs/mandat/backend/pkg/imagetype"
 )
 
 // MaxUploadBytes caps a single cover upload.
@@ -26,7 +26,11 @@ const MaxUploadBytes = 10 << 20
 // The production S3 client satisfies it; tests inject a fake.
 type S3API interface {
 	PutObject(ctx context.Context, in *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
-	DeleteObject(ctx context.Context, in *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	DeleteObject(
+		ctx context.Context,
+		in *s3.DeleteObjectInput,
+		optFns ...func(*s3.Options),
+	) (*s3.DeleteObjectOutput, error)
 }
 
 // Client stores cover images in Cloudflare R2 over the S3 API.
@@ -56,15 +60,6 @@ func NewClient(cfg Config, api S3API) (*Client, error) {
 	return &Client{cfg: cfg, api: api}, nil
 }
 
-// mimeForExt maps accepted key extensions onto sniffed MIME types.
-var mimeForExt = map[string]string{
-	"jpg":  "image/jpeg",
-	"jpeg": "image/jpeg",
-	"png":  "image/png",
-	"webp": "image/webp",
-	"gif":  "image/gif",
-}
-
 // Upload stores body under key and returns its public URL.
 // Content sniffing is authoritative: the declared content type is ignored
 // and the key extension must agree with the sniffed image type.
@@ -84,7 +79,7 @@ func (c *Client) Upload(ctx context.Context, key string, body io.Reader, content
 		return "", fmt.Errorf("%w: size exceeds %d bytes", errs.ErrPayloadTooLarge, MaxUploadBytes)
 	}
 
-	sniffed := sniffMIME(data)
+	sniffed := imagetype.Sniff(data)
 	if !strings.HasPrefix(sniffed, "image/") {
 		return "", fmt.Errorf("%w: object %q is %s, not an image", errs.ErrInvalidInput, key, sniffed)
 	}
@@ -128,16 +123,6 @@ func (c *Client) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// sniffMIME reports the content type of data from its leading bytes.
-func sniffMIME(data []byte) string {
-	head := data
-	if len(head) > 512 {
-		head = head[:512]
-	}
-
-	return http.DetectContentType(head)
-}
-
 // checkExtMIME rejects a key whose extension disagrees with sniffed content.
 func checkExtMIME(key, sniffed string) error {
 	dot := strings.LastIndex(key, ".")
@@ -145,7 +130,7 @@ func checkExtMIME(key, sniffed string) error {
 		return errs.NewValidationError("cover", "object key must carry an image extension")
 	}
 	ext := strings.ToLower(key[dot+1:])
-	want, ok := mimeForExt[ext]
+	want, ok := imagetype.MIMEForExt(ext)
 	if !ok {
 		return errs.NewValidationError("cover", "unsupported image type "+ext)
 	}

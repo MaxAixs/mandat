@@ -87,8 +87,8 @@ func TestListPublished_ClampsLimitToMax(t *testing.T) {
 
 	assert.Equal(t, MaxPageLimit, result.Limit)
 	assert.Equal(t, 3, result.Page)
-	assert.Equal(t, MaxPageLimit, repo.LastPublishedFilter.Limit)
-	assert.Equal(t, 3, repo.LastPublishedFilter.Page)
+	assert.Equal(t, MaxPageLimit+1, repo.LastPublishedFilter.Limit)
+	assert.Equal(t, 2*MaxPageLimit, repo.LastPublishedFilter.Offset)
 	assert.Nil(t, repo.LastPublishedFilter.Status, "the public list must not let callers choose a status")
 }
 

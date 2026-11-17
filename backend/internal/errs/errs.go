@@ -14,7 +14,9 @@ var (
 	ErrPayloadTooLarge    = errors.New("payload too large")
 	ErrServiceUnavailable = errors.New("service unavailable")
 	ErrUnauthorized       = errors.New("unauthorized")
+	ErrUnauthenticated    = errors.New("authentication required")
 	ErrForbidden          = errors.New("forbidden")
+	ErrUntrustedOrigin    = errors.New("untrusted request origin")
 	ErrTooManyRequests    = errors.New("too many requests")
 
 	ErrExchangeRatesNotFound = errors.New("exchange rates not found")

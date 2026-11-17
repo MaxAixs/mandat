@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
 )
 
 // Server owns the http server, its gin router, and the graceful
@@ -51,17 +50,19 @@ func New(cfg HTTPConfig, middlewares []gin.HandlerFunc, registrars ...Registrar)
 	s.router.RemoteIPHeaders = cfg.ClientIPHeaders
 
 	s.router.Use(gin.Recovery())
-	s.router.Use(middleware.LimitBodySize(middleware.DefaultMaxBodyBytes))
+	s.router.Use(securityHeaders(cfg.SecureCookies))
+	s.router.Use(limitBodySize(defaultMaxBodyBytes))
 
 	if len(cfg.AllowedOrigins) > 0 {
-		s.router.Use(middleware.CORS(cfg.AllowedOrigins))
+		s.router.Use(corsMiddleware(cfg.AllowedOrigins))
 	}
+
+	// After CORS, so a rejected cross-site write still carries CORS headers.
+	s.router.Use(originGuard(cfg.AllowedOrigins))
 
 	// After CORS, so a rejection still carries the CORS headers the browser needs.
 	s.router.Use(middlewares...)
 
-	// Authentication and authorization middlewares will attach
-	// to this group when they are introduced.
 	api := s.router.Group("")
 	for _, registrar := range registrars {
 		if registrar != nil {

@@ -21,7 +21,7 @@ type NewsResponse struct {
 	Views       int64      `json:"views"`
 	Featured    bool       `json:"featured"`
 	MainEvent   bool       `json:"main_event"`
-	ImageUrl    string     `json:"image_url"`
+	ImageURL    string     `json:"image_url"`
 	Source      string     `json:"source"`
 	SourceURL   string     `json:"source_url"`
 	PublishedAt *time.Time `json:"published_at"`
@@ -31,9 +31,10 @@ type NewsResponse struct {
 
 // ListResponse is a page of news articles.
 type ListResponse struct {
-	Items []*NewsResponse `json:"items"`
-	Page  int             `json:"page"`
-	Limit int             `json:"limit"`
+	Items   []*NewsResponse `json:"items"`
+	Page    int             `json:"page"`
+	Limit   int             `json:"limit"`
+	HasMore bool            `json:"has_more"`
 }
 
 // PublicNewsResponse is a published article card returned by the public API.
@@ -42,7 +43,7 @@ type PublicNewsResponse struct {
 	Category    string     `json:"category"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
-	ImageUrl    string     `json:"image_url"`
+	ImageURL    string     `json:"image_url"`
 	Featured    bool       `json:"featured"`
 	MainEvent   bool       `json:"main_event"`
 	Views       int64      `json:"views"`
@@ -51,9 +52,10 @@ type PublicNewsResponse struct {
 
 // PublicNewsListResponse is a page of published article cards.
 type PublicNewsListResponse struct {
-	Items []*PublicNewsResponse `json:"items"`
-	Page  int                   `json:"page"`
-	Limit int                   `json:"limit"`
+	Items   []*PublicNewsResponse `json:"items"`
+	Page    int                   `json:"page"`
+	Limit   int                   `json:"limit"`
+	HasMore bool                  `json:"has_more"`
 }
 
 // PublicNewsDetailResponse is a published article returned by the public API.
@@ -63,7 +65,7 @@ type PublicNewsDetailResponse struct {
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	Text        string     `json:"text"`
-	ImageUrl    string     `json:"image_url"`
+	ImageURL    string     `json:"image_url"`
 	Featured    bool       `json:"featured"`
 	MainEvent   bool       `json:"main_event"`
 	Source      string     `json:"source"`
@@ -163,7 +165,7 @@ func NewsToPublicResponse(news *models.News) *PublicNewsResponse {
 		Category:    string(news.Category),
 		Title:       news.Title,
 		Description: news.Description,
-		ImageUrl:    news.ImageUrl,
+		ImageURL:    news.ImageURL,
 		Featured:    news.Featured,
 		MainEvent:   news.MainEvent,
 		Views:       news.Views,
@@ -183,7 +185,7 @@ func NewsToPublicDetailResponse(news *models.News) *PublicNewsDetailResponse {
 		Title:       news.Title,
 		Description: news.Description,
 		Text:        news.Text,
-		ImageUrl:    news.ImageUrl,
+		ImageURL:    news.ImageURL,
 		Featured:    news.Featured,
 		MainEvent:   news.MainEvent,
 		Source:      news.Source,
@@ -211,7 +213,7 @@ func NewsToResponse(news *models.News) *NewsResponse {
 		Views:       news.Views,
 		Featured:    news.Featured,
 		MainEvent:   news.MainEvent,
-		ImageUrl:    news.ImageUrl,
+		ImageURL:    news.ImageURL,
 		Source:      news.Source,
 		SourceURL:   news.SourceURL,
 		PublishedAt: news.PublishedAt,

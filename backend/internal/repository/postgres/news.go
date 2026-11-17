@@ -19,13 +19,19 @@ import (
 const newsColumns = `id, slug, category, title, description, text, language,
 	status, views, featured, main_event, image_url, source, source_url, published_at, created_at, updated_at`
 
+// commandExecutor is the Exec surface shared by the pool and transactions.
+type commandExecutor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+// scanner abstracts QueryRow and Rows for shared scanning logic.
+type scanner interface {
+	Scan(dest ...any) error
+}
+
 // NewsRepo persists news articles in PostgreSQL.
 type NewsRepo struct {
 	pool *pgxpool.Pool
-}
-
-type commandExecutor interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
 // NewNewsRepo creates a NewsRepo backed by pool.
@@ -48,26 +54,6 @@ func (r *NewsRepo) Create(ctx context.Context, news *models.News) error {
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
-	}
-
-	return nil
-}
-
-func insertNews(ctx context.Context, db commandExecutor, news *models.News) error {
-	const fc = "newsRepo_insertNews"
-
-	query := `INSERT INTO news
-		(id, slug, category, title, description, text, language, status,
-		featured, main_event, image_url, source, source_url, published_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
-
-	_, err := db.Exec(ctx, query,
-		news.ID, news.Slug, news.Category, news.Title, news.Description,
-		news.Text, news.Language, news.Status, news.Featured, news.MainEvent,
-		news.ImageUrl, news.Source, news.SourceURL, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("%s: %w", fc, err)
 	}
 
 	return nil
@@ -126,24 +112,16 @@ func (r *NewsRepo) List(ctx context.Context, filter models.ListFilter) ([]*model
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
 	listQuery += fmt.Sprintf(` ORDER BY created_at DESC, id DESC LIMIT $%d OFFSET $%d`, limitPos, offsetPos)
-	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+	args = append(args, filter.Limit, filter.Offset)
 
 	rows, err := r.pool.Query(ctx, listQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
-	defer rows.Close()
 
-	var items []*models.News
-	for rows.Next() {
-		news, err := scanNews(rows)
-		if err != nil {
-			return nil, fmt.Errorf("%s: scan: %w", fc, err)
-		}
-		items = append(items, news)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: rows: %w", fc, err)
+	items, err := collectNews(rows)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, err)
 	}
 
 	return items, nil
@@ -167,24 +145,16 @@ func (r *NewsRepo) ListPublished(ctx context.Context, filter models.ListFilter) 
 		limitPos,
 		offsetPos,
 	)
-	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
+	args = append(args, filter.Limit, filter.Offset)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
-	defer rows.Close()
 
-	var items []*models.News
-	for rows.Next() {
-		news, err := scanNews(rows)
-		if err != nil {
-			return nil, fmt.Errorf("%s: scan: %w", fc, err)
-		}
-		items = append(items, news)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: rows: %w", fc, err)
+	items, err := collectNews(rows)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, err)
 	}
 
 	return items, nil
@@ -209,18 +179,10 @@ func (r *NewsRepo) SearchPublished(ctx context.Context, query string, limit int)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrNewsNotFound))
 	}
-	defer rows.Close()
 
-	var items []*models.News
-	for rows.Next() {
-		news, err := scanNews(rows)
-		if err != nil {
-			return nil, fmt.Errorf("%s: scan: %w", fc, err)
-		}
-		items = append(items, news)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: rows: %w", fc, err)
+	items, err := collectNews(rows)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fc, err)
 	}
 
 	return items, nil
@@ -306,9 +268,24 @@ func (r *NewsRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// scanner abstracts QueryRow and Rows for shared scanning logic.
-type scanner interface {
-	Scan(dest ...any) error
+func insertNews(ctx context.Context, db commandExecutor, news *models.News) error {
+	const fc = "newsRepo_insertNews"
+
+	query := `INSERT INTO news
+		(id, slug, category, title, description, text, language, status,
+		featured, main_event, image_url, source, source_url, published_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+
+	_, err := db.Exec(ctx, query,
+		news.ID, news.Slug, news.Category, news.Title, news.Description,
+		news.Text, news.Language, news.Status, news.Featured, news.MainEvent,
+		news.ImageURL, news.Source, news.SourceURL, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", fc, err)
+	}
+
+	return nil
 }
 
 func scanNews(row scanner) (*models.News, error) {
@@ -317,13 +294,37 @@ func scanNews(row scanner) (*models.News, error) {
 	err := row.Scan(
 		&news.ID, &news.Slug, &news.Category, &news.Title, &news.Description,
 		&news.Text, &news.Language, &news.Status, &news.Views, &news.Featured,
-		&news.MainEvent, &news.ImageUrl, &news.Source, &news.SourceURL, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
+		&news.MainEvent, &news.ImageURL, &news.Source, &news.SourceURL, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &news, nil
+}
+
+// collectNews scans every row into an article and closes rows.
+func collectNews(rows pgx.Rows) ([]*models.News, error) {
+	defer rows.Close()
+
+	var items []*models.News
+	for rows.Next() {
+		news, err := scanNews(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		items = append(items, news)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows: %w", err)
+	}
+
+	return items, nil
+}
+
+// escapeLike escapes the LIKE pattern metacharacters in s.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 func updateNews(ctx context.Context, db commandExecutor, news *models.News) error {
@@ -337,7 +338,7 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 	tag, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
-		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageUrl,
+		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageURL,
 		news.Source, news.SourceURL, news.PublishedAt, news.UpdatedAt,
 	)
 	if err != nil {
@@ -348,9 +349,4 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 	}
 
 	return nil
-}
-
-// escapeLike escapes the LIKE pattern metacharacters in s.
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }

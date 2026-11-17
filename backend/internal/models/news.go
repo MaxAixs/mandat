@@ -58,7 +58,7 @@ type News struct {
 	Views       int64
 	Featured    bool
 	MainEvent   bool
-	ImageUrl    string
+	ImageURL    string
 	Source      string
 	SourceURL   string
 	PublishedAt *time.Time
@@ -66,11 +66,11 @@ type News struct {
 	UpdatedAt   time.Time
 }
 
-// ListFilter selects a page of news.
-// Nil Status and Category mean all statuses and categories. Page starts at 1.
+// ListFilter selects a window of news: up to Limit rows after skipping Offset.
+// Nil Status and Category mean all statuses and categories.
 type ListFilter struct {
 	Status   *Status
 	Category *Category
-	Page     int
 	Limit    int
+	Offset   int
 }

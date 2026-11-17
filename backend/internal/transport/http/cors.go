@@ -1,4 +1,4 @@
-package middleware
+package httptransport
 
 import (
 	"net/http"
@@ -7,8 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORS allows cross-origin requests only from the given origins.
-func CORS(origins []string) gin.HandlerFunc {
+// corsMiddleware allows cross-origin requests only from the given origins.
+// Staff authenticate with a cookie, so no Authorization header is allowed.
+func corsMiddleware(origins []string) gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowOrigins: origins,
 		AllowMethods: []string{
@@ -18,7 +19,7 @@ func CORS(origins []string) gin.HandlerFunc {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		AllowCredentials: true,
 	})
 }

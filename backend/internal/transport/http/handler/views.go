@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
 
 // ViewService records a throttled public article view.
@@ -28,7 +29,7 @@ func NewViewHandler(svc ViewService, viewerMiddleware gin.HandlerFunc) *ViewHand
 
 // Register binds the public view route.
 func (h *ViewHandler) Register(r *gin.RouterGroup) {
-	news := r.Group("/api" + newsPath)
+	news := r.Group(routes.PublicNews)
 	news.POST("/:slug/view", h.viewerMiddleware, h.Record)
 }
 

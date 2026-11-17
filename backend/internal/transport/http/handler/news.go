@@ -16,18 +16,8 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
-	"github.com/maxaixs/mandat/backend/pkg/storage/r2"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
-
-// adminBasePath is the root path of the admin API.
-const (
-	adminBasePath = "/api/admin"
-	newsPath      = "/news"
-)
-
-// AdminNewsPrefix is the matched route prefix of the news admin endpoints.
-// The body-size middleware uses it to widen the cap for cover uploads.
-const AdminNewsPrefix = adminBasePath + newsPath
 
 // NewsService is the news administration behavior used by NewsHandler.
 type NewsService interface {
@@ -51,16 +41,13 @@ func NewNewsHandler(svc NewsService, middlewares ...gin.HandlerFunc) *NewsHandle
 
 // Register binds the news routes under the admin group.
 func (h *NewsHandler) Register(r *gin.RouterGroup) {
-	admin := r.Group(adminBasePath)
-	admin.Use(h.middlewares...)
-	{
-		news := admin.Group(newsPath)
-		news.POST("", h.Create)
-		news.GET("", h.List)
-		news.GET("/:slug", h.GetBySlug)
-		news.PUT("/:slug", h.Update)
-		news.DELETE("/:slug", h.Delete)
-	}
+	news := r.Group(routes.AdminNews)
+	news.Use(h.middlewares...)
+	news.POST("", h.Create)
+	news.GET("", h.List)
+	news.GET("/:slug", h.GetBySlug)
+	news.PUT("/:slug", h.Update)
+	news.DELETE("/:slug", h.Delete)
 }
 
 // Create handles POST /api/admin/news.
@@ -112,9 +99,10 @@ func (h *NewsHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.ListResponse{
-		Items: items,
-		Page:  result.Page,
-		Limit: result.Limit,
+		Items:   items,
+		Page:    result.Page,
+		Limit:   result.Limit,
+		HasMore: result.HasMore,
 	})
 }
 
@@ -184,7 +172,7 @@ func (h *NewsHandler) bindInput(c *gin.Context) (service.NewsInput, error) {
 		Text:        formField(form, "text"),
 		Language:    formField(form, "language"),
 		Status:      formField(form, "status"),
-		ImageUrl:    formField(form, "image_url"),
+		ImageURL:    formField(form, "image_url"),
 		Source:      formField(form, "source"),
 		SourceURL:   formField(form, "source_url"),
 	}
@@ -252,7 +240,7 @@ func openCover(form *multipart.Form) (*service.CoverUpload, error) {
 	}
 
 	fh := files[0]
-	if fh.Size > r2.MaxUploadBytes {
+	if fh.Size > service.MaxCoverBytes {
 		return nil, errs.ErrPayloadTooLarge
 	}
 

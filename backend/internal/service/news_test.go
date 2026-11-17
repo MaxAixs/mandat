@@ -413,7 +413,8 @@ func TestList_ClampsLimitToMax(t *testing.T) {
 	result, err := svc.List(context.Background(), 1, 100000, "", "")
 	require.NoError(t, err)
 	assert.Equal(t, MaxPageLimit, result.Limit)
-	assert.Equal(t, MaxPageLimit, repo.LastFilter.Limit)
+	assert.Equal(t, MaxPageLimit+1, repo.LastFilter.Limit)
+	assert.Equal(t, 0, repo.LastFilter.Offset)
 }
 
 func TestList_RejectsUnknownStatus(t *testing.T) {
@@ -621,7 +622,7 @@ func TestUpdate_AppliesEditableFields(t *testing.T) {
 	update.Category = models.CategoryAnalytics
 	update.Description = "Новий опис"
 	update.Featured = true
-	update.ImageUrl = "https://example.com/cover.jpg"
+	update.ImageURL = "https://example.com/cover.jpg"
 
 	updated, err := svc.Update(context.Background(), created.Slug, update)
 	require.NoError(t, err)
@@ -629,7 +630,7 @@ func TestUpdate_AppliesEditableFields(t *testing.T) {
 	assert.Equal(t, models.CategoryAnalytics, updated.Category)
 	assert.Equal(t, "Новий опис", updated.Description)
 	assert.True(t, updated.Featured)
-	assert.Equal(t, "https://example.com/cover.jpg", updated.ImageUrl)
+	assert.Equal(t, "https://example.com/cover.jpg", updated.ImageURL)
 }
 
 func TestDelete_NotFound(t *testing.T) {

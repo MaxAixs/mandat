@@ -9,6 +9,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
 
 // PublicNewsService is the published-news behavior used by PublicNewsHandler.
@@ -34,7 +35,7 @@ func NewPublicNewsHandler(
 
 // Register binds the public news routes.
 func (h *PublicNewsHandler) Register(r *gin.RouterGroup) {
-	news := r.Group("/api" + newsPath)
+	news := r.Group(routes.PublicNews)
 	news.GET("", h.List)
 	news.GET("/search", h.Search)
 
@@ -83,9 +84,10 @@ func (h *PublicNewsHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.PublicNewsListResponse{
-		Items: items,
-		Page:  result.Page,
-		Limit: result.Limit,
+		Items:   items,
+		Page:    result.Page,
+		Limit:   result.Limit,
+		HasMore: result.HasMore,
 	})
 }
 
@@ -111,8 +113,9 @@ func (h *PublicNewsHandler) Search(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.PublicNewsListResponse{
-		Items: items,
-		Page:  result.Page,
-		Limit: result.Limit,
+		Items:   items,
+		Page:    result.Page,
+		Limit:   result.Limit,
+		HasMore: result.HasMore,
 	})
 }

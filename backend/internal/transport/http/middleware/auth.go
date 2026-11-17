@@ -3,11 +3,11 @@ package middleware
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
+	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
 )
 
@@ -21,20 +21,17 @@ func RequireAuth(auth Authenticator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie(dto.AdminSessionCookie)
 		if err != nil {
-			abortWithAuthError(c, http.StatusUnauthorized, "Authentication required")
+			httptransport.WriteError(c, errs.ErrUnauthenticated)
 
 			return
 		}
 
 		user, err := auth.Authenticate(c.Request.Context(), token)
 		if err != nil {
-			status := http.StatusUnauthorized
-			message := "Authentication required"
-			if !errors.Is(err, errs.ErrUnauthorized) {
-				status = http.StatusInternalServerError
-				message = "Internal server error"
+			if errors.Is(err, errs.ErrUnauthorized) {
+				err = errs.ErrUnauthenticated
 			}
-			abortWithAuthError(c, status, message)
+			httptransport.WriteError(c, err)
 
 			return
 		}
@@ -54,11 +51,13 @@ func RequireRoles(roles ...models.Role) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := CurrentUser(c)
 		if !ok {
-			abortWithAuthError(c, http.StatusUnauthorized, "Authentication required")
+			httptransport.WriteError(c, errs.ErrUnauthenticated)
+
 			return
 		}
 		if _, ok := allowed[user.Role]; !ok {
-			abortWithAuthError(c, http.StatusForbidden, "Insufficient permissions")
+			httptransport.WriteError(c, errs.ErrForbidden)
+
 			return
 		}
 
@@ -75,10 +74,4 @@ func CurrentUser(c *gin.Context) (*models.AdminUser, bool) {
 
 	user, ok := value.(*models.AdminUser)
 	return user, ok && user != nil
-}
-
-func abortWithAuthError(c *gin.Context, status int, message string) {
-	c.AbortWithStatusJSON(status, gin.H{
-		"error": gin.H{"status": status, "message": message},
-	})
 }

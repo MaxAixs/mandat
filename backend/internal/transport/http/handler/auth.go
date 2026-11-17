@@ -6,19 +6,22 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/maxaixs/mandat/backend/internal/errs"
 	"github.com/maxaixs/mandat/backend/internal/models"
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/middleware"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
-
-const authBasePath = "/api/auth"
 
 // AuthService is the authentication behavior used by AuthHandler.
 type AuthService interface {
 	Login(ctx context.Context, login string, password string) (*service.AuthResult, error)
 	Authenticate(ctx context.Context, rawToken string) (*models.AdminUser, error)
 	Logout(ctx context.Context, rawToken string) error
+	LogoutAll(ctx context.Context, userID uuid.UUID) error
 }
 
 // AuthHandler exposes staff login, logout, and current-user endpoints.
@@ -46,12 +49,13 @@ func NewAuthHandler(
 
 // Register binds public login and authenticated session routes.
 func (h *AuthHandler) Register(r *gin.RouterGroup) {
-	auth := r.Group(authBasePath)
+	auth := r.Group(routes.Auth)
 	auth.POST("/login", h.loginRateLimit, h.Login)
 
 	authenticated := auth.Group("")
 	authenticated.Use(h.authMiddleware)
 	authenticated.POST("/logout", h.Logout)
+	authenticated.POST("/logout-all", h.LogoutAll)
 	authenticated.GET("/me", h.Me)
 }
 
@@ -94,18 +98,30 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// Me handles GET /api/auth/me.
-func (h *AuthHandler) Me(c *gin.Context) {
-	value, ok := c.Get(dto.CurrentUserKey)
+// LogoutAll handles POST /api/auth/logout-all: it revokes every session of the current user.
+func (h *AuthHandler) LogoutAll(c *gin.Context) {
+	user, ok := middleware.CurrentUser(c)
 	if !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		httptransport.WriteError(c, errs.ErrUnauthenticated)
 
 		return
 	}
 
-	user, ok := value.(*models.AdminUser)
-	if !ok || user == nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	if err := h.svc.LogoutAll(c.Request.Context(), user.ID); err != nil {
+		httptransport.WriteError(c, err)
+
+		return
+	}
+
+	h.clearSessionCookie(c)
+	c.Status(http.StatusNoContent)
+}
+
+// Me handles GET /api/auth/me.
+func (h *AuthHandler) Me(c *gin.Context) {
+	user, ok := middleware.CurrentUser(c)
+	if !ok {
+		httptransport.WriteError(c, errs.ErrUnauthenticated)
 
 		return
 	}

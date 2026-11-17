@@ -18,13 +18,14 @@ const fullYAML = `
 log_level: debug
 http:
   port: 9000
+  secure_cookies: true
   allowed_origins:
     - http://localhost:5173
     - https://mandat.example
   startup_timeout: 20s
   read_header_timeout: 7s
   read_timeout: 11s
-  write_timeout: 12s
+  write_timeout: 20s
   idle_timeout: 100s
   shutdown_timeout: 9s
 db:
@@ -54,6 +55,7 @@ func TestLoad_ParsesAllSections(t *testing.T) {
 	assert.Equal(t, "debug", cfg.LogLevel)
 	assert.Equal(t, 9000, cfg.HTTP.Port)
 	assert.Equal(t, 20*time.Second, cfg.HTTP.StartupTimeout)
+	assert.Equal(t, 20*time.Second, cfg.HTTP.WriteTimeout)
 	assert.Equal(t, "db-host", cfg.DB.Host)
 	assert.Equal(t, "require", cfg.DB.SSLMode)
 	assert.Equal(t, []string{"http://localhost:5173", "https://mandat.example"}, cfg.HTTP.AllowedOrigins)
@@ -70,7 +72,7 @@ func TestLoad_DefaultsForMissingValues(t *testing.T) {
 	assert.Equal(t, 15*time.Second, cfg.HTTP.StartupTimeout)
 	assert.Equal(t, 5*time.Second, cfg.HTTP.ReadHeaderTimeout)
 	assert.Equal(t, 10*time.Second, cfg.HTTP.ReadTimeout)
-	assert.Equal(t, 10*time.Second, cfg.HTTP.WriteTimeout)
+	assert.Equal(t, 30*time.Second, cfg.HTTP.WriteTimeout)
 	assert.Equal(t, 60*time.Second, cfg.HTTP.IdleTimeout)
 	assert.Equal(t, 10*time.Second, cfg.HTTP.ShutdownTimeout)
 	assert.Equal(t, 5432, cfg.DB.Port)

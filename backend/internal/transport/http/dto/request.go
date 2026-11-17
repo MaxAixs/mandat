@@ -17,7 +17,7 @@ type NewsRequest struct {
 	Status      string `json:"status"`
 	Featured    bool   `json:"featured"`
 	MainEvent   bool   `json:"main_event"`
-	ImageUrl    string `json:"image_url"`
+	ImageURL    string `json:"image_url"`
 	Source      string `json:"source"`
 	SourceURL   string `json:"source_url"`
 }
@@ -33,7 +33,7 @@ func (r NewsRequest) ToInput() service.NewsInput {
 		Status:      models.Status(r.Status),
 		Featured:    r.Featured,
 		MainEvent:   r.MainEvent,
-		ImageUrl:    r.ImageUrl,
+		ImageURL:    r.ImageURL,
 		Source:      r.Source,
 		SourceURL:   r.SourceURL,
 	}

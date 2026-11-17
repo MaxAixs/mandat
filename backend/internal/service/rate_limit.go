@@ -10,8 +10,8 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/errs"
 )
 
-// globalRateLimitKeyPrefix scopes the counters of the global per-client limit.
-const globalRateLimitKeyPrefix = "global:"
+// globalRateLimitScope scopes the counters of the global per-client limit.
+const globalRateLimitScope = "global"
 
 // ipv6SubscriberBits is the prefix one IPv6 subscriber usually owns,
 // so rotating addresses inside it does not reset the limit.
@@ -34,11 +34,22 @@ type RateLimitService struct {
 	store  RateLimitStore
 	logger *slog.Logger
 	cfg    RateLimitConfig
+	scope  string
 }
 
 // NewRateLimitService creates a RateLimitService over store.
 func NewRateLimitService(store RateLimitStore, logger *slog.Logger, cfg RateLimitConfig) *RateLimitService {
-	return &RateLimitService{store: store, logger: logger, cfg: cfg}
+	return NewScopedRateLimitService(store, logger, cfg, globalRateLimitScope)
+}
+
+// NewScopedRateLimitService creates a RateLimitService whose counters live under scope.
+func NewScopedRateLimitService(
+	store RateLimitStore,
+	logger *slog.Logger,
+	cfg RateLimitConfig,
+	scope string,
+) *RateLimitService {
+	return &RateLimitService{store: store, logger: logger, cfg: cfg, scope: scope}
 }
 
 // Allow returns errs.ErrTooManyRequests together with the time to wait
@@ -46,11 +57,23 @@ func NewRateLimitService(store RateLimitStore, logger *slog.Logger, cfg RateLimi
 func (s *RateLimitService) Allow(ctx context.Context, clientIP string) (time.Duration, error) {
 	const fc = "rateLimitService_Allow"
 
+	return s.hit(ctx, fc, clientKey(clientIP))
+}
+
+// AllowKey is Allow for an arbitrary key, used verbatim without IP masking.
+func (s *RateLimitService) AllowKey(ctx context.Context, key string) (time.Duration, error) {
+	const fc = "rateLimitService_AllowKey"
+
+	return s.hit(ctx, fc, key)
+}
+
+// hit counts one request for key in the service scope; fc names the caller in logs and errors.
+func (s *RateLimitService) hit(ctx context.Context, fc string, key string) (time.Duration, error) {
 	if !s.cfg.Enabled {
 		return 0, nil
 	}
 
-	count, ttl, err := s.store.Hit(ctx, globalRateLimitKeyPrefix+clientKey(clientIP), s.cfg.Window)
+	count, ttl, err := s.store.Hit(ctx, s.scope+":"+key, s.cfg.Window)
 	if err != nil {
 		if ctx.Err() != nil {
 			return 0, nil

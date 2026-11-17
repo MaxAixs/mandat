@@ -7,8 +7,10 @@ services:
       POSTGRES_USER: mandat
       POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is not set, copy .env.example to .env}"
       POSTGRES_DB: mandat
+    restart: unless-stopped
+    # Loopback only: the database must not be reachable from other hosts.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -27,6 +29,9 @@ services:
       R2_ENDPOINT: "${R2_ENDPOINT:-}"
       R2_BUCKET: "${R2_BUCKET:-}"
       R2_PUBLIC_BASE_URL: "${R2_PUBLIC_BASE_URL:-}"
+      HTTP_SECURE_COOKIES: "${HTTP_SECURE_COOKIES:-}"
+      HTTP_ALLOWED_ORIGINS: "${HTTP_ALLOWED_ORIGINS:-}"
+    restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
@@ -35,11 +40,13 @@ services:
       redis:
         condition: service_healthy
 
-  # Admin sessions only: no volume, a restart just logs everyone out.
+  # Admin sessions and rate-limit counters: no volume, a restart logs everyone out.
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    # Loopback only: this Redis has no password.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

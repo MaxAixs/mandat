@@ -9,12 +9,13 @@ http:
   startup_timeout: 15s
   read_header_timeout: 5s
   read_timeout: 10s
-  write_timeout: 10s
+  write_timeout: 30s     # must exceed download.timeout (pasted cover fetch + upload)
   idle_timeout: 60s
   shutdown_timeout: 10s
   session_ttl: 12h
-  secure_cookies: false # Set to true behind production HTTPS.
-  allowed_origins:
+  secure_cookies: false # true behind production HTTPS (env HTTP_SECURE_COOKIES);
+                        # required once allowed_origins lists a non-local origin
+  allowed_origins:      # env HTTP_ALLOWED_ORIGINS (comma-separated) overrides
     - http://localhost:5173
     - http://localhost:3000
     - http://localhost:3001
@@ -62,6 +63,8 @@ redis:                # admin sessions; the local Compose Redis has no password
 rates:                # upstream rate providers (keep in sync with config.go defaults)
   nbu_url: "https://bank.gov.ua/NBU_Exchange/exchange" # endpoint without query parameters
   fuel_url: "https://20.com.ua/api/v1/prices"
+  refresh_interval: 24h # how often both tables are re-fetched (min 1m)
+  http_timeout: 10s     # one request to a provider
 
 storage:              # Cloudflare R2; keys come from R2_ACCESS_KEY_ID /
   endpoint: ""        # R2_SECRET_ACCESS_KEY (or set R2_ACCOUNT_ID to derive it)
@@ -71,7 +74,7 @@ storage:              # Cloudflare R2; keys come from R2_ACCESS_KEY_ID /
                       # and its fallback URLs are not publicly deliverable
 
 download:             # pasted-image fetcher (covers); AllowPrivate is code-only
-  timeout: 15s
+  timeout: 15s        # must stay below http.write_timeout
   max_bytes: 10485760 # 10 MB, keep in sync with the R2 driver cap
   max_redirects: 3
 
@@ -79,3 +82,8 @@ rate_limit:           # global per-client limit, counters in Redis (fails open)
   enabled: true
   requests: 300       # per client (IPv4 address or IPv6 /64) per window
   window: 1m
+
+login_rate_limit:     # login attempts, counted per client IP and per account (Redis)
+  enabled: true
+  requests: 5
+  window: 5m

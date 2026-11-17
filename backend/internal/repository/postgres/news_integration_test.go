@@ -120,7 +120,7 @@ func publishedNews(slug string, publishedAt time.Time) *models.News {
 func publishedFeaturedIDs(t *testing.T, repo *newsrepo.NewsRepo) []uuid.UUID {
 	t.Helper()
 
-	items, err := repo.ListPublished(context.Background(), models.ListFilter{Page: 1, Limit: 100})
+	items, err := repo.ListPublished(context.Background(), models.ListFilter{Limit: 100})
 	require.NoError(t, err)
 
 	var ids []uuid.UUID
@@ -144,7 +144,7 @@ func requireSinglePublishedFeatured(t *testing.T, repo *newsrepo.NewsRepo, wantI
 func publishedMainEventIDs(t *testing.T, repo *newsrepo.NewsRepo) []uuid.UUID {
 	t.Helper()
 
-	items, err := repo.ListPublished(context.Background(), models.ListFilter{Page: 1, Limit: 100})
+	items, err := repo.ListPublished(context.Background(), models.ListFilter{Limit: 100})
 	require.NoError(t, err)
 
 	var ids []uuid.UUID
@@ -187,7 +187,6 @@ func publishedMainEventIDsInCategory(
 
 	items, err := repo.ListPublished(context.Background(), models.ListFilter{
 		Category: &category,
-		Page:     1,
 		Limit:    100,
 	})
 	require.NoError(t, err)
@@ -216,7 +215,7 @@ func insertPublishedMainEventRaw(
 
 	_, err := pool.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
-		news.Language, news.Status, news.MainEvent, news.ImageUrl, news.PublishedAt,
+		news.Language, news.Status, news.MainEvent, news.ImageURL, news.PublishedAt,
 		news.CreatedAt, news.UpdatedAt,
 	)
 
@@ -229,7 +228,7 @@ func TestNewsRepo_CreateAndGetByID(t *testing.T) {
 
 	news := draftNews("uryad-skhalyv-biudzhet")
 	news.Featured = true
-	news.ImageUrl = "https://example.com/cover.jpg"
+	news.ImageURL = "https://example.com/cover.jpg"
 	require.NoError(t, repo.Create(ctx, news))
 
 	assert.NotZero(t, news.ID)
@@ -252,7 +251,7 @@ func TestNewsRepo_CreateAndGetByID(t *testing.T) {
 	assert.Equal(t, models.StatusDraft, got.Status)
 	assert.Equal(t, int64(0), got.Views)
 	assert.True(t, got.Featured)
-	assert.Equal(t, "https://example.com/cover.jpg", got.ImageUrl)
+	assert.Equal(t, "https://example.com/cover.jpg", got.ImageURL)
 	assert.Nil(t, got.PublishedAt)
 }
 
@@ -574,7 +573,7 @@ func TestNewsRepo_Create_HostileStringsRoundTrip(t *testing.T) {
 	assert.Equal(t, "hostile'--slug", got.Slug)
 
 	// Table must still exist and be queryable.
-	_, err = repo.List(ctx, models.ListFilter{Page: 1, Limit: 20})
+	_, err = repo.List(ctx, models.ListFilter{Limit: 20})
 	require.NoError(t, err)
 }
 
@@ -609,18 +608,18 @@ func TestNewsRepo_List_PaginationAndFilter(t *testing.T) {
 		require.NoError(t, repo.Create(ctx, n))
 	}
 
-	items, err := repo.List(ctx, models.ListFilter{Page: 1, Limit: 2})
+	items, err := repo.List(ctx, models.ListFilter{Limit: 2})
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 	// Newest first: last created (d2) comes first.
 	assert.Equal(t, "d2", items[0].Slug)
 	assert.Equal(t, "d1", items[1].Slug)
 
-	items, err = repo.List(ctx, models.ListFilter{Status: &published, Page: 1, Limit: 20})
+	items, err = repo.List(ctx, models.ListFilter{Status: &published, Limit: 20})
 	require.NoError(t, err)
 	assert.Len(t, items, 3)
 
-	items, err = repo.List(ctx, models.ListFilter{Page: 3, Limit: 2})
+	items, err = repo.List(ctx, models.ListFilter{Limit: 2, Offset: 4})
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -650,7 +649,7 @@ func TestNewsRepo_List_CategoryFilterAppliesBeforePagination(t *testing.T) {
 	sportCategory := models.CategoryInsides
 
 	// Admin List does not restrict status, so Category-only returns both Sport rows.
-	categoryOnly, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 20})
+	categoryOnly, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Limit: 20})
 	require.NoError(t, err)
 	require.Len(t, categoryOnly, 2, "Category-only List must include published and draft Sport rows")
 	assert.Equal(t, "list-category-sport-published", categoryOnly[0].Slug)
@@ -662,7 +661,6 @@ func TestNewsRepo_List_CategoryFilterAppliesBeforePagination(t *testing.T) {
 	publishedSport, err := repo.List(ctx, models.ListFilter{
 		Status:   &published,
 		Category: &sportCategory,
-		Page:     1,
 		Limit:    20,
 	})
 	require.NoError(t, err)
@@ -670,17 +668,17 @@ func TestNewsRepo_List_CategoryFilterAppliesBeforePagination(t *testing.T) {
 	assert.Equal(t, "list-category-sport-published", publishedSport[0].Slug)
 	assert.Equal(t, models.CategoryInsides, publishedSport[0].Category)
 
-	firstPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 1})
+	firstPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, firstPage, 1, "page one must hold the newest Sport row, not a newer non-Sport row")
 	assert.Equal(t, "list-category-sport-published", firstPage[0].Slug)
 
-	secondPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 2, Limit: 1})
+	secondPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Limit: 1, Offset: 1})
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1, "page two must keep the category filter")
 	assert.Equal(t, "list-category-sport-draft", secondPage[0].Slug)
 
-	thirdPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Page: 3, Limit: 1})
+	thirdPage, err := repo.List(ctx, models.ListFilter{Category: &sportCategory, Limit: 1, Offset: 2})
 	require.NoError(t, err)
 	assert.Empty(t, thirdPage)
 }
@@ -715,7 +713,7 @@ func TestNewsRepo_ListPublished_ExcludesDraftsAndOrdersByPublishedAt(t *testing.
 		require.NoError(t, repo.Create(ctx, news))
 	}
 
-	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 10})
+	items, err := repo.ListPublished(ctx, models.ListFilter{Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, items, 2, "drafts must not appear in the public list")
 	assert.Equal(t, "published-newer", items[0].Slug, "newest publication must come first")
@@ -736,17 +734,17 @@ func TestNewsRepo_ListPublished_Pagination(t *testing.T) {
 		require.NoError(t, repo.Create(ctx, news))
 	}
 
-	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 1})
+	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, firstPage, 1)
 	assert.Equal(t, "second", firstPage[0].Slug)
 
-	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 2, Limit: 1})
+	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Limit: 1, Offset: 1})
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1)
 	assert.Equal(t, "first", secondPage[0].Slug)
 
-	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Page: 3, Limit: 1})
+	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Limit: 1, Offset: 2})
 	require.NoError(t, err)
 	assert.Empty(t, emptyPage)
 }
@@ -765,7 +763,7 @@ func TestNewsRepo_ListPublished_OldFeaturedLeadsFirstPage(t *testing.T) {
 		require.NoError(t, repo.Create(ctx, news))
 	}
 
-	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	items, err := repo.ListPublished(ctx, models.ListFilter{Limit: 20})
 	require.NoError(t, err)
 	require.Len(t, items, 20)
 
@@ -815,7 +813,7 @@ func TestNewsRepo_ListPublished_OldMainEventLeadsFirstPage(t *testing.T) {
 		require.NoError(t, repo.Create(ctx, news))
 	}
 
-	items, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	items, err := repo.ListPublished(ctx, models.ListFilter{Limit: 20})
 	require.NoError(t, err)
 	require.Len(t, items, 20)
 
@@ -1114,7 +1112,6 @@ func TestNewsRepo_ListPublished_CategoryFilterAppliesBeforePagination(t *testing
 	sportCategory := models.CategoryInsides
 	items, err := repo.ListPublished(ctx, models.ListFilter{
 		Category: &sportCategory,
-		Page:     1,
 		Limit:    20,
 	})
 	require.NoError(t, err)
@@ -1122,7 +1119,7 @@ func TestNewsRepo_ListPublished_CategoryFilterAppliesBeforePagination(t *testing
 	assert.Equal(t, "sport-older", items[0].Slug)
 	assert.Equal(t, models.CategoryInsides, items[0].Category)
 
-	unfiltered, err := repo.ListPublished(ctx, models.ListFilter{Page: 1, Limit: 20})
+	unfiltered, err := repo.ListPublished(ctx, models.ListFilter{Limit: 20})
 	require.NoError(t, err)
 	require.Len(t, unfiltered, 20)
 	for _, item := range unfiltered {
@@ -1204,18 +1201,18 @@ func TestNewsRepo_ListPublished_CategoryFilterPaginatesMatchingRows(t *testing.T
 
 	sportCategory := models.CategoryInsides
 
-	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 1, Limit: 2})
+	firstPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Limit: 2})
 	require.NoError(t, err)
 	require.Len(t, firstPage, 2)
 	assert.Equal(t, "sport-3", firstPage[0].Slug)
 	assert.Equal(t, "sport-2", firstPage[1].Slug)
 
-	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 2, Limit: 2})
+	secondPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Limit: 2, Offset: 2})
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1)
 	assert.Equal(t, "sport-1", secondPage[0].Slug)
 
-	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Page: 3, Limit: 2})
+	emptyPage, err := repo.ListPublished(ctx, models.ListFilter{Category: &sportCategory, Limit: 2, Offset: 4})
 	require.NoError(t, err)
 	assert.Empty(t, emptyPage)
 }

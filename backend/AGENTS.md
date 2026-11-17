@@ -324,14 +324,15 @@ The HTTP layer must return consistent JSON error responses.
 ```json
 {
   "error": {
+    "status": 404,
     "message": "News article not found"
   }
 }
 ```
 
-The error payload carries a client-facing message only; clients classify failures by the HTTP status code. Client-facing messages must not disclose internal implementation details.
+The error payload carries the HTTP status and a client-facing message; clients classify failures by the HTTP status code. Client-facing messages must not disclose internal implementation details.
 
-The mapping from application errors to responses lives in one place — the `errResps` table in `internal/transport/http/errors.go`. Each entry maps a sentinel error onto its HTTP status and message (`ErrResp`). Add new client-facing errors as a single table entry; do not branch on error types inside handlers.
+The mapping from application errors to responses lives in one place — the `errResps` table in `internal/transport/http/errors.go`. It is an ordered list: each entry maps a sentinel error onto its HTTP status and message (`ErrResp`), and the first sentinel found in the error chain wins. Add new client-facing errors as a single table entry; do not branch on error types inside handlers. Middleware writes its errors through the same `httptransport.WriteError`; a `*errs.RetryAfterError` in the chain also sets `Retry-After`.
 
 ## 6. Logging
 
@@ -473,7 +474,7 @@ For image editing, define the provider capabilities and supported operations bef
 
 Store image files in Cloudflare R2. Store image metadata and object references in PostgreSQL, not the binary contents themselves. R2 is the only object storage; AWS S3 is not supported.
 
-Cover object keys derive from the article slug (`covers/<slug>.<ext>`) at create/update time.
+Cover object keys derive from the article slug plus a random suffix per upload (`covers/<slug>-<8 hex>.<ext>`), so a replacement never overwrites the live cover. The article slug is fixed at creation and never changes on update.
 
 Requirements:
 

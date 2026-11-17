@@ -3,22 +3,15 @@ package middleware
 import (
 	"context"
 	"errors"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/maxaixs/mandat/backend/internal/errs"
+	httptransport "github.com/maxaixs/mandat/backend/internal/transport/http"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
-
-// healthPathPrefix marks the probe routes, which are never throttled.
-// It mirrors the health handler group: importing it would cycle through httptransport.
-const healthPathPrefix = "/health"
-
-// minRetryAfterSeconds keeps Retry-After meaningful when the window is about to reset.
-const minRetryAfterSeconds = 1
 
 // RateLimiter decides whether a client may make another request.
 type RateLimiter interface {
@@ -37,13 +30,7 @@ func RateLimit(limiter RateLimiter) gin.HandlerFunc {
 
 		wait, err := limiter.Allow(c.Request.Context(), c.ClientIP())
 		if errors.Is(err, errs.ErrTooManyRequests) {
-			c.Header("Retry-After", strconv.Itoa(retryAfterSeconds(wait)))
-			// Same wire format as WriteError, written here because WriteError cannot set
-			// Retry-After and its errResps message for this sentinel is login-specific.
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
-				"status":  http.StatusTooManyRequests,
-				"message": "Too many requests",
-			}})
+			httptransport.WriteError(c, errs.NewRetryAfterError(wait))
 
 			return
 		}
@@ -60,15 +47,5 @@ func isRateLimitExempt(c *gin.Context) bool {
 
 	path := c.Request.URL.Path
 
-	return path == healthPathPrefix || strings.HasPrefix(path, healthPathPrefix+"/")
-}
-
-// retryAfterSeconds rounds wait up to whole seconds, at least minRetryAfterSeconds.
-func retryAfterSeconds(wait time.Duration) int {
-	seconds := int(math.Ceil(wait.Seconds()))
-	if seconds < minRetryAfterSeconds {
-		return minRetryAfterSeconds
-	}
-
-	return seconds
+	return path == routes.Health || strings.HasPrefix(path, routes.Health+"/")
 }

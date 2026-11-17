@@ -122,7 +122,7 @@ func (s *StubRepo) List(_ context.Context, filter models.ListFilter) ([]*models.
 		return matched[i].ID.String() > matched[j].ID.String()
 	})
 
-	offset := (filter.Page - 1) * filter.Limit
+	offset := filter.Offset
 	if offset > len(matched) {
 		offset = len(matched)
 	}
@@ -171,7 +171,7 @@ func (s *StubRepo) ListPublished(_ context.Context, filter models.ListFilter) ([
 		return matched[i].PublishedAt.After(*matched[j].PublishedAt)
 	})
 
-	offset := (filter.Page - 1) * filter.Limit
+	offset := filter.Offset
 	if offset > len(matched) {
 		offset = len(matched)
 	}

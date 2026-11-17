@@ -16,7 +16,8 @@ cp .env.example .env   # first run only: dev DB password, git-ignored
 docker compose up -d --build
 ```
 
-The API listens on `:8080`, PostgreSQL on `:5432`, Redis on `:6379`.
+The API listens on `:8080`, PostgreSQL on `127.0.0.1:5432`, Redis on `127.0.0.1:6379`
+(database ports are bound to loopback only).
 Migrations are embedded in the binary and applied automatically on startup.
 
 `go test ./...` can be run from the host; unit tests need nothing, repository
@@ -51,15 +52,25 @@ Authentication uses an opaque random token in the `mandat_admin_session` cookie.
 Only its SHA-256 hash is stored, in Redis (`admin:session:<hash>` keys with a TTL
 matching the session expiry); staff accounts stay in PostgreSQL, so role changes
 apply without re-login. Sessions last 12 hours and logout revokes them
-immediately. Restarting Redis logs everyone out; the legacy `admin_sessions`
-PostgreSQL table is no longer read or written. The cookie is `HttpOnly` and
-`SameSite=Lax`; set `http.secure_cookies: true` behind production HTTPS. Login is
-limited to ten attempts per client IP per five minutes.
+immediately; a per-user set (`admin:user:<id>:sessions`) lets `logout-all` revoke
+every session of the account. Restarting Redis logs everyone out; the legacy
+`admin_sessions` PostgreSQL table is no longer read or written. The cookie is
+`HttpOnly` and `SameSite=Lax`; set `http.secure_cookies: true` (or
+`HTTP_SECURE_COOKIES=true`) behind production HTTPS — startup fails when a
+non-local origin is allowed without secure cookies. State-changing requests under
+`/api/admin` and `/api/auth` sent from a browser must carry an `Origin` that is
+listed in `http.allowed_origins` (env `HTTP_ALLOWED_ORIGINS`) or matches the API
+host; otherwise they get `403`.
+
+Login attempts are limited in Redis per client IP (`ratelimit:login:ip:<client>`)
+and per account (`ratelimit:login:user:<login>`), by default 5 per 5 minutes each
+(`login_rate_limit` section). Over the limit login answers `429` with `Retry-After`.
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/auth/login` | Login with `{ "login", "password" }` and set the session cookie |
 | `POST` | `/api/auth/logout` | Revoke the current session and clear the cookie (`204`) |
+| `POST` | `/api/auth/logout-all` | Revoke every session of the current user and clear the cookie (`204`) |
 | `GET` | `/api/auth/me` | Return the current user's `id`, `login`, and `role` |
 
 ## Admin API
@@ -72,10 +83,13 @@ moderator session cookie. Cross-origin frontend requests must include credential
 | `POST` | `/api/admin/news` | Create an article |
 | `GET` | `/api/admin/news?page=&limit=&status=&category=` | Paginated list (newest first) |
 | `GET` | `/api/admin/news/:slug` | Get one article |
-| `PUT` | `/api/admin/news/:slug` | Update an article |
+| `PUT` | `/api/admin/news/:slug` | Update an article (the slug never changes) |
 | `DELETE` | `/api/admin/news/:slug` | Delete an article (`200 OK`, empty body) |
 
-`page` starts at 1, `limit` defaults to 20 and is capped at 100.
+`page` starts at 1, `limit` defaults to 20 and is capped at 100. List responses
+are `{ "items", "page", "limit", "has_more" }`; `has_more` is true when a next page exists.
+Cover uploads are checked by content before anything is written (the extension must
+match the image bytes, max 10 MB) and stored as `covers/<slug>-<random>.<ext>`.
 `status` accepts `draft` or `published`. `category` accepts `Новини`,
 `Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Економіка`, `Політика`, or
 `Регіональні новини`; an unknown value returns `400 Invalid input`.
@@ -98,7 +112,8 @@ and counter increments are atomic in PostgreSQL.
 
 Only articles with status `published` are returned, newest publication first.
 The response contains public article cards without the full text or administrative
-fields. `page` starts at 1, `limit` defaults to 20 and is capped at 100.
+fields. `page` starts at 1, `limit` defaults to 20 and is capped at 100; the list
+includes `has_more`.
 
 ## Health checks
 
@@ -135,7 +150,11 @@ The default empty list trusts nobody, so the peer address is used and spoofed
 Cloudflare ranges (https://www.cloudflare.com/ips/); add the address of any reverse
 proxy between Cloudflare and the API, and refresh the list if Cloudflare changes it —
 otherwise traffic from unlisted edges shares the limit of the edge IP.
-The same client IP drives the login attempt limit.
+The same client IP drives the per-IP login attempt limit.
+
+Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy` and a deny-all `Content-Security-Policy`; HSTS is added when
+`secure_cookies` is on, and `/api/admin` / `/api/auth` responses are `Cache-Control: no-store`.
 
 Errors are returned as:
 

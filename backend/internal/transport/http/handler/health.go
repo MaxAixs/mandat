@@ -7,6 +7,7 @@ import (
 	"github.com/maxaixs/mandat/backend/internal/service"
 	"github.com/maxaixs/mandat/backend/internal/transport/http"
 	"github.com/maxaixs/mandat/backend/internal/transport/http/dto"
+	"github.com/maxaixs/mandat/backend/internal/transport/http/routes"
 )
 
 // HealthHandler exposes liveness and readiness probes.
@@ -21,7 +22,7 @@ func NewHealthHandler(svc *service.HealthService) *HealthHandler {
 
 // Register binds the health check routes.
 func (h *HealthHandler) Register(r *gin.RouterGroup) {
-	health := r.Group("/health")
+	health := r.Group(routes.Health)
 	health.GET("/live", h.Live)
 	health.GET("/ready", h.Ready)
 }

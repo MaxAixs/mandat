@@ -72,6 +72,8 @@ func NewFuelService(httpClient HTTPClient, store FuelStore, logger *slog.Logger,
 
 // StartAutoRefresh refreshes rates every interval until ctx is done.
 func (s *FuelService) StartAutoRefresh(ctx context.Context, interval time.Duration) {
+	const fc = "fuelService_StartAutoRefresh"
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -81,7 +83,7 @@ func (s *FuelService) StartAutoRefresh(ctx context.Context, interval time.Durati
 			return
 		case <-ticker.C:
 			if err := s.Refresh(ctx); err != nil {
-				s.logger.ErrorContext(ctx, "failed to refresh fuel rates", "fc", "fuelService_StartAutoRefresh", "error", err)
+				s.logger.ErrorContext(ctx, "failed to refresh fuel rates", "fc", fc, "error", err)
 			}
 		}
 	}
