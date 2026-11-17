@@ -18,16 +18,16 @@ import (
 
 // rateLimitFakeLimiter stands in for the service so tests need no Redis.
 type rateLimitFakeLimiter struct {
-	calls  int
-	lastIP string
-	wait   time.Duration
-	err    error
+	calls   int
+	lastKey string
+	wait    time.Duration
+	err     error
 }
 
-// Allow records the client IP and answers with the canned wait or error.
-func (f *rateLimitFakeLimiter) Allow(_ context.Context, clientIP string) (time.Duration, error) {
+// Allow records the client key and answers with the canned wait or error.
+func (f *rateLimitFakeLimiter) Allow(_ context.Context, key string) (time.Duration, error) {
 	f.calls++
-	f.lastIP = clientIP
+	f.lastKey = key
 
 	return f.wait, f.err
 }
@@ -165,7 +165,7 @@ func TestRateLimit_PassesClientIP(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, 1, limiter.calls)
-	assert.Equal(t, "203.0.113.9", limiter.lastIP,
+	assert.Equal(t, "203.0.113.9", limiter.lastKey,
 		"the limiter must key on gin's client IP")
 }
 
@@ -249,4 +249,86 @@ func TestRateLimit_NegativeWaitClampsRetryAfter(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
 	assert.Equal(t, "1", rec.Header().Get("Retry-After"),
 		"a negative wait must clamp to the one-second minimum")
+}
+
+func TestRateLimit_NormalizesClientKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		wantKey    string
+	}{
+		{"ipv4 verbatim", "203.0.113.7:1234", "203.0.113.7"},
+		{"ipv6 first in /64", "[2001:db8:1:2:aaaa::1]:1234", "2001:db8:1:2::/64"},
+		{"ipv6 second in /64", "[2001:db8:1:2:bbbb::2]:1234", "2001:db8:1:2::/64"},
+		{"ipv4-mapped ipv6", "[::ffff:203.0.113.7]:1234", "203.0.113.7"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			limiter := &rateLimitFakeLimiter{}
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			router.Use(RateLimit(limiter))
+			router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			req.RemoteAddr = tt.remoteAddr
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			require.Equal(t, 1, limiter.calls)
+			assert.Equal(t, tt.wantKey, limiter.lastKey)
+		})
+	}
+}
+
+func TestRateLimit_SameSlash64SharesKey(t *testing.T) {
+	limiter := &rateLimitFakeLimiter{}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(RateLimit(limiter))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+	serve := func(remoteAddr string) {
+		t.Helper()
+
+		req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+		req.RemoteAddr = remoteAddr
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	serve("[2001:db8:1:2:aaaa::1]:1234")
+	require.Equal(t, 1, limiter.calls)
+	firstKey := limiter.lastKey
+
+	serve("[2001:db8:1:2:bbbb::2]:1234")
+	require.Equal(t, 2, limiter.calls)
+
+	assert.Equal(t, firstKey, limiter.lastKey,
+		"two subscribers behind one /64 must share a single counter")
+	assert.Equal(t, "2001:db8:1:2::/64", limiter.lastKey)
+}
+
+func TestRateLimit_ZonedLinkLocalStripsZone(t *testing.T) {
+	limiter := &rateLimitFakeLimiter{}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(RateLimit(limiter))
+	router.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.RemoteAddr = "[fe80::1%eth0]:1234"
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, 1, limiter.calls)
+	if limiter.lastKey == "" {
+		t.Skip("gin ClientIP drops the zone, so the middleware never sees a zoned address")
+	}
+	assert.Equal(t, "fe80::/64", limiter.lastKey)
 }

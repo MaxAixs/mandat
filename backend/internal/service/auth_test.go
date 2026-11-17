@@ -90,8 +90,8 @@ type loginLimiterStub struct {
 	err     error
 }
 
-// AllowKey records the call and answers with the canned wait or error.
-func (s *loginLimiterStub) AllowKey(_ context.Context, key string) (time.Duration, error) {
+// Allow records the call and answers with the canned wait or error.
+func (s *loginLimiterStub) Allow(_ context.Context, key string) (time.Duration, error) {
 	s.calls++
 	s.lastKey = key
 

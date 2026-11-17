@@ -130,75 +130,6 @@ func TestRateLimitService_Allow_DisabledNeverCallsStore(t *testing.T) {
 	assert.Zero(t, store.calls, "a disabled limiter must not touch the store")
 }
 
-func TestRateLimitService_Allow_NormalizesClientKey(t *testing.T) {
-	tests := []struct {
-		name      string
-		clientIP  string
-		wantKey   string
-		wantCalls int
-	}{
-		{"ipv4", "203.0.113.7", "global:203.0.113.7", 1},
-		{"ipv6 first in /64", "2001:db8:1:2:aaaa::1", "global:2001:db8:1:2::/64", 1},
-		{"ipv6 second in /64", "2001:db8:1:2:bbbb::2", "global:2001:db8:1:2::/64", 1},
-		{"unparsable verbatim", "not-an-ip", "global:not-an-ip", 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-			svc, _ := newRateLimitTestService(store, enabledRateLimitConfig())
-
-			_, err := svc.Allow(context.Background(), tt.clientIP)
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantCalls, store.calls)
-			assert.Equal(t, tt.wantKey, store.lastKey)
-			assert.Equal(t, time.Minute, store.lastWindow,
-				"the configured window must reach the store")
-		})
-	}
-}
-
-func TestRateLimitService_Allow_SameSlash64SharesKey(t *testing.T) {
-	store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-	svc, _ := newRateLimitTestService(store, enabledRateLimitConfig())
-
-	_, err := svc.Allow(context.Background(), "2001:db8:1:2:aaaa::1")
-	require.NoError(t, err)
-	firstKey := store.lastKey
-
-	_, err = svc.Allow(context.Background(), "2001:db8:1:2:bbbb::2")
-	require.NoError(t, err)
-
-	assert.Equal(t, firstKey, store.lastKey,
-		"two subscribers behind one /64 must share a single counter")
-	assert.Equal(t, "global:2001:db8:1:2::/64", store.lastKey)
-}
-
-func TestRateLimitService_Allow_NormalizesMappedAndZonedIPv6(t *testing.T) {
-	tests := []struct {
-		name     string
-		clientIP string
-		wantKey  string
-	}{
-		{"ipv4-mapped ipv6", "::ffff:203.0.113.7", "global:203.0.113.7"},
-		{"zoned link-local", "fe80::1%eth0", "global:fe80::/64"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-			svc, _ := newRateLimitTestService(store, enabledRateLimitConfig())
-
-			_, err := svc.Allow(context.Background(), tt.clientIP)
-
-			require.NoError(t, err)
-			assert.Equal(t, 1, store.calls)
-			assert.Equal(t, tt.wantKey, store.lastKey)
-		})
-	}
-}
-
 // rateLimitCtxErrStore answers with the context error, like a store
 // call interrupted by a client disconnect.
 type rateLimitCtxErrStore struct{}
@@ -240,64 +171,40 @@ func TestScopedRateLimitService_Allow_UsesScopePrefix(t *testing.T) {
 		"a scoped service must namespace its counters under the scope")
 }
 
-func TestScopedRateLimitService_Allow_MasksIPv6ToSlash64(t *testing.T) {
+func TestScopedRateLimitService_Allow_UsesKeyVerbatim(t *testing.T) {
 	tests := []struct {
-		name     string
-		clientIP string
-		wantKey  string
+		name string
+		key  string
+		want string
 	}{
-		{"first in /64", "2001:db8:1:2:aaaa::1", "login:ip:2001:db8:1:2::/64"},
-		{"second in /64", "2001:db8:1:2:bbbb::2", "login:ip:2001:db8:1:2::/64"},
+		{"case preserved", "Admin", "login:user:Admin"},
+		{"ipv6 looking key not masked", "2001:db8::1", "login:user:2001:db8::1"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-			svc, _ := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:ip")
+			svc, _ := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:user")
 
-			_, err := svc.Allow(context.Background(), tt.clientIP)
+			wait, err := svc.Allow(context.Background(), tt.key)
 
 			require.NoError(t, err)
+			assert.Zero(t, wait)
 			assert.Equal(t, 1, store.calls)
-			assert.Equal(t, tt.wantKey, store.lastKey,
-				"IPv6 clients of a scoped service are still masked to /64")
+			assert.Equal(t, tt.want, store.lastKey,
+				"Allow must keep the key verbatim, including its case")
 		})
 	}
 }
 
-func TestScopedRateLimitService_AllowKey_UsesScopeVerbatim(t *testing.T) {
-	store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-	svc, _ := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:user")
-
-	wait, err := svc.AllowKey(context.Background(), "Admin")
-
-	require.NoError(t, err)
-	assert.Zero(t, wait)
-	assert.Equal(t, 1, store.calls)
-	assert.Equal(t, "login:user:Admin", store.lastKey,
-		"AllowKey must keep the key verbatim, including its case")
-}
-
-func TestScopedRateLimitService_AllowKey_IPv6NotMasked(t *testing.T) {
-	store := &rateLimitFakeStore{count: 1, ttl: time.Minute}
-	svc, _ := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:user")
-
-	_, err := svc.AllowKey(context.Background(), "2001:db8::1")
-
-	require.NoError(t, err)
-	assert.Equal(t, 1, store.calls)
-	assert.Equal(t, "login:user:2001:db8::1", store.lastKey,
-		"AllowKey must not apply IP masking")
-}
-
-func TestScopedRateLimitService_AllowKey_OverLimit(t *testing.T) {
+func TestScopedRateLimitService_Allow_OverLimit(t *testing.T) {
 	store := &rateLimitFakeStore{
 		count: 301,
 		ttl:   25 * time.Second,
 	}
 	svc, _ := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:user")
 
-	wait, err := svc.AllowKey(context.Background(), "Admin")
+	wait, err := svc.Allow(context.Background(), "Admin")
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, errs.ErrTooManyRequests),
@@ -307,7 +214,7 @@ func TestScopedRateLimitService_AllowKey_OverLimit(t *testing.T) {
 	assert.Equal(t, "login:user:Admin", store.lastKey)
 }
 
-func TestScopedRateLimitService_AllowKey_DisabledNeverCallsStore(t *testing.T) {
+func TestScopedRateLimitService_Allow_DisabledNeverCallsStore(t *testing.T) {
 	store := &rateLimitFakeStore{count: 1000000, ttl: time.Hour}
 	svc, _ := newScopedRateLimitTestService(store, RateLimitConfig{
 		Enabled:  false,
@@ -315,21 +222,21 @@ func TestScopedRateLimitService_AllowKey_DisabledNeverCallsStore(t *testing.T) {
 		Window:   time.Minute,
 	}, "login:user")
 
-	wait, err := svc.AllowKey(context.Background(), "Admin")
+	wait, err := svc.Allow(context.Background(), "Admin")
 
 	require.NoError(t, err)
 	assert.Zero(t, wait)
 	assert.Zero(t, store.calls, "a disabled limiter must not touch the store")
 }
 
-func TestScopedRateLimitService_AllowKey_StoreErrorFailsOpen(t *testing.T) {
+func TestScopedRateLimitService_Allow_StoreErrorFailsOpen(t *testing.T) {
 	store := &rateLimitFakeStore{err: errors.New("redis is down")}
 	svc, handler := newScopedRateLimitTestService(store, enabledRateLimitConfig(), "login:user")
 
-	wait, err := svc.AllowKey(context.Background(), "Admin")
+	wait, err := svc.Allow(context.Background(), "Admin")
 
 	require.NoError(t, err, "a Redis failure must let the request through")
 	assert.Zero(t, wait)
-	assert.True(t, handler.hasFC("rateLimitService_AllowKey"),
+	assert.True(t, handler.hasFC("rateLimitService_Allow"),
 		"the fail-open must still be logged with the function context")
 }

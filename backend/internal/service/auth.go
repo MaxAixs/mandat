@@ -48,7 +48,7 @@ type SessionStore interface {
 
 // LoginAttemptLimiter throttles login attempts per account.
 type LoginAttemptLimiter interface {
-	AllowKey(ctx context.Context, key string) (time.Duration, error)
+	Allow(ctx context.Context, key string) (time.Duration, error)
 }
 
 // dummyPasswordHash is compared against when the login is unknown,
@@ -155,7 +155,7 @@ func (s *AuthService) checkAttemptLimit(ctx context.Context, login string) error
 		return nil
 	}
 
-	wait, err := s.limiter.AllowKey(ctx, strings.ToLower(login))
+	wait, err := s.limiter.Allow(ctx, strings.ToLower(login))
 	if err == nil {
 		return nil
 	}

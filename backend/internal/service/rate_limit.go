@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/netip"
 	"time"
 
 	"github.com/maxaixs/mandat/backend/internal/errs"
@@ -12,10 +11,6 @@ import (
 
 // globalRateLimitScope scopes the counters of the global per-client limit.
 const globalRateLimitScope = "global"
-
-// ipv6SubscriberBits is the prefix one IPv6 subscriber usually owns,
-// so rotating addresses inside it does not reset the limit.
-const ipv6SubscriberBits = 64
 
 // RateLimitStore is the counter storage used by RateLimitService.
 type RateLimitStore interface {
@@ -52,23 +47,12 @@ func NewScopedRateLimitService(
 	return &RateLimitService{store: store, logger: logger, cfg: cfg, scope: scope}
 }
 
-// Allow returns errs.ErrTooManyRequests together with the time to wait
-// when clientIP is over the limit. Store failures let the request through.
-func (s *RateLimitService) Allow(ctx context.Context, clientIP string) (time.Duration, error) {
+// Allow counts one request for key in the service scope and returns
+// errs.ErrTooManyRequests with the time to wait once key is over the limit.
+// Store failures let the request through.
+func (s *RateLimitService) Allow(ctx context.Context, key string) (time.Duration, error) {
 	const fc = "rateLimitService_Allow"
 
-	return s.hit(ctx, fc, clientKey(clientIP))
-}
-
-// AllowKey is Allow for an arbitrary key, used verbatim without IP masking.
-func (s *RateLimitService) AllowKey(ctx context.Context, key string) (time.Duration, error) {
-	const fc = "rateLimitService_AllowKey"
-
-	return s.hit(ctx, fc, key)
-}
-
-// hit counts one request for key in the service scope; fc names the caller in logs and errors.
-func (s *RateLimitService) hit(ctx context.Context, fc string, key string) (time.Duration, error) {
 	if !s.cfg.Enabled {
 		return 0, nil
 	}
@@ -90,20 +74,4 @@ func (s *RateLimitService) hit(ctx context.Context, fc string, key string) (time
 	}
 
 	return 0, nil
-}
-
-// clientKey identifies a client: IPv4 as is, IPv6 by its /64 prefix,
-// anything unparsable verbatim.
-func clientKey(clientIP string) string {
-	addr, err := netip.ParseAddr(clientIP)
-	if err != nil {
-		return clientIP
-	}
-
-	addr = addr.Unmap().WithZone("")
-	if addr.Is4() {
-		return addr.String()
-	}
-
-	return netip.PrefixFrom(addr, ipv6SubscriberBits).Masked().String()
 }
