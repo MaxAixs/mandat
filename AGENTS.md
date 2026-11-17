@@ -19,10 +19,12 @@ The superpowers workflow is unchanged; only the model performing each role diffe
 
 | Role | Model | Agent |
 |------|-------|-------|
-| Brainstorming, plans, code, coordination, fixing review findings | `opencode-go/muse-spark-1.3-contributor` | primary session |
-| Writing tests (RED step of TDD) | `opencode-go/deepseek-v4.1-flash` | `test-author` subagent |
-| Code review | `opencode-go/deepseek-v4.1-flash` | `reviewer` subagent |
+| Brainstorming, plans, code, coordination, fixing review findings | Claude (Claude Code) | primary session |
+| Writing tests (RED step of TDD) | `opencode-go/muse-spark-1.3-contributor` | `test-author` opencode agent |
+| Code review | `opencode-go/muse-spark-1.3-contributor` | `reviewer` opencode agent |
 
+- The primary session runs in Claude Code and dispatches the opencode agents from the repo root:
+  `opencode run --agent test-author "<task brief>"` and `opencode run --agent reviewer "<scope>"`.
 - Tests are never written by the primary agent: dispatch `test-author` before implementing a task.
 - `reviewer` writes its report to `.superpowers/reviews/*.txt` (git-ignored); the primary agent reads that file and fixes the findings.
 - Directory-specific routing rules live in the local `AGENTS.md` (see `backend/AGENTS.md`).
