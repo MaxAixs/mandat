@@ -1,32 +1,13 @@
 import MandatLogo from '@/components/MandatLogo'
 import SocialIcon from '@/components/SocialIcon'
-import { FOOTER_COPYRIGHT, FOOTER_LINKS, FOOTER_USAGE_NOTICE, SOCIAL_LINKS } from '@/constants'
+import { FOOTER_COPYRIGHT, FOOTER_LINKS, SOCIAL_LINKS } from '@/constants'
+import { cn } from '@/lib/utils'
 
 export default function Footer() {
   return (
     <footer className="border-t border-mandat-line bg-mandat-surface pt-14 pb-12">
       <div className="mx-auto max-w-[1240px] px-6">
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
-          {FOOTER_LINKS.map((column) => (
-            <div key={column.title}>
-              <h4 className="font-display text-[14px] tracking-[2px] uppercase mb-4">{column.title}</h4>
-              <ul className="grid gap-2.5 list-none p-0">
-                {column.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-mandat-muted text-[14px] hover:text-mandat-red-bright transition-colors no-underline"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-12 flex flex-col items-center border-t border-mandat-line pt-12 text-center">
+        <div className="flex flex-col items-center text-center">
           <a href="/" className="no-underline">
             <MandatLogo className="h-14 sm:h-[72px]" />
           </a>
@@ -49,10 +30,29 @@ export default function Footer() {
               </a>
             ))}
           </div>
+        </div>
 
-          <p className="mt-8 max-w-[640px] text-[13px] leading-relaxed text-mandat-muted">
-            {FOOTER_USAGE_NOTICE}
-          </p>
+        <div className="mt-4 grid grid-cols-2 gap-8 border-t border-mandat-line pt-4 sm:grid-cols-3 sm:gap-10">
+          {FOOTER_LINKS.map((column) => {
+            const wide = column.title === 'Розділи'
+            return (
+              <div key={column.title} className={cn(wide && 'sm:col-span-2')}>
+                <h4 className={cn('font-display text-[14px] tracking-[2px] uppercase mb-2', wide && 'text-center')} style={wide ? { transform: 'translateX(-30px)' } : undefined}>{column.title}</h4>
+                <ul className={cn('grid gap-2.5 list-none p-0', wide && 'sm:grid-cols-[auto_auto] sm:justify-center sm:gap-x-4')}>
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      <a
+                        href={link.href}
+                        className="text-mandat-muted text-[14px] hover:text-mandat-red-bright transition-colors no-underline"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
         </div>
       </div>
     </footer>

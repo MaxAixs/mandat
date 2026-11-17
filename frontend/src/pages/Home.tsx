@@ -16,6 +16,7 @@ const LATEST_NEWS_COUNT = 10
 const rateMeta: Record<string, { name: string; flag: string }> = {
   EUR: { name: 'Євро', flag: '🇪🇺' },
   USD: { name: 'Долар США', flag: '🇺🇸' },
+  GBP: { name: 'Фунт стерлінгів', flag: '🇬🇧' },
   PLN: { name: 'Злотий', flag: '🇵🇱' },
 }
 

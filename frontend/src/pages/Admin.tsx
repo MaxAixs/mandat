@@ -7,7 +7,6 @@ import {
   FileEdit,
   FileText,
   Globe,
-  Info,
   Landmark,
   LayoutDashboard,
   LoaderCircle,
@@ -20,6 +19,7 @@ import {
   Search,
   Star,
   Trash2,
+  TrendingUp,
   Volleyball,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -84,7 +84,7 @@ const mainEventIconByCategory: Record<Category, LucideIcon> = {
   'Міжнародні новини': Globe,
   Спорт: Volleyball,
   "Інтерв'ю": Mic,
-  'Про нас': Info,
+  'Економіка': TrendingUp,
   Політика: Landmark,
   'Регіональні новини': MapPin,
 }

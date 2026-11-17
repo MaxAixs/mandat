@@ -4,7 +4,6 @@ import AuthProvider from '@/components/auth/AuthProvider'
 import RequireAuth from '@/components/auth/RequireAuth'
 
 import Home from './pages/Home'
-import About from './pages/About'
 import Admin from './pages/Admin'
 import Login from './pages/Login'
 import Article from './pages/Article'
@@ -16,7 +15,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/economics" element={<CategoryPage category="Економіка" />} />
         <Route path="/sport" element={<CategoryPage category="Спорт" />} />
         <Route path="/international" element={<CategoryPage category="Міжнародні новини" />} />
         <Route path="/politics" element={<CategoryPage category="Політика" />} />

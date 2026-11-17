@@ -12,18 +12,16 @@ export const TELEGRAM_CHANNEL = {
 
 /** Legal lines shown at the very bottom of the footer. */
 export const FOOTER_COPYRIGHT = `© ${new Date().getFullYear()}, ${SITE_NAME}. Усі права захищено.`
-export const FOOTER_USAGE_NOTICE =
-  'Використання матеріалів сайту лише за умови посилання (для інтернет-видань — гіперпосилання) на «Мандат» не нижче третього абзацу.'
-
 /** Social profiles linked from the footer. */
 export const SOCIAL_LINKS = [
   { id: 'instagram', label: 'Instagram', href: '#' },
   { id: 'threads', label: 'Threads', href: '#' },
   { id: 'telegram', label: 'Telegram', href: TELEGRAM_CHANNEL.url },
+  { id: 'facebook', label: 'Facebook', href: '#' },
 ]
 
 /** Categories available for news articles. */
-export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Про нас', 'Політика', 'Регіональні новини']
+export const CATEGORIES: Category[] = ['Новини', 'Міжнародні новини', 'Спорт', 'Інтерв\'ю', 'Економіка', 'Політика', 'Регіональні новини']
 
 /** Header navigation. */
 export const NAV_LINKS: NavLink[] = [
@@ -33,20 +31,21 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'Регіональні новини', href: '/regional' },
   { label: 'Спорт', href: '/sport' },
   { label: 'Інтерв\'ю', href: '/interview' },
-  { label: 'Про нас', href: '/about' },
+  { label: 'Економіка', href: '/economics' },
 ]
 
-/** Footer link columns. The "Розділи" column mirrors the header navigation. */
+/** Footer link columns. The "Розділи" column mirrors the header navigation
+ * plus the full feed, keeping 8 links so the footer renders them 2×4. */
 export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
   {
     title: 'Розділи',
-    links: NAV_LINKS,
+    links: [...NAV_LINKS, { label: 'Всі новини', href: '/news' }],
   },
   {
     title: 'Про проєкт',
     links: [
-      { label: 'Про нас', href: '/about' },
       { label: 'Редакційна політика', href: '#' },
+      { label: 'Умови використання матеріалів', href: '#' },
       { label: 'Реклама', href: '#' },
       { label: 'Контакти', href: '#' },
     ],

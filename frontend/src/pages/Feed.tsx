@@ -12,12 +12,11 @@ import type { Category } from '@/types'
 
 type FeedFilter = Category | null
 
-// Rubric filter buttons: every news rubric except «Про нас» (an about page,
-// not news). Single source is CATEGORIES, so the next rubric appears here
-// automatically.
+// Rubric filter buttons: every news rubric. Single source is CATEGORIES,
+// so the next rubric appears here automatically.
 const FILTERS: { label: string; value: FeedFilter }[] = [
   { label: 'Всі новини', value: null },
-  ...CATEGORIES.filter((c) => c !== 'Про нас').map((c) => ({ label: c, value: c })),
+  ...CATEGORIES.map((c) => ({ label: c, value: c })),
 ]
 
 export default function Feed() {
