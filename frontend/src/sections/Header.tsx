@@ -21,10 +21,10 @@ export default function Header() {
   }, [pathname])
 
   return (
-    <header
-      className="sticky top-0 z-50 border-b border-mandat-line"
-      style={{ background: 'color-mix(in srgb, var(--mandat-bg) 92%, transparent)', backdropFilter: 'blur(12px)' }}
-    >
+    // Mobile: solid background on its own compositing layer. iOS WebKit repaints a
+    // translucent sticky header with backdrop-filter late during momentum scroll,
+    // so it visibly lags and page text shows through. The blur stays on desktop.
+    <header className="sticky top-0 z-50 transform-gpu border-b border-mandat-line bg-mandat-bg lg:transform-none lg:bg-[color-mix(in_srgb,var(--mandat-bg)_92%,transparent)] lg:backdrop-blur-[12px]">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 lg:gap-x-6 h-[60px] lg:h-[95px]">
           <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-center lg:justify-self-start">
