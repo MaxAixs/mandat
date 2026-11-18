@@ -44,7 +44,7 @@ export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
   {
     title: 'Про проєкт',
     links: [
-      { label: 'Редакційна політика', href: '#' },
+      { label: 'Принципи та правила', href: '/rules' },
       { label: 'Умови використання матеріалів', href: '#' },
       { label: 'Реклама', href: '#' },
       { label: 'Контакти', href: '#' },

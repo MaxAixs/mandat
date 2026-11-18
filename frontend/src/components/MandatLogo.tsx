@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils'
 
 interface MandatLogoProps {
   className?: string
+  /** Overrides the red bar fill, e.g. `fill-white` on a red background. */
+  barClassName?: string
 }
 
 /** Letter outlines of the «МАНДАТ» wordmark, traced from the brand logo. */
@@ -14,7 +16,7 @@ const WORDMARK_PATH =
  * Transparent background and crisp at any size — set the height through
  * `className` (e.g. `h-9`); the width follows the aspect ratio.
  */
-export default function MandatLogo({ className }: MandatLogoProps) {
+export default function MandatLogo({ className, barClassName }: MandatLogoProps) {
   return (
     <svg
       viewBox="0 0 1814 333"
@@ -23,7 +25,7 @@ export default function MandatLogo({ className }: MandatLogoProps) {
       className={cn('block h-10 w-auto', className)}
     >
       <path d={WORDMARK_PATH} className="fill-white" />
-      <rect x="550" y="284" width="707" height="49" rx="24" className="fill-mandat-red" />
+      <rect x="550" y="284" width="707" height="49" rx="24" className={cn('fill-mandat-red', barClassName)} />
     </svg>
   )
 }
