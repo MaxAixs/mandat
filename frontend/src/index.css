@@ -256,6 +256,15 @@
     --mandat-muted: #8A8D91;
   }
 
+  /* Mobile and tablet (below Tailwind `lg`): a slightly darker background. */
+  @media (max-width: 1023px) {
+    :root {
+      --mandat-bg: #101114;
+      --mandat-surface: #17191D;
+      --mandat-surface-2: #1D2025;
+    }
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     font-size: 16px;

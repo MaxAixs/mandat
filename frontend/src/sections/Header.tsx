@@ -1,23 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, NavLink, useLocation } from 'react-router'
 
 import SearchBox from '@/components/SearchBox'
 import MandatLogo from '@/components/MandatLogo'
+import { cn } from '@/lib/utils'
 import { NAV_LINKS } from '@/constants'
 
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
+  const { pathname } = useLocation()
+  const mobileNavRef = useRef<HTMLElement>(null)
+
+  // Keep the active rubric in view in the horizontally scrolling mobile nav.
+  useEffect(() => {
+    const nav = mobileNavRef.current
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!nav || !active) return
+    nav.scrollLeft = active.offsetLeft - nav.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2
+  }, [pathname])
 
   return (
     <header
       className="sticky top-0 z-50 border-b border-mandat-line"
-      style={{ background: 'rgba(23,25,28,0.92)', backdropFilter: 'blur(12px)' }}
+      style={{ background: 'color-mix(in srgb, var(--mandat-bg) 92%, transparent)', backdropFilter: 'blur(12px)' }}
     >
-      <div className="w-full px-8">
-        <div className="grid grid-cols-[auto_1fr_auto] lg:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 lg:gap-x-6 h-[95px]">
-          <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-start">
-            <MandatLogo className="h-9 shrink-0" />
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 lg:gap-x-6 h-[60px] lg:h-[95px]">
+          <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-center lg:justify-self-start">
+            <MandatLogo className="h-7 shrink-0 lg:h-9" />
           </Link>
 
           <nav className="hidden lg:flex min-w-0 gap-2 xl:gap-4 min-[1440px]:gap-5 min-[1680px]:gap-7 justify-self-center">
@@ -37,7 +48,7 @@ export default function Header() {
               <SearchBox />
             </div>
           </div>
-          <div className="xl:hidden justify-self-end">
+          <div className="hidden lg:block xl:hidden justify-self-end">
             <button
               type="button"
               onClick={() => setSearchOpen((prev) => !prev)}
@@ -49,8 +60,31 @@ export default function Header() {
             </button>
           </div>
         </div>
+        <nav
+          ref={mobileNavRef}
+          aria-label="Рубрики"
+          className="lg:hidden -mx-4 flex gap-5 overflow-x-auto overscroll-x-contain border-t border-mandat-line px-4 sm:-mx-6 sm:gap-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.label}
+              to={link.href}
+              end
+              className={({ isActive }) =>
+                cn(
+                  'relative shrink-0 whitespace-nowrap py-3 font-header text-[13px] font-medium uppercase tracking-[0.5px] no-underline transition-colors',
+                  isActive
+                    ? 'text-white after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-mandat-red-bright'
+                    : 'text-mandat-muted hover:text-mandat-text',
+                )
+              }
+            >
+              {link.shortLabel ?? link.label}
+            </NavLink>
+          ))}
+        </nav>
         {searchOpen && (
-          <div className="xl:hidden pb-4">
+          <div className="hidden lg:block xl:hidden py-3">
             <SearchBox autoFocus onNavigate={() => setSearchOpen(false)} />
           </div>
         )}

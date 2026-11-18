@@ -27,8 +27,8 @@ export const CATEGORIES: Category[] = ['Новини', 'Міжнародні н�
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '/' },
   { label: 'Політика', href: '/politics' },
-  { label: 'Міжнародні новини', href: '/international' },
-  { label: 'Регіональні новини', href: '/regional' },
+  { label: 'Міжнародні новини', shortLabel: 'Міжнародні', href: '/international' },
+  { label: 'Регіональні новини', shortLabel: 'Регіональні', href: '/regional' },
   { label: 'Спорт', href: '/sport' },
   { label: 'Інтерв\'ю', href: '/interview' },
   { label: 'Економіка', href: '/economics' },

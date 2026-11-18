@@ -58,6 +58,8 @@ export interface StatItem {
 export interface NavLink {
   label: string
   href: string
+  /** Shorter label for the compact mobile header nav. */
+  shortLabel?: string
 }
 
 /** Staff role returned by the authentication API. */
