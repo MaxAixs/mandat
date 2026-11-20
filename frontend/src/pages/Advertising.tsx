@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { ArrowUpRight } from 'lucide-react'
 
+import AdvertisingFormatCard from '@/components/AdvertisingFormatCard'
 import HeadingMarker from '@/components/HeadingMarker'
 import MandatLogo from '@/components/MandatLogo'
 import SocialIcon from '@/components/SocialIcon'
@@ -12,7 +12,6 @@ import {
   ADVERTISING_EMAIL,
   ADVERTISING_FORMATS,
   ADVERTISING_FORMATS_LEAD,
-  ADVERTISING_FORMATS_QUESTION,
   ADVERTISING_FORMATS_TITLE,
   ADVERTISING_LEAD,
   ADVERTISING_ORDER_LABEL,
@@ -95,25 +94,18 @@ export default function Advertising() {
           <HeadingMarker />
           {ADVERTISING_FORMATS_TITLE}
         </h2>
-        <div className="mt-8 border border-mandat-line bg-mandat-surface p-5 md:p-10">
-          <p className="max-w-[760px] text-[16px] leading-relaxed text-mandat-muted">
-            {ADVERTISING_FORMATS_LEAD}
-          </p>
-          <h3 className="mt-8 text-[16px] font-semibold text-white">{ADVERTISING_FORMATS_QUESTION}</h3>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-            {ADVERTISING_FORMATS.map((format) => (
-              <a
-                key={format}
-                href={`mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(`${ADVERTISING_ORDER_SUBJECT}: ${format}`)}`}
-                aria-label={`${ADVERTISING_ORDER_LABEL}: ${format}`}
-                className="flex min-h-[96px] flex-col justify-between gap-3 bg-mandat-red p-4 text-[14px] font-medium leading-snug text-white no-underline transition-colors hover:bg-mandat-red-bright sm:min-h-[112px] sm:p-5 sm:text-[15px]"
-              >
-                <span>{format}</span>
-                <ArrowUpRight className="size-5 self-end opacity-80" strokeWidth={1.5} aria-hidden="true" />
-              </a>
-            ))}
-          </div>
+        <p className="mt-4 max-w-[760px] text-[16px] leading-relaxed text-mandat-muted md:text-[17px]">
+          {ADVERTISING_FORMATS_LEAD}
+        </p>
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {ADVERTISING_FORMATS.map((format) => (
+            <AdvertisingFormatCard
+              key={format.id}
+              format={format}
+              href={`mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(`${ADVERTISING_ORDER_SUBJECT}: ${format.title}`)}`}
+              ariaLabel={`${ADVERTISING_ORDER_LABEL}: ${format.title}`}
+            />
+          ))}
         </div>
       </main>
 
