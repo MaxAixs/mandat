@@ -30,6 +30,7 @@ type errMapping struct {
 // It is ordered: the first sentinel found in the error chain wins.
 var errResps = []errMapping{
 	{errs.ErrNewsNotFound, ErrResp{Status: http.StatusNotFound, Message: "News article not found"}},
+	{errs.ErrAdFormatNotFound, ErrResp{Status: http.StatusNotFound, Message: "Ad format not found"}},
 	{errs.ErrPayloadTooLarge, ErrResp{Status: http.StatusRequestEntityTooLarge, Message: "Request payload too large"}},
 	{errs.ErrInvalidInput, ErrResp{Status: http.StatusBadRequest, Message: "Invalid input"}},
 	{errs.ErrConflict, ErrResp{Status: http.StatusConflict, Message: "Resource conflict"}},

@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrNewsNotFound       = errors.New("news not found")
+	ErrAdFormatNotFound   = errors.New("ad format not found")
 	ErrInvalidInput       = errors.New("invalid input")
 	ErrConflict           = errors.New("resource conflict")
 	ErrPayloadTooLarge    = errors.New("payload too large")

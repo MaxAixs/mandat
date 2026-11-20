@@ -97,6 +97,18 @@ func run() error {
 		middleware.RequireAuth(authService),
 		middleware.RequireRoles(models.RoleAdmin, models.RoleModerator),
 	)
+	adFormatService := service.NewAdFormatService(
+		newsrepo.NewAdFormatRepo(pool),
+		log,
+		r2client,
+		cfg.Storage.PublicBase(),
+	)
+	adFormatHandler := handler.NewAdFormatHandler(
+		adFormatService,
+		middleware.RequireAuth(authService),
+		middleware.RequireRoles(models.RoleAdmin, models.RoleModerator),
+	)
+	publicAdFormatHandler := handler.NewPublicAdFormatHandler(adFormatService)
 	viewerMiddleware := middleware.EnsureViewer(cfg.HTTP.SecureCookies)
 	publicNewsHandler := handler.NewPublicNewsHandler(newsService, viewerMiddleware)
 	viewService := service.NewViewService(newsrepo.NewViewRepo(pool), log)
@@ -143,6 +155,8 @@ func run() error {
 		authHandler,
 		newsHandler,
 		publicNewsHandler,
+		adFormatHandler,
+		publicAdFormatHandler,
 		viewHandler,
 		healthHandler,
 		runningLineHandler,

@@ -9,10 +9,14 @@ const (
 	AdminBase = API + "/admin"
 	// AdminNews is the root of the news administration endpoints.
 	AdminNews = AdminBase + "/news"
+	// AdminAdFormats is the root of the ad format card administration endpoints.
+	AdminAdFormats = AdminBase + "/ad-formats"
 	// Auth is the root of the staff authentication endpoints.
 	Auth = API + "/auth"
 	// PublicNews is the root of the public news endpoints.
 	PublicNews = API + "/news"
+	// PublicAdFormats lists the ad format cards of the advertising page.
+	PublicAdFormats = API + "/ad-formats"
 	// Health is the root of the liveness and readiness probes.
 	Health = "/health"
 )

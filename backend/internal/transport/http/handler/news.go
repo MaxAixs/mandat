@@ -191,7 +191,7 @@ func (h *NewsHandler) bindInput(c *gin.Context) (service.NewsInput, error) {
 
 	input := req.ToInput()
 
-	cover, err := openCover(form)
+	cover, err := openUpload(form, "cover")
 	if err != nil {
 		return service.NewsInput{}, err
 	}
@@ -230,11 +230,11 @@ func parseBoolField(raw string) (bool, error) {
 	return value, nil
 }
 
-// openCover extracts the optional cover file part. A missing part is not
-// an error; the caller closes the returned body after the service call.
+// openUpload extracts the optional image file part named field. A missing part
+// is not an error; the caller closes the returned body after the service call.
 // Oversized files fail here, before the service reads them.
-func openCover(form *multipart.Form) (*service.CoverUpload, error) {
-	files := form.File["cover"]
+func openUpload(form *multipart.Form, field string) (*service.CoverUpload, error) {
+	files := form.File[field]
 	if len(files) == 0 {
 		return nil, nil
 	}

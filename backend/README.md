@@ -94,12 +94,26 @@ match the image bytes, max 10 MB) and stored as `covers/<slug>-<random>.<ext>`.
 `Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Економіка`, `Політика`, or
 `Регіональні новини`; an unknown value returns `400 Invalid input`.
 
+Ad format cards of the `/advertising` page (same roles as news):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/ad-formats` | All cards in display order, `{ "items" }` |
+| `POST` | `/api/admin/ad-formats` | Create a card at the end (multipart: `title`, `description`, optional file `image`) |
+| `PUT` | `/api/admin/ad-formats/:id` | Update text; a new `image` replaces the old one, `remove_image=true` clears it |
+| `DELETE` | `/api/admin/ad-formats/:id` | Delete a card and its image (`200 OK`, empty body) |
+| `POST` | `/api/admin/ad-formats/:id/move` | Swap with the neighbour: `{ "direction": "up" \| "down" }`; no neighbour is a no-op |
+
+`title` is 1–80 characters, `description` at most 240. Images follow the cover rules
+and are stored as `ad-formats/<id>-<random>.<ext>`; replaced and deleted images are removed.
+
 ## Public API
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/news?page=&limit=&category=` | Paginated published articles for the public site (same `category` values as the admin API) |
 | `GET` | `/api/news/search?q=&limit=` | Live title suggestions over published articles, newest first (default limit 7, max 20; empty `q` returns an empty list) |
+| `GET` | `/api/ad-formats` | Ad format cards of the advertising page in display order, `{ "items" }` |
 | `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
 | `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |
 
