@@ -1,4 +1,4 @@
-const FUEL_API_URL = 'http://localhost:8080/api/fuel'
+const FUEL_API_URL = '/api/fuel'
 
 export interface FuelRateItem {
   code: string

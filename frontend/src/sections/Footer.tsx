@@ -32,20 +32,20 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-8 border-t border-mandat-line pt-4 sm:grid-cols-3 sm:gap-10">
+        <div className="mt-4 grid grid-cols-2 gap-8 border-t border-mandat-line pt-4 sm:grid-cols-3 sm:gap-x-[1.5cm] sm:gap-y-10">
           {FOOTER_LINKS.map((column) => {
             const wide = column.title === 'Розділи'
             return (
               <div key={column.title} className={cn(wide && 'sm:col-span-2')}>
-                <h4 className={cn('font-display text-[14px] tracking-[2px] uppercase mb-2', wide && 'text-center')} style={wide ? { transform: 'translateX(-30px)' } : undefined}>{column.title}</h4>
-                <ul className={cn('grid gap-2.5 list-none p-0', wide && 'sm:grid-cols-[auto_auto] sm:justify-center sm:gap-x-4')}>
+                <h4 className="font-display text-[14px] tracking-[2px] uppercase mb-2">{column.title}</h4>
+                <ul className={cn('grid gap-2.5 list-none p-0', wide && 'sm:grid-flow-col sm:grid-rows-4 sm:justify-start sm:gap-x-4')}>
                   {column.links.map((link) => (
                     <li key={link.label}>
                       <a
                         href={link.href}
                         className="text-mandat-muted text-[14px] hover:text-mandat-red-bright transition-colors no-underline"
                       >
-                        {link.label}
+                        {link.shortLabel ?? link.label}
                       </a>
                     </li>
                   ))}

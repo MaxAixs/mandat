@@ -1,6 +1,6 @@
 import type { AuthUser } from '@/types'
 
-const AUTH_API_URL = 'http://localhost:8080/api/auth'
+const AUTH_API_URL = '/api/auth'
 
 interface ApiErrorPayload {
   error?: {

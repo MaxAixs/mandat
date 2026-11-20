@@ -10,6 +10,7 @@ import Article from './pages/Article'
 import CategoryPage from './pages/Category'
 import Feed from './pages/Feed'
 import Rules from './pages/Rules'
+import Advertising from './pages/Advertising'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/interview" element={<CategoryPage category="Інтерв'ю" />} />
         <Route path="/news" element={<Feed />} />
         <Route path="/rules" element={<Rules />} />
+        <Route path="/advertising" element={<Advertising />} />
         <Route path="/news/:slug" element={<Article />} />
         <Route path="/admin/login" element={<Login />} />
         <Route

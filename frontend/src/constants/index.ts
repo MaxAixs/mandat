@@ -27,27 +27,25 @@ export const CATEGORIES: Category[] = ['Новини', 'Міжнародні н�
 export const NAV_LINKS: NavLink[] = [
   { label: 'Новини', href: '/' },
   { label: 'Політика', href: '/politics' },
+  { label: 'Економіка', href: '/economics' },
   { label: 'Міжнародні новини', shortLabel: 'Міжнародні', href: '/international' },
   { label: 'Регіональні новини', shortLabel: 'Регіональні', href: '/regional' },
-  { label: 'Спорт', href: '/sport' },
   { label: 'Інтерв\'ю', href: '/interview' },
-  { label: 'Економіка', href: '/economics' },
+  { label: 'Спорт', href: '/sport' },
 ]
 
-/** Footer link columns. The "Розділи" column mirrors the header navigation
- * plus the full feed, keeping 8 links so the footer renders them 2×4. */
+/** Footer link columns. The "Розділи" column mirrors the header navigation. */
 export const FOOTER_LINKS: { title: string; links: NavLink[] }[] = [
-  {
-    title: 'Розділи',
-    links: [...NAV_LINKS, { label: 'Всі новини', href: '/news' }],
-  },
   {
     title: 'Про проєкт',
     links: [
-      { label: 'Принципи та правила', href: '/rules' },
-      { label: 'Умови використання матеріалів', href: '#' },
-      { label: 'Реклама', href: '#' },
+      { label: 'Умови використання матеріалів', href: '/rules' },
+      { label: 'Реклама', href: '/advertising' },
       { label: 'Контакти', href: '#' },
     ],
+  },
+  {
+    title: 'Розділи',
+    links: NAV_LINKS,
   },
 ]

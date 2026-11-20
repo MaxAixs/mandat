@@ -9,6 +9,11 @@ export default defineConfig({
   plugins: [inspectAttr(), react()],
   server: {
     port: 3000,
+    // Same-origin API in dev: the phone-facing ngrok tunnel forwards only
+    // this port, so `/api/*` is proxied to the backend on :8080.
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
   },
   resolve: {
     alias: {

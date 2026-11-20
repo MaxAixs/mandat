@@ -1,4 +1,4 @@
-const EXCHANGE_API_URL = 'http://localhost:8080/api/exchange'
+const EXCHANGE_API_URL = '/api/exchange'
 
 export interface ExchangeRateItem {
   code: string

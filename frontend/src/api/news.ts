@@ -1,7 +1,7 @@
 import type { AdminNews, Category, NewsFormValues, NewsStatus } from '@/types'
 
-const NEWS_API_URL = 'http://localhost:8080/api/admin/news'
-const PUBLIC_NEWS_API_URL = 'http://localhost:8080/api/news'
+const NEWS_API_URL = '/api/admin/news'
+const PUBLIC_NEWS_API_URL = '/api/news'
 
 // DEFAULT_SEARCH_LIMIT is the suggestion count used by the header search box.
 export const DEFAULT_SEARCH_LIMIT = 7

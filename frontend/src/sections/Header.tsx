@@ -20,14 +20,10 @@ export default function Header() {
     nav.scrollLeft = active.offsetLeft - nav.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2
   }, [pathname])
 
+  // Mobile: the header stays at the top of the page and scrolls away with it.
+  // Desktop: sticky with a translucent blurred background.
   return (
-    // Mobile: solid background on its own compositing layer. iOS WebKit repaints a
-    // translucent sticky header with backdrop-filter late during momentum scroll,
-    // so it visibly lags and page text shows through. The blur stays on desktop.
-    // The ::before block extends the background upwards: iOS draws the page under
-    // its floating status/address bar, above where the sticky header pins, and
-    // scrolling text would otherwise be visible in that gap.
-    <header className="sticky top-0 z-50 transform-gpu border-b border-mandat-line bg-mandat-bg before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-[100vh] before:bg-mandat-bg before:content-[''] lg:transform-none lg:bg-[color-mix(in_srgb,var(--mandat-bg)_92%,transparent)] lg:backdrop-blur-[12px] lg:before:hidden">
+    <header className="relative top-0 z-50 border-b border-mandat-line bg-mandat-bg lg:sticky lg:bg-[color-mix(in_srgb,var(--mandat-bg)_92%,transparent)] lg:backdrop-blur-[12px]">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 lg:gap-x-6 h-[60px] lg:h-[95px]">
           <Link to="/" className="flex min-w-0 items-center gap-4 no-underline text-mandat-text justify-self-center lg:justify-self-start">
@@ -39,9 +35,9 @@ export default function Header() {
               <Link
                 key={link.label}
                 to={link.href}
-                className="relative font-header text-[14px] min-[1440px]:text-[16px] min-[1680px]:text-[18px] font-medium tracking-[0.5px] min-[1680px]:tracking-[1px] uppercase whitespace-nowrap py-2.5 group text-mandat-text"
+                className="relative font-header text-[16px] min-[1440px]:text-[18px] min-[1680px]:text-[20px] font-medium tracking-[0.5px] min-[1680px]:tracking-[1px] whitespace-nowrap py-2.5 group text-mandat-text"
               >
-                {link.label}
+                {link.shortLabel ?? link.label}
                 <span className="absolute left-0 bottom-0 h-[2px] w-0 bg-mandat-red-bright transition-all duration-250 group-hover:w-full" />
               </Link>
             ))}
@@ -66,7 +62,7 @@ export default function Header() {
         <nav
           ref={mobileNavRef}
           aria-label="Рубрики"
-          className="lg:hidden -mx-4 flex gap-5 overflow-x-auto overscroll-x-contain border-t border-mandat-line px-4 sm:-mx-6 sm:gap-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="lg:hidden -mx-4 flex h-[46px] items-center gap-5 overflow-x-auto overscroll-x-contain border-t border-mandat-line px-4 sm:-mx-6 sm:gap-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {NAV_LINKS.map((link) => (
             <NavLink
@@ -75,7 +71,7 @@ export default function Header() {
               end
               className={({ isActive }) =>
                 cn(
-                  'relative shrink-0 whitespace-nowrap py-3 font-header text-[13px] font-medium uppercase tracking-[0.5px] no-underline transition-colors',
+                  'relative shrink-0 whitespace-nowrap py-3 font-header text-[13px] font-medium tracking-[0.5px] no-underline transition-colors',
                   isActive
                     ? 'text-white after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-mandat-red-bright'
                     : 'text-mandat-muted hover:text-mandat-text',
