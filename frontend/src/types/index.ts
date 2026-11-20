@@ -99,3 +99,23 @@ export interface AdminNews extends NewsFormValues {
   created_at: string
   updated_at: string
 }
+
+/** An ad format card of the advertising page, managed from the admin panel. */
+export interface AdFormat {
+  id: string
+  title: string
+  description: string
+  /** Empty when the card has no image. */
+  image_url: string
+  position: number
+}
+
+/** Editable fields of an ad format card. A new `image` replaces the current one. */
+export interface AdFormatFormValues {
+  title: string
+  description: string
+  image?: File | null
+  removeImage?: boolean
+}
+
+export type AdFormatMoveDirection = 'up' | 'down'

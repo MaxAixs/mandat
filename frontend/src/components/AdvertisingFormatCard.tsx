@@ -1,9 +1,9 @@
 import { ArrowUpRight } from 'lucide-react'
 
-import type { AdvertisingFormat } from '@/constants/advertising'
+import type { AdFormat } from '@/types'
 
 interface AdvertisingFormatCardProps {
-  format: AdvertisingFormat
+  format: AdFormat
   href: string
   ariaLabel: string
 }
@@ -16,9 +16,9 @@ export default function AdvertisingFormatCard({ format, href, ariaLabel }: Adver
       aria-label={ariaLabel}
       className="group relative isolate flex min-h-[260px] flex-col justify-end overflow-hidden border border-mandat-line bg-mandat-surface-2 p-5 no-underline transition-colors hover:border-mandat-red-bright focus-visible:border-mandat-red-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mandat-red-bright sm:min-h-[320px] sm:p-6"
     >
-      {format.image ? (
+      {format.image_url ? (
         <img
-          src={format.image}
+          src={format.image_url}
           alt=""
           loading="lazy"
           className="absolute inset-0 -z-20 size-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"

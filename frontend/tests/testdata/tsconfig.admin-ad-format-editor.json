@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-admin-ad-format-editor-tests"
+  },
+  "include": ["../admin-ad-format-editor.test.tsx"]
+}

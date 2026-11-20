@@ -56,7 +56,7 @@ test('listNews builds pagination and status query', async () => {
 
   assert.equal(
     requestedUrl,
-    'http://localhost:8080/api/admin/news?page=2&limit=20&status=published',
+    '/api/admin/news?page=2&limit=20&status=published',
   )
   assert.deepEqual(result, { items: [], page: 2, limit: 20 })
 })
@@ -70,7 +70,7 @@ test('listNews omits an empty status filter', async () => {
 
   await listNews(1, 20)
 
-  assert.equal(requestedUrl, 'http://localhost:8080/api/admin/news?page=1&limit=20')
+  assert.equal(requestedUrl, '/api/admin/news?page=1&limit=20')
 })
 
 test('listNews sends the category filter after the status filter', async () => {
@@ -84,9 +84,9 @@ test('listNews sends the category filter after the status filter', async () => {
 
   assert.equal(
     requestedUrl,
-    `http://localhost:8080/api/admin/news?page=1&limit=20&status=published&category=${SPORT_CATEGORY_ENCODED}`,
+    `/api/admin/news?page=1&limit=20&status=published&category=${SPORT_CATEGORY_ENCODED}`,
   )
-  assert.equal(new URL(requestedUrl).searchParams.get('category'), 'Спорт')
+  assert.equal(new URL(requestedUrl, 'http://localhost').searchParams.get('category'), 'Спорт')
 })
 
 test('listNews sends the category without a status filter', async () => {
@@ -100,10 +100,10 @@ test('listNews sends the category without a status filter', async () => {
 
   assert.equal(
     requestedUrl,
-    `http://localhost:8080/api/admin/news?page=2&limit=20&category=${SPORT_CATEGORY_ENCODED}`,
+    `/api/admin/news?page=2&limit=20&category=${SPORT_CATEGORY_ENCODED}`,
   )
   assert.equal(
-    new URL(requestedUrl).searchParams.has('status'),
+    new URL(requestedUrl, 'http://localhost').searchParams.has('status'),
     false,
     'an absent status must not be serialised',
   )
@@ -118,7 +118,7 @@ test('createNews sends a POST JSON payload', async () => {
 
   await createNews(payload)
 
-  assert.equal(request?.url, 'http://localhost:8080/api/admin/news')
+  assert.equal(request?.url, '/api/admin/news')
   assert.equal(request?.init?.method, 'POST')
   assert.deepEqual(request?.init?.headers, { 'Content-Type': 'application/json' })
   assert.equal(request?.init?.body, JSON.stringify(payload))
@@ -141,7 +141,7 @@ test('updateNews encodes the slug and sends PUT', async () => {
 
   assert.equal(
     request?.url,
-    'http://localhost:8080/api/admin/news/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B0%2F1',
+    '/api/admin/news/%D0%BD%D0%BE%D0%B2%D0%B8%D0%BD%D0%B0%2F1',
   )
   assert.equal(request?.init?.method, 'PUT')
 
@@ -172,7 +172,7 @@ test('deleteNews sends DELETE and accepts an empty response', async () => {
 
   await deleteNews('test-slug')
 
-  assert.equal(request?.url, 'http://localhost:8080/api/admin/news/test-slug')
+  assert.equal(request?.url, '/api/admin/news/test-slug')
   assert.equal(request?.init?.method, 'DELETE')
 })
 

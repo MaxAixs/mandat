@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   LogOut,
   MapPin,
+  Megaphone,
   Mic,
   Newspaper,
   Plus,
@@ -31,8 +32,10 @@ import {
   listNews,
   updateNews,
 } from '@/api/news'
+import AdFormatsPanel from '@/components/admin/AdFormatsPanel'
 import NewsEditorDialog from '@/components/admin/NewsEditorDialog'
 import { CATEGORIES } from '@/constants'
+import { ADVERTISING_ADMIN_SECTION } from '@/constants/advertising'
 import useAuth from '@/hooks/use-auth'
 import {
   AlertDialog,
@@ -64,6 +67,13 @@ import {
 import type { AdminNews, Category, NewsFormValues } from '@/types'
 
 const PAGE_SIZE = 20
+
+type AdminSection = 'news' | 'ads'
+
+const ADMIN_SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
+  { id: 'news', label: 'Керування новинами', icon: Newspaper },
+  { id: 'ads', label: 'Формати реклами', icon: Megaphone },
+]
 
 const dateFormatter = new Intl.DateTimeFormat('uk-UA', {
   day: '2-digit',
@@ -103,11 +113,46 @@ function MainEventBadge({ category }: { category: Category }) {
   )
 }
 
+interface AdminSectionNavProps {
+  active: AdminSection
+  onSelect: (section: AdminSection) => void
+  className: string
+}
+
+/** Switches the admin panel between news and ad formats: sidebar on desktop, a tab row on mobile. */
+function AdminSectionNav({ active, onSelect, className }: AdminSectionNavProps) {
+  return (
+    <nav aria-label="Розділи адмінпанелі" className={className}>
+      {ADMIN_SECTIONS.map(({ id, label, icon: Icon }) => {
+        const isActive = id === active
+
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-current={isActive ? 'page' : undefined}
+            onClick={() => onSelect(id)}
+            className={`flex items-center gap-3 border-b-2 px-3 py-3 lg:border-b-0 lg:border-l-2 text-left text-sm font-medium transition-colors ${
+              isActive
+                ? 'border-mandat-red-bright bg-mandat-red/15 text-white'
+                : 'border-transparent text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text'
+            }`}
+          >
+            <Icon className={`size-4 shrink-0 ${isActive ? 'text-mandat-red-bright' : ''}`} />
+            {label}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 export default function Admin() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [articles, setArticles] = useState<AdminNews[]>([])
   const [query, setQuery] = useState('')
+  const [section, setSection] = useState<AdminSection>('news')
   const [category, setCategory] = useState<Category>('Новини')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -120,6 +165,8 @@ export default function Admin() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const requestId = useRef(0)
+
+  const showingAds = section === 'ads'
 
   const loadNews = useCallback(async () => {
     const currentRequest = ++requestId.current
@@ -145,9 +192,10 @@ export default function Admin() {
     }
   }, [page, category])
 
+  // The news list is not fetched while the ad formats section is open; switching back reloads it.
   useEffect(() => {
-    void loadNews()
-  }, [loadNews])
+    if (!showingAds) void loadNews()
+  }, [loadNews, showingAds])
 
   const visibleArticles = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('uk')
@@ -249,15 +297,12 @@ export default function Admin() {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-6">
+          <div className="flex-1 px-3 py-6">
             <div className="mb-3 px-3 text-[10px] font-medium tracking-[0.2em] text-mandat-muted">
               РОБОЧА ОБЛАСТЬ
             </div>
-            <div className="flex items-center gap-3 border-l-2 border-mandat-red-bright bg-mandat-red/15 px-3 py-3 text-sm font-medium text-white">
-              <Newspaper className="size-4 text-mandat-red-bright" />
-              Керування новинами
-            </div>
-          </nav>
+            <AdminSectionNav active={section} onSelect={setSection} className="flex flex-col gap-1" />
+          </div>
 
           <div className="border-t border-mandat-line p-4">
             <Link
@@ -281,7 +326,7 @@ export default function Admin() {
               <LayoutDashboard className="size-4" />
               <span>Адмінпанель</span>
               <span className="text-mandat-line">/</span>
-              <span className="text-mandat-text">Новини</span>
+              <span className="text-mandat-text">{showingAds ? ADVERTISING_ADMIN_SECTION : 'Новини'}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
@@ -307,238 +352,249 @@ export default function Admin() {
           </header>
 
           <main className="mx-auto max-w-[1600px] p-4 md:p-8">
-            <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-              <div>
-                <div className="mb-2 text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">
-                  КОНТЕНТ / НОВИНИ
+            <AdminSectionNav
+              active={section}
+              onSelect={setSection}
+              className="mb-6 grid grid-cols-2 border border-mandat-line bg-mandat-surface lg:hidden"
+            />
+            {showingAds ? (
+              <AdFormatsPanel />
+            ) : (
+              <>
+              <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+                <div>
+                  <div className="mb-2 text-[11px] font-semibold tracking-[0.22em] text-mandat-red-bright">
+                    КОНТЕНТ / НОВИНИ
+                  </div>
+                  <h1 className="text-3xl font-medium tracking-wide md:text-4xl">Керування новинами</h1>
+                  <p className="mt-2 text-sm text-mandat-muted">
+                    Створюйте, редагуйте та публікуйте матеріали редакції.
+                  </p>
                 </div>
-                <h1 className="text-3xl font-medium tracking-wide md:text-4xl">Керування новинами</h1>
-                <p className="mt-2 text-sm text-mandat-muted">
-                  Створюйте, редагуйте та публікуйте матеріали редакції.
-                </p>
-              </div>
-              <Button
-                onClick={openCreateDialog}
-                className="h-11 rounded-none bg-mandat-red px-5 text-white shadow-lg shadow-mandat-red/10 hover:bg-mandat-red-bright"
-              >
-                <Plus className="size-4" />
-                Додати новину
-              </Button>
-            </div>
-
-            <section aria-label="Статистика" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {stats.map(({ label, value, icon: Icon }, index) => (
-                <div
-                  key={label}
-                  className="relative overflow-hidden border border-mandat-line bg-mandat-surface p-4 md:p-5"
+                <Button
+                  onClick={openCreateDialog}
+                  className="h-11 rounded-none bg-mandat-red px-5 text-white shadow-lg shadow-mandat-red/10 hover:bg-mandat-red-bright"
                 >
-                  {index === 0 && <div className="absolute inset-y-0 left-0 w-0.5 bg-mandat-red-bright" />}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-xs text-mandat-muted md:text-sm">{label}</div>
-                      <div className="mt-2 font-display text-2xl font-medium tracking-wide md:text-3xl">{value}</div>
-                    </div>
-                    <div className="flex size-9 items-center justify-center border border-mandat-line bg-mandat-bg text-mandat-muted">
-                      <Icon className="size-4" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </section>
-
-            <section className="border border-mandat-line bg-mandat-surface">
-              <div className="flex flex-col gap-3 border-b border-mandat-line p-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative max-w-md flex-1">
-                  <Search className="absolute left-3 top-3 size-4 text-mandat-muted" />
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    aria-label="Пошук новин на поточній сторінці"
-                    placeholder="Пошук на поточній сторінці..."
-                    className="h-10 rounded-none border-mandat-line bg-mandat-bg pl-10 text-mandat-text placeholder:text-mandat-muted focus-visible:ring-mandat-red-bright/30"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select
-                    value={category}
-                    onValueChange={(value) => {
-                      setCategory(value as Category)
-                      setPage(1)
-                    }}
-                  >
-                    <SelectTrigger aria-label="Фільтр за категорією" className="h-10 flex-1 rounded-none border-mandat-line bg-mandat-bg text-mandat-text md:w-56 md:flex-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-mandat-line bg-mandat-surface text-mandat-text">
-                      {CATEGORIES.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    title="Оновити список"
-                    disabled={loading}
-                    onClick={() => void loadNews()}
-                    className="size-10 rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
-                  >
-                    <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-                  </Button>
-                </div>
+                  <Plus className="size-4" />
+                  Додати новину
+                </Button>
               </div>
 
-              <div className="overflow-x-auto">
-                <Table className="min-w-[920px]">
-                  <TableHeader>
-                    <TableRow className="border-mandat-line bg-mandat-bg/50 hover:bg-mandat-bg/50">
-                      <TableHead className="px-5 text-[10px] tracking-[0.16em] text-mandat-muted">НОВИНА</TableHead>
-                      <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">КАТЕГОРІЯ</TableHead>
-                      <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">СТАТУС</TableHead>
-                      <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">ДАТА</TableHead>
-                      <TableHead className="text-right text-[10px] tracking-[0.16em] text-mandat-muted">ПЕРЕГЛЯДИ</TableHead>
-                      <TableHead className="w-28 text-right text-[10px] tracking-[0.16em] text-mandat-muted">ДІЇ</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibleArticles.map((article) => (
-                      <TableRow key={article.id} className="group border-mandat-line hover:bg-mandat-surface-2/50">
-                        <TableCell className="max-w-md px-5 py-4">
-                          <div className="flex items-start gap-2">
-                            <div className="min-w-0">
-                              <div className="line-clamp-1 font-medium text-mandat-text">{article.title}</div>
-                              <div className="mt-1 truncate font-mono text-[11px] text-mandat-muted">/{article.slug}</div>
-                            </div>
-                            {article.featured && (
-                              <Star className="mt-0.5 size-3.5 shrink-0 fill-mandat-red-bright text-mandat-red-bright" />
-                            )}
-                            {article.main_event && (
-                              <MainEventBadge category={article.category} />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="border border-mandat-line bg-mandat-bg px-2.5 py-1 text-xs text-mandat-muted">
-                            {article.category}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center gap-2 text-xs ${
-                              article.status === 'published' ? 'text-mandat-text' : 'text-mandat-muted'
-                            }`}
-                          >
-                            <span
-                              className={`size-1.5 rounded-full ${
-                                article.status === 'published' ? 'bg-mandat-red-bright' : 'bg-mandat-muted'
-                              }`}
-                            />
-                            {article.status === 'published' ? 'Опубліковано' : 'Чернетка'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-mandat-muted">
-                          {dateFormatter.format(new Date(article.published_at ?? article.updated_at))}
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-mandat-muted">
-                          {viewsFormatter.format(article.views)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              title="Редагувати"
-                              onClick={() => openEditDialog(article)}
-                              className="rounded-none text-mandat-muted hover:bg-mandat-red/15 hover:text-mandat-red-bright"
-                            >
-                              <FileEdit className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              title="Видалити"
-                              onClick={() => openDeleteDialog(article)}
-                              className="rounded-none text-mandat-muted hover:bg-mandat-red/15 hover:text-mandat-red-bright"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                {loading && (
-                  <div role="status" className="flex items-center justify-center gap-3 border-t border-mandat-line px-4 py-12 text-sm text-mandat-muted">
-                    <LoaderCircle className="size-5 animate-spin text-mandat-red-bright" />
-                    Завантаження новин...
+              <section aria-label="Статистика" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {stats.map(({ label, value, icon: Icon }, index) => (
+                  <div
+                    key={label}
+                    className="relative overflow-hidden border border-mandat-line bg-mandat-surface p-4 md:p-5"
+                  >
+                    {index === 0 && <div className="absolute inset-y-0 left-0 w-0.5 bg-mandat-red-bright" />}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-xs text-mandat-muted md:text-sm">{label}</div>
+                        <div className="mt-2 font-display text-2xl font-medium tracking-wide md:text-3xl">{value}</div>
+                      </div>
+                      <div className="flex size-9 items-center justify-center border border-mandat-line bg-mandat-bg text-mandat-muted">
+                        <Icon className="size-4" />
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
+              </section>
 
-                {loadError && !loading && (
-                  <div role="alert" className="flex flex-col items-center border-t border-mandat-line px-4 py-12 text-center">
-                    <h2 className="text-lg">Не вдалося завантажити новини</h2>
-                    <p className="mt-2 max-w-lg text-sm text-mandat-muted">{loadError}</p>
+              <section className="border border-mandat-line bg-mandat-surface">
+                <div className="flex flex-col gap-3 border-b border-mandat-line p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="relative max-w-md flex-1">
+                    <Search className="absolute left-3 top-3 size-4 text-mandat-muted" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      aria-label="Пошук новин на поточній сторінці"
+                      placeholder="Пошук на поточній сторінці..."
+                      className="h-10 rounded-none border-mandat-line bg-mandat-bg pl-10 text-mandat-text placeholder:text-mandat-muted focus-visible:ring-mandat-red-bright/30"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select
+                      value={category}
+                      onValueChange={(value) => {
+                        setCategory(value as Category)
+                        setPage(1)
+                      }}
+                    >
+                      <SelectTrigger aria-label="Фільтр за категорією" className="h-10 flex-1 rounded-none border-mandat-line bg-mandat-bg text-mandat-text md:w-56 md:flex-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-none border-mandat-line bg-mandat-surface text-mandat-text">
+                        {CATEGORIES.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       variant="outline"
+                      size="icon"
+                      title="Оновити список"
+                      disabled={loading}
                       onClick={() => void loadNews()}
-                      className="mt-5 rounded-none border-mandat-line bg-mandat-bg text-mandat-text hover:bg-mandat-surface-2"
+                      className="size-10 rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
                     >
-                      Спробувати ще раз
+                      <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
-                )}
+                </div>
 
-                {!loading && !loadError && visibleArticles.length === 0 && (
-                  <div className="flex flex-col items-center border-t border-mandat-line px-4 py-16 text-center">
-                    <div className="mb-4 flex size-12 items-center justify-center border border-mandat-line bg-mandat-bg">
-                      <Search className="size-5 text-mandat-muted" />
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[920px]">
+                    <TableHeader>
+                      <TableRow className="border-mandat-line bg-mandat-bg/50 hover:bg-mandat-bg/50">
+                        <TableHead className="px-5 text-[10px] tracking-[0.16em] text-mandat-muted">НОВИНА</TableHead>
+                        <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">КАТЕГОРІЯ</TableHead>
+                        <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">СТАТУС</TableHead>
+                        <TableHead className="text-[10px] tracking-[0.16em] text-mandat-muted">ДАТА</TableHead>
+                        <TableHead className="text-right text-[10px] tracking-[0.16em] text-mandat-muted">ПЕРЕГЛЯДИ</TableHead>
+                        <TableHead className="w-28 text-right text-[10px] tracking-[0.16em] text-mandat-muted">ДІЇ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleArticles.map((article) => (
+                        <TableRow key={article.id} className="group border-mandat-line hover:bg-mandat-surface-2/50">
+                          <TableCell className="max-w-md px-5 py-4">
+                            <div className="flex items-start gap-2">
+                              <div className="min-w-0">
+                                <div className="line-clamp-1 font-medium text-mandat-text">{article.title}</div>
+                                <div className="mt-1 truncate font-mono text-[11px] text-mandat-muted">/{article.slug}</div>
+                              </div>
+                              {article.featured && (
+                                <Star className="mt-0.5 size-3.5 shrink-0 fill-mandat-red-bright text-mandat-red-bright" />
+                              )}
+                              {article.main_event && (
+                                <MainEventBadge category={article.category} />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="border border-mandat-line bg-mandat-bg px-2.5 py-1 text-xs text-mandat-muted">
+                              {article.category}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`inline-flex items-center gap-2 text-xs ${
+                                article.status === 'published' ? 'text-mandat-text' : 'text-mandat-muted'
+                              }`}
+                            >
+                              <span
+                                className={`size-1.5 rounded-full ${
+                                  article.status === 'published' ? 'bg-mandat-red-bright' : 'bg-mandat-muted'
+                                }`}
+                              />
+                              {article.status === 'published' ? 'Опубліковано' : 'Чернетка'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-xs text-mandat-muted">
+                            {dateFormatter.format(new Date(article.published_at ?? article.updated_at))}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-mandat-muted">
+                            {viewsFormatter.format(article.views)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Редагувати"
+                                onClick={() => openEditDialog(article)}
+                                className="rounded-none text-mandat-muted hover:bg-mandat-red/15 hover:text-mandat-red-bright"
+                              >
+                                <FileEdit className="size-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Видалити"
+                                onClick={() => openDeleteDialog(article)}
+                                className="rounded-none text-mandat-muted hover:bg-mandat-red/15 hover:text-mandat-red-bright"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {loading && (
+                    <div role="status" className="flex items-center justify-center gap-3 border-t border-mandat-line px-4 py-12 text-sm text-mandat-muted">
+                      <LoaderCircle className="size-5 animate-spin text-mandat-red-bright" />
+                      Завантаження новин...
                     </div>
-                    <h2 className="text-lg">Новин не знайдено</h2>
-                    <p className="mt-2 text-sm text-mandat-muted">Спробуйте змінити пошуковий запит або фільтр.</p>
+                  )}
+
+                  {loadError && !loading && (
+                    <div role="alert" className="flex flex-col items-center border-t border-mandat-line px-4 py-12 text-center">
+                      <h2 className="text-lg">Не вдалося завантажити новини</h2>
+                      <p className="mt-2 max-w-lg text-sm text-mandat-muted">{loadError}</p>
+                      <Button
+                        variant="outline"
+                        onClick={() => void loadNews()}
+                        className="mt-5 rounded-none border-mandat-line bg-mandat-bg text-mandat-text hover:bg-mandat-surface-2"
+                      >
+                        Спробувати ще раз
+                      </Button>
+                    </div>
+                  )}
+
+                  {!loading && !loadError && visibleArticles.length === 0 && (
+                    <div className="flex flex-col items-center border-t border-mandat-line px-4 py-16 text-center">
+                      <div className="mb-4 flex size-12 items-center justify-center border border-mandat-line bg-mandat-bg">
+                        <Search className="size-5 text-mandat-muted" />
+                      </div>
+                      <h2 className="text-lg">Новин не знайдено</h2>
+                      <p className="mt-2 text-sm text-mandat-muted">Спробуйте змінити пошуковий запит або фільтр.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-mandat-line px-4 py-4 text-xs text-mandat-muted sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    {query
+                      ? `Знайдено на цій сторінці: ${visibleArticles.length}`
+                      : `На сторінці: ${articles.length}`}
                   </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3 border-t border-mandat-line px-4 py-4 text-xs text-mandat-muted sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  {query
-                    ? `Знайдено на цій сторінці: ${visibleArticles.length}`
-                    : `На сторінці: ${articles.length}`}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page === 1 || loading}
+                      onClick={() => setPage((current) => current - 1)}
+                      className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
+                    >
+                      <ChevronLeft className="size-4" />
+                      Назад
+                    </Button>
+                    <span className="px-2">Сторінка {page}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasNextPage || loading}
+                      onClick={() => setPage((current) => current + 1)}
+                      className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
+                    >
+                      Далі
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 1 || loading}
-                    onClick={() => setPage((current) => current - 1)}
-                    className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
-                  >
-                    <ChevronLeft className="size-4" />
-                    Назад
-                  </Button>
-                  <span className="px-2">Сторінка {page}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasNextPage || loading}
-                    onClick={() => setPage((current) => current + 1)}
-                    className="rounded-none border-mandat-line bg-mandat-bg text-mandat-muted hover:bg-mandat-surface-2 hover:text-mandat-text"
-                  >
-                    Далі
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <div className="mt-5 flex items-center gap-2 text-xs text-mandat-muted">
-              <Star className="size-3.5 text-mandat-red-bright" />
-              Матеріалів на головній на цій сторінці: {featuredCount}
-            </div>
+              <div className="mt-5 flex items-center gap-2 text-xs text-mandat-muted">
+                <Star className="size-3.5 text-mandat-red-bright" />
+                Матеріалів на головній на цій сторінці: {featuredCount}
+              </div>
+              </>
+            )}
           </main>
         </div>
       </div>

@@ -1,4 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+
+import { listAdFormats } from '@/api/adFormats'
 
 import AdvertisingFormatCard from '@/components/AdvertisingFormatCard'
 import HeadingMarker from '@/components/HeadingMarker'
@@ -10,7 +12,6 @@ import {
   ADVERTISING_AUDIENCE_TITLE,
   ADVERTISING_CTA_TITLE,
   ADVERTISING_EMAIL,
-  ADVERTISING_FORMATS,
   ADVERTISING_FORMATS_LEAD,
   ADVERTISING_FORMATS_TITLE,
   ADVERTISING_LEAD,
@@ -21,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import Footer from '@/sections/Footer'
 import Header from '@/sections/Header'
+import type { AdFormat } from '@/types'
 
 // Logos per marquee half; the half must stay wider than a 2560px screen.
 const MARQUEE_ITEMS = 12
@@ -31,9 +33,22 @@ const orderButtonClassName =
   'inline-flex h-12 items-center justify-center px-7 text-[15px] font-medium no-underline transition-colors'
 
 export default function Advertising() {
+  const [formats, setFormats] = useState<AdFormat[]>([])
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
     document.title = ADVERTISING_TITLE
+  }, [])
+
+  // The cards are managed in the admin panel; on failure the grid just stays empty.
+  useEffect(() => {
+    let active = true
+    listAdFormats()
+      .then((items) => active && setFormats(items))
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
   }, [])
 
   return (
@@ -98,7 +113,7 @@ export default function Advertising() {
           {ADVERTISING_FORMATS_LEAD}
         </p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {ADVERTISING_FORMATS.map((format) => (
+          {formats.map((format) => (
             <AdvertisingFormatCard
               key={format.id}
               format={format}

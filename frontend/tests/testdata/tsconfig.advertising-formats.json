@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-advertising-formats-tests"
+  },
+  "include": ["../advertising-formats.test.tsx"]
+}
