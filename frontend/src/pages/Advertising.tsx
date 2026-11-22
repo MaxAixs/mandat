@@ -19,6 +19,7 @@ import {
   ADVERTISING_ORDER_SUBJECT,
   ADVERTISING_TITLE,
 } from '@/constants/advertising'
+import { BANNER_ADS_FORMAT_TITLE, BANNER_ADS_PATH } from '@/constants/banner-ads'
 import { cn } from '@/lib/utils'
 import Footer from '@/sections/Footer'
 import Header from '@/sections/Header'
@@ -113,14 +114,19 @@ export default function Advertising() {
           {ADVERTISING_FORMATS_LEAD}
         </p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {formats.map((format) => (
-            <AdvertisingFormatCard
-              key={format.id}
-              format={format}
-              href={`mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(`${ADVERTISING_ORDER_SUBJECT}: ${format.title}`)}`}
-              ariaLabel={`${ADVERTISING_ORDER_LABEL}: ${format.title}`}
-            />
-          ))}
+          {formats.map((format) => {
+            // Banner ads have their own page with the placement rules; other cards open an order email.
+            const pagePath = format.title.trim() === BANNER_ADS_FORMAT_TITLE ? BANNER_ADS_PATH : undefined
+            return (
+              <AdvertisingFormatCard
+                key={format.id}
+                format={format}
+                to={pagePath}
+                href={`mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(`${ADVERTISING_ORDER_SUBJECT}: ${format.title}`)}`}
+                ariaLabel={pagePath ? format.title : `${ADVERTISING_ORDER_LABEL}: ${format.title}`}
+              />
+            )
+          })}
         </div>
       </main>
 
