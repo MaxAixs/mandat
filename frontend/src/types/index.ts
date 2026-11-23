@@ -153,3 +153,10 @@ export interface ContactFormValues {
 }
 
 export type ContactMoveDirection = 'up' | 'down'
+
+/** Subscriber count of the public Telegram channel, refreshed hourly by the backend. */
+export interface TelegramChannelStats {
+  subscribers: number
+  /** RFC 3339 time of the last successful refresh. */
+  updated_at: string
+}

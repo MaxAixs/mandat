@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
 import { listAdFormats } from '@/api/adFormats'
+import { getTelegramChannel } from '@/api/telegram'
 
 import AdvertisingFormatCard from '@/components/AdvertisingFormatCard'
 import HeadingMarker from '@/components/HeadingMarker'
@@ -40,11 +41,14 @@ const FORMAT_PAGES: Record<string, string> = {
   [CLIENT_PROJECTS_FORMAT_TITLE]: CLIENT_PROJECTS_PATH,
 }
 
+const subscribersFormatter = new Intl.NumberFormat('uk-UA')
+
 const orderButtonClassName =
   'inline-flex h-12 items-center justify-center px-7 text-[15px] font-medium no-underline transition-colors'
 
 export default function Advertising() {
   const [formats, setFormats] = useState<AdFormat[]>([])
+  const [telegramSubscribers, setTelegramSubscribers] = useState<number | null>(null)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -52,15 +56,24 @@ export default function Advertising() {
   }, [])
 
   // The cards are managed in the admin panel; on failure the grid just stays empty.
+  // The Telegram count is live; until it arrives (or if it fails) its tile shows «—».
   useEffect(() => {
     let active = true
     listAdFormats()
       .then((items) => active && setFormats(items))
       .catch(() => undefined)
+    getTelegramChannel()
+      .then((stats) => active && setTelegramSubscribers(stats.subscribers))
+      .catch(() => undefined)
     return () => {
       active = false
     }
   }, [])
+
+  const audience: Record<string, string> = {
+    ...ADVERTISING_AUDIENCE,
+    telegram: telegramSubscribers === null ? '—' : subscribersFormatter.format(telegramSubscribers),
+  }
 
   return (
     <div className="min-h-screen bg-mandat-bg text-mandat-text">
@@ -105,7 +118,7 @@ export default function Advertising() {
             >
               <span>
                 <span className="block text-[22px] font-bold leading-none tabular-nums text-white sm:text-[26px]">
-                  {ADVERTISING_AUDIENCE[social.id] ?? '—'}
+                  {audience[social.id] ?? '—'}
                 </span>
                 <span className="mt-3 block text-[14px] text-mandat-muted">{social.label}</span>
               </span>

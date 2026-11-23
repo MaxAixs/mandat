@@ -1,7 +1,5 @@
 /** Content of the /advertising page: audience and ad formats. */
 
-import { TELEGRAM_CHANNEL } from '@/constants'
-
 export const ADVERTISING_TITLE = 'Реклама на «Мандаті»'
 export const ADVERTISING_PATH = '/advertising'
 /** Back link label on the pages of individual ad formats. */
@@ -15,11 +13,13 @@ export const ADVERTISING_ORDER_LABEL = 'Замовити рекламу'
 
 export const ADVERTISING_AUDIENCE_TITLE = 'Соціальні мережі'
 
-/** Followers by `SOCIAL_LINKS` id; only Telegram is confirmed, the rest await real figures. */
+/**
+ * Followers by `SOCIAL_LINKS` id, awaiting real figures. Telegram is not here: its
+ * count comes live from the API (refreshed hourly from the channel page).
+ */
 export const ADVERTISING_AUDIENCE: Record<string, string> = {
   instagram: '—',
   threads: '—',
-  telegram: TELEGRAM_CHANNEL.subscribers,
   facebook: '—',
 }
 

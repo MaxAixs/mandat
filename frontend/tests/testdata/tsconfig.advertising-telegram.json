@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-advertising-telegram-tests"
+  },
+  "include": [
+    "../advertising-telegram.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/pages/Advertising.tsx"
+  ]
+}

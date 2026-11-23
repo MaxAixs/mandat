@@ -7,7 +7,6 @@ export const SITE_TAGLINE = 'новини · інсайди · аналітик�
 export const TELEGRAM_CHANNEL = {
   name: 'МАНДАТ у Telegram',
   url: 'https://t.me/mandat_ua',
-  subscribers: '42 728',
 }
 
 /** Legal lines shown at the very bottom of the footer. */
