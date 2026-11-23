@@ -107,6 +107,21 @@ Ad format cards of the `/advertising` page (same roles as news):
 `title` is 1–80 characters, `description` at most 240. Images follow the cover rules
 and are stored as `ad-formats/<id>-<random>.<ext>`; replaced and deleted images are removed.
 
+Contacts of the `/contacts` page (same roles as news):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/contacts` | All contacts in display order, `{ "items" }` |
+| `POST` | `/api/admin/contacts` | Create a contact at the end: `{ "type", "value", "label" }` |
+| `PUT` | `/api/admin/contacts/:id` | Update type, value and label (same body) |
+| `DELETE` | `/api/admin/contacts/:id` | Delete a contact (`200 OK`, empty body) |
+| `POST` | `/api/admin/contacts/:id/move` | Swap with the neighbour: `{ "direction": "up" \| "down" }`; no neighbour is a no-op |
+
+`type` is one of `email`, `telegram`, `instagram`, `threads`, `facebook`, `phone`, `website`.
+The value is validated per type; social types accept `name`, `@name` or a profile link on
+their own host and store the bare handle. Responses add the server-built `display` text and
+`href` link; `label` (at most 40 characters) replaces the type name on the page.
+
 ## Public API
 
 | Method | Path | Description |
@@ -114,6 +129,7 @@ and are stored as `ad-formats/<id>-<random>.<ext>`; replaced and deleted images 
 | `GET` | `/api/news?page=&limit=&category=` | Paginated published articles for the public site (same `category` values as the admin API) |
 | `GET` | `/api/news/search?q=&limit=` | Live title suggestions over published articles, newest first (default limit 7, max 20; empty `q` returns an empty list) |
 | `GET` | `/api/ad-formats` | Ad format cards of the advertising page in display order, `{ "items" }` |
+| `GET` | `/api/contacts` | Contacts of the contacts page in display order, `{ "items" }` with `display` and `href` |
 | `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
 | `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |
 

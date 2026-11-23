@@ -15,6 +15,9 @@ import (
 // adFormatColumns is the column list shared by ad format SELECT queries.
 const adFormatColumns = `id, title, description, image_url, position, created_at, updated_at`
 
+// adFormatsTable is the ad format table, ordered by a deferred unique position.
+const adFormatsTable = "ad_formats"
+
 // AdFormatRepo persists ad format cards in PostgreSQL.
 type AdFormatRepo struct {
 	pool *pgxpool.Pool
@@ -123,7 +126,7 @@ func (r *AdFormatRepo) Move(ctx context.Context, id uuid.UUID, up bool) error {
 	const fc = "adFormatRepo_Move"
 
 	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
-		return swapWithNeighbour(ctx, tx, id, up)
+		return swapWithNeighbour(ctx, tx, adFormatsTable, id, up)
 	})
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, mapError(err, errs.ErrAdFormatNotFound))
@@ -151,20 +154,22 @@ func scanAdFormat(row scanner) (*models.AdFormat, error) {
 	return &format, nil
 }
 
-// swapWithNeighbour locks the table and exchanges positions of the card and its neighbour.
-func swapWithNeighbour(ctx context.Context, tx pgx.Tx, id uuid.UUID, up bool) error {
-	if _, err := tx.Exec(ctx, `LOCK TABLE ad_formats IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+// swapWithNeighbour locks table and exchanges positions of the row and its neighbour.
+// table is always a package constant (never user input) of a table with id and a
+// deferred unique position.
+func swapWithNeighbour(ctx context.Context, tx pgx.Tx, table string, id uuid.UUID, up bool) error {
+	if _, err := tx.Exec(ctx, `LOCK TABLE `+table+` IN SHARE ROW EXCLUSIVE MODE`); err != nil {
 		return err
 	}
 
 	var position int
-	if err := tx.QueryRow(ctx, `SELECT position FROM ad_formats WHERE id = $1`, id).Scan(&position); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT position FROM `+table+` WHERE id = $1`, id).Scan(&position); err != nil {
 		return err
 	}
 
-	neighbourQuery := `SELECT id, position FROM ad_formats WHERE position > $1 ORDER BY position ASC LIMIT 1`
+	neighbourQuery := `SELECT id, position FROM ` + table + ` WHERE position > $1 ORDER BY position ASC LIMIT 1`
 	if up {
-		neighbourQuery = `SELECT id, position FROM ad_formats WHERE position < $1 ORDER BY position DESC LIMIT 1`
+		neighbourQuery = `SELECT id, position FROM ` + table + ` WHERE position < $1 ORDER BY position DESC LIMIT 1`
 	}
 
 	var (
@@ -180,7 +185,7 @@ func swapWithNeighbour(ctx context.Context, tx pgx.Tx, id uuid.UUID, up bool) er
 	}
 
 	_, err = tx.Exec(ctx,
-		`UPDATE ad_formats SET position = CASE id WHEN $1 THEN $2::int ELSE $3::int END, updated_at = now()
+		`UPDATE `+table+` SET position = CASE id WHEN $1 THEN $2::int ELSE $3::int END, updated_at = now()
 		WHERE id IN ($1, $4)`,
 		id, neighbourPosition, position, neighbourID,
 	)
