@@ -66,6 +66,10 @@ rates:                # upstream rate providers (keep in sync with config.go def
   refresh_interval: 24h # how often both tables are re-fetched (min 1m)
   http_timeout: 10s     # one request to a provider
 
+telegram:             # public channel whose subscriber count is shown on /advertising
+  channel_url: "https://t.me/mandat_ua" # https://t.me/<name> page, parsed for «N subscribers»
+  refresh_interval: 1h  # how often the count is re-fetched (min 1m)
+
 storage:              # Cloudflare R2; keys come from R2_ACCESS_KEY_ID /
   endpoint: ""        # R2_SECRET_ACCESS_KEY (or set R2_ACCOUNT_ID to derive it)
   bucket: ""         # or R2_ENDPOINT / R2_BUCKET env overrides

@@ -50,6 +50,7 @@ type Config struct {
 	DB        postgres.DBConfig        `mapstructure:"db"`
 	Redis     redis.Config             `mapstructure:"redis"`
 	Rates     RatesConfig              `mapstructure:"rates"`
+	Telegram  TelegramConfig           `mapstructure:"telegram"`
 	Storage   r2.Config                `mapstructure:"storage"`
 	Download  imgdownloader.Config     `mapstructure:"download"`
 	RateLimit service.RateLimitConfig  `mapstructure:"rate_limit"`
@@ -66,6 +67,14 @@ type RatesConfig struct {
 	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 	// HTTPTimeout bounds one request to a rate provider.
 	HTTPTimeout time.Duration `mapstructure:"http_timeout"`
+}
+
+// TelegramConfig points at the public Telegram channel whose subscriber count is shown.
+type TelegramConfig struct {
+	// ChannelURL is the public channel page, https://t.me/<name>.
+	ChannelURL string `mapstructure:"channel_url"`
+	// RefreshInterval is how often the subscriber count is re-fetched.
+	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 }
 
 // Load reads the YAML file at path and validates it.
@@ -133,6 +142,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("rates.fuel_url", "https://20.com.ua/api/v1/prices")
 	v.SetDefault("rates.refresh_interval", 24*time.Hour)
 	v.SetDefault("rates.http_timeout", 10*time.Second)
+	v.SetDefault("telegram.channel_url", "https://t.me/mandat_ua")
+	v.SetDefault("telegram.refresh_interval", time.Hour)
 	v.SetDefault("download.timeout", 15*time.Second)
 	v.SetDefault("download.max_bytes", 10<<20)
 	v.SetDefault("download.max_redirects", 3)
@@ -193,6 +204,10 @@ func (c *Config) validate() error {
 		return err
 	}
 
+	if err := c.Telegram.validate(); err != nil {
+		return err
+	}
+
 	if err := c.validateHTTP(); err != nil {
 		return err
 	}
@@ -245,6 +260,25 @@ func (r RatesConfig) validateIntervals() error {
 
 	if r.HTTPTimeout <= 0 {
 		return fmt.Errorf("rates.http_timeout must be positive")
+	}
+
+	return nil
+}
+
+// validate checks that the channel is a public https://t.me/<name> page and that
+// the refresh cadence does not hammer Telegram.
+func (t TelegramConfig) validate() error {
+	parsed, err := url.Parse(t.ChannelURL)
+	name := ""
+	if err == nil {
+		name = strings.Trim(parsed.Path, "/")
+	}
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "t.me" || name == "" || strings.Contains(name, "/") {
+		return fmt.Errorf("telegram.channel_url: %q must be a https://t.me/<name> channel page", t.ChannelURL)
+	}
+
+	if t.RefreshInterval < minRatesRefreshInterval {
+		return fmt.Errorf("telegram.refresh_interval must be at least %s", minRatesRefreshInterval)
 	}
 
 	return nil

@@ -23,6 +23,7 @@ var (
 
 	ErrExchangeRatesNotFound = errors.New("exchange rates not found")
 	ErrFuelRatesNotFound     = errors.New("fuel rates not found")
+	ErrTelegramStatsNotFound = errors.New("telegram stats not found")
 )
 
 // ValidationError describes a rejected input field.

@@ -21,6 +21,8 @@ const (
 	PublicAdFormats = API + "/ad-formats"
 	// PublicContacts lists the contacts of the contacts page.
 	PublicContacts = API + "/contacts"
+	// PublicTelegramChannel serves the subscriber count of the Telegram channel.
+	PublicTelegramChannel = API + "/telegram/channel"
 	// Health is the root of the liveness and readiness probes.
 	Health = "/health"
 )

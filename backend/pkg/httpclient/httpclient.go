@@ -1,4 +1,4 @@
-// Package httpclient provides a JSON client for trusted outbound calls
+// Package httpclient provides a JSON and text client for trusted outbound calls
 // over a shared HTTP client. Services declare the narrow interface they
 // need and the client implements it. Cases with special security needs
 // (SSRF guards, body limits) keep their own clients.
@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -16,7 +17,7 @@ import (
 // DefaultDelays spaces the three retries of a fetch.
 var DefaultDelays = [3]time.Duration{5 * time.Second, 10 * time.Second, 15 * time.Second}
 
-// Client is a JSON API client over a shared HTTP client.
+// Client is an HTTP client for trusted outbound calls over a shared HTTP client.
 type Client struct {
 	http   *http.Client
 	logger *slog.Logger
@@ -54,6 +55,36 @@ func (c *Client) GetJSON(ctx context.Context, url string, out any) error {
 	}
 
 	return nil
+}
+
+// GetText performs a GET request to url and returns a 2xx response body;
+// bodies longer than maxBytes are rejected.
+func (c *Client) GetText(ctx context.Context, url string, maxBytes int64) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return "", fmt.Errorf("httpclient_GetText: build request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("httpclient_GetText: do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", fmt.Errorf("httpclient_GetText: unexpected status %s", resp.Status)
+	}
+
+	// One byte over the cap tells an oversized body apart from one of exactly maxBytes.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return "", fmt.Errorf("httpclient_GetText: read body: %w", err)
+	}
+	if int64(len(body)) > maxBytes {
+		return "", fmt.Errorf("httpclient_GetText: body exceeds %d bytes", maxBytes)
+	}
+
+	return string(body), nil
 }
 
 // FetchWithRetries runs fn once, then retries it once per delay.

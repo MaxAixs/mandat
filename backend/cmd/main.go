@@ -126,6 +126,8 @@ func run() error {
 	exchangeService := service.NewExchangeService(sharedHTTP, exchangeStore, log, cfg.Rates.NBUURL)
 	fuelStore := redisrepo.NewFuelStore(redisClient)
 	fuelService := service.NewFuelService(sharedHTTP, fuelStore, log, cfg.Rates.FuelURL)
+	telegramStore := redisrepo.NewTelegramStore(redisClient)
+	telegramService := service.NewTelegramService(sharedHTTP, telegramStore, log, cfg.Telegram.ChannelURL)
 
 	// Background jobs are awaited before the deferred Redis/pool closes run,
 	// so none of them touches a closed client during shutdown.
@@ -150,6 +152,13 @@ func run() error {
 
 	background.Go(func() { exchangeService.StartAutoRefresh(ctx, cfg.Rates.RefreshInterval) })
 	background.Go(func() { fuelService.StartAutoRefresh(ctx, cfg.Rates.RefreshInterval) })
+	// Telegram refreshes on its own job, so slow rate providers never delay the count.
+	background.Go(func() {
+		if err := telegramService.Refresh(ctx); err != nil {
+			log.ErrorContext(ctx, "telegram subscribers unavailable at startup, keeping the stored value", "error", err)
+		}
+		telegramService.StartAutoRefresh(ctx, cfg.Telegram.RefreshInterval)
+	})
 
 	runningLineHandler := handler.NewRunningLineHandler(exchangeService, fuelService)
 
@@ -167,6 +176,7 @@ func run() error {
 		viewHandler,
 		healthHandler,
 		runningLineHandler,
+		handler.NewTelegramHandler(telegramService),
 	)
 	if err != nil {
 		return fmt.Errorf("build http server: %w", err)

@@ -130,6 +130,7 @@ their own host and store the bare handle. Responses add the server-built `displa
 | `GET` | `/api/news/search?q=&limit=` | Live title suggestions over published articles, newest first (default limit 7, max 20; empty `q` returns an empty list) |
 | `GET` | `/api/ad-formats` | Ad format cards of the advertising page in display order, `{ "items" }` |
 | `GET` | `/api/contacts` | Contacts of the contacts page in display order, `{ "items" }` with `display` and `href` |
+| `GET` | `/api/telegram/channel` | Subscriber count of the Telegram channel, `{ "subscribers", "updated_at" }`; refreshed hourly from the public t.me page, `503` until the first successful refresh |
 | `GET` | `/api/news/:slug` | Full published article; also establishes the anonymous viewer cookie |
 | `POST` | `/api/news/:slug/view` | Record a view and return `{ "views": number }` |
 
