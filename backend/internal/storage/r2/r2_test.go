@@ -20,6 +20,20 @@ type fakeAPI struct {
 	lastDelete *s3.DeleteObjectInput
 	putErr     error
 	delErr     error
+
+	headCalls int
+	getCalls  int
+	copyCalls int
+
+	lastHead *s3.HeadObjectInput
+	lastGet  *s3.GetObjectInput
+	lastCopy *s3.CopyObjectInput
+
+	headOut *s3.HeadObjectOutput
+	headErr error
+	getBody []byte
+	getErr  error
+	copyErr error
 }
 
 func (f *fakeAPI) PutObject(
@@ -42,6 +56,48 @@ func (f *fakeAPI) DeleteObject(
 	f.lastDelete = in
 
 	return &s3.DeleteObjectOutput{}, f.delErr
+}
+
+func (f *fakeAPI) HeadObject(
+	ctx context.Context,
+	in *s3.HeadObjectInput,
+	optFns ...func(*s3.Options),
+) (*s3.HeadObjectOutput, error) {
+	f.headCalls++
+	f.lastHead = in
+	if f.headErr != nil {
+		return nil, f.headErr
+	}
+	if f.headOut != nil {
+		return f.headOut, nil
+	}
+
+	return &s3.HeadObjectOutput{}, nil
+}
+
+func (f *fakeAPI) GetObject(
+	ctx context.Context,
+	in *s3.GetObjectInput,
+	optFns ...func(*s3.Options),
+) (*s3.GetObjectOutput, error) {
+	f.getCalls++
+	f.lastGet = in
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+
+	return &s3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(f.getBody))}, nil
+}
+
+func (f *fakeAPI) CopyObject(
+	ctx context.Context,
+	in *s3.CopyObjectInput,
+	optFns ...func(*s3.Options),
+) (*s3.CopyObjectOutput, error) {
+	f.copyCalls++
+	f.lastCopy = in
+
+	return &s3.CopyObjectOutput{}, f.copyErr
 }
 
 // zeroReader yields an unbounded stream of zero bytes without allocating.
@@ -151,7 +207,7 @@ func TestClient_Upload_IgnoresDeclaredType(t *testing.T) {
 
 	url, err := client.Upload(
 		context.Background(),
-		"covers/photo.jpg",
+		"covers/image.jpg",
 		bytes.NewReader(jpegBytes()),
 		"application/octet-stream",
 	)
@@ -171,7 +227,7 @@ func TestClient_Upload_RejectsExtMIMEMismatch(t *testing.T) {
 
 	url, err := client.Upload(
 		context.Background(),
-		"covers/photo.png",
+		"covers/image.png",
 		bytes.NewReader(jpegBytes()),
 		"image/png",
 	)

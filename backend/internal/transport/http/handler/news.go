@@ -21,6 +21,8 @@ import (
 
 // NewsService is the news administration behavior used by NewsHandler.
 type NewsService interface {
+	PresignVideoUpload(ctx context.Context, req service.UploadRequest) (*service.PresignedUpload, error)
+	PresignImageUpload(ctx context.Context, req service.UploadRequest) (*service.PresignedUpload, error)
 	Create(ctx context.Context, input service.NewsInput) (*models.News, error)
 	GetBySlug(ctx context.Context, slug string) (*models.News, error)
 	List(ctx context.Context, page int, limit int, status string, category string) (*service.ListResult, error)
@@ -48,6 +50,8 @@ func (h *NewsHandler) Register(r *gin.RouterGroup) {
 	news.GET("/:slug", h.GetBySlug)
 	news.PUT("/:slug", h.Update)
 	news.DELETE("/:slug", h.Delete)
+	news.POST("/video-uploads", h.PresignVideoUpload)
+	news.POST("/image-uploads", h.PresignImageUpload)
 }
 
 // Create handles POST /api/admin/news.
@@ -175,6 +179,9 @@ func (h *NewsHandler) bindInput(c *gin.Context) (service.NewsInput, error) {
 		ImageURL:    formField(form, "image_url"),
 		Source:      formField(form, "source"),
 		SourceURL:   formField(form, "source_url"),
+		VideoKey:    formField(form, "video_key"),
+		VideoURL:    formField(form, "video_url"),
+		Images:      form.Value["images"],
 	}
 
 	featured, err := parseBoolField(formField(form, "featured"))
@@ -198,6 +205,16 @@ func (h *NewsHandler) bindInput(c *gin.Context) (service.NewsInput, error) {
 	input.Cover = cover
 
 	return input, nil
+}
+
+// PresignVideoUpload handles POST /api/admin/news/video-uploads.
+func (h *NewsHandler) PresignVideoUpload(c *gin.Context) {
+	writePresign(c, h.svc.PresignVideoUpload)
+}
+
+// PresignImageUpload handles POST /api/admin/news/image-uploads.
+func (h *NewsHandler) PresignImageUpload(c *gin.Context) {
+	writePresign(c, h.svc.PresignImageUpload)
 }
 
 // isMultipart reports multipart form submissions.
@@ -289,4 +306,23 @@ func queryInt(c *gin.Context, name string, fallback int) (int, error) {
 	}
 
 	return value, nil
+}
+
+// writePresign binds an upload announcement, presigns it and writes the response.
+func writePresign(c *gin.Context, presign func(ctx context.Context, req service.UploadRequest) (*service.PresignedUpload, error)) {
+	var req dto.UploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httptransport.WriteError(c, bindError(err))
+
+		return
+	}
+
+	upload, err := presign(c.Request.Context(), req.ToInput())
+	if err != nil {
+		httptransport.WriteError(c, err)
+
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.UploadToResponse(upload))
 }

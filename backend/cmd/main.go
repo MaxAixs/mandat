@@ -79,6 +79,7 @@ func run() error {
 		r2client,
 		cfg.Storage.PublicBase(),
 		imgdownloader.NewDownloader(cfg.Download),
+		service.WithMediaStorage(r2client),
 	)
 	authRepo := newsrepo.NewAuthRepo(pool)
 	sessionStore := redisrepo.NewSessionStore(redisClient)

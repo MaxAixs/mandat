@@ -17,7 +17,8 @@ import (
 
 // newsColumns is the canonical column list shared by SELECT queries.
 const newsColumns = `id, slug, category, title, description, text, language,
-	status, views, featured, main_event, image_url, source, source_url, published_at, created_at, updated_at`
+	status, views, featured, main_event, image_url, source, source_url, video_kind, video_url,
+	image_urls, published_at, created_at, updated_at`
 
 // commandExecutor is the Exec surface shared by the pool and transactions.
 type commandExecutor interface {
@@ -273,13 +274,16 @@ func insertNews(ctx context.Context, db commandExecutor, news *models.News) erro
 
 	query := `INSERT INTO news
 		(id, slug, category, title, description, text, language, status,
-		featured, main_event, image_url, source, source_url, published_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+		featured, main_event, image_url, source, source_url, video_kind, video_url,
+		image_urls, published_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`
 
+	videoKind, videoURL := videoValues(news.Video)
 	_, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description,
 		news.Text, news.Language, news.Status, news.Featured, news.MainEvent,
-		news.ImageURL, news.Source, news.SourceURL, news.PublishedAt, news.CreatedAt, news.UpdatedAt,
+		news.ImageURL, news.Source, news.SourceURL, videoKind, videoURL,
+		imageValues(news.ImageURLs), news.PublishedAt, news.CreatedAt, news.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, err)
@@ -289,15 +293,23 @@ func insertNews(ctx context.Context, db commandExecutor, news *models.News) erro
 }
 
 func scanNews(row scanner) (*models.News, error) {
-	var news models.News
+	var (
+		news      models.News
+		videoKind *string
+		videoURL  string
+	)
 
 	err := row.Scan(
 		&news.ID, &news.Slug, &news.Category, &news.Title, &news.Description,
 		&news.Text, &news.Language, &news.Status, &news.Views, &news.Featured,
-		&news.MainEvent, &news.ImageURL, &news.Source, &news.SourceURL, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
+		&news.MainEvent, &news.ImageURL, &news.Source, &news.SourceURL, &videoKind, &videoURL,
+		&news.ImageURLs, &news.PublishedAt, &news.CreatedAt, &news.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if videoKind != nil {
+		news.Video = &models.Video{Kind: models.VideoKind(*videoKind), URL: videoURL}
 	}
 
 	return &news, nil
@@ -333,13 +345,16 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 	query := `UPDATE news SET
 		slug = $2, category = $3, title = $4, description = $5, text = $6,
 		language = $7, status = $8, featured = $9, main_event = $10, image_url = $11,
-		source = $12, source_url = $13, published_at = $14, updated_at = $15
+		source = $12, source_url = $13, video_kind = $14, video_url = $15,
+		image_urls = $16, published_at = $17, updated_at = $18
 		WHERE id = $1`
 
+	videoKind, videoURL := videoValues(news.Video)
 	tag, err := db.Exec(ctx, query,
 		news.ID, news.Slug, news.Category, news.Title, news.Description, news.Text,
 		news.Language, news.Status, news.Featured, news.MainEvent, news.ImageURL,
-		news.Source, news.SourceURL, news.PublishedAt, news.UpdatedAt,
+		news.Source, news.SourceURL, videoKind, videoURL, imageValues(news.ImageURLs),
+		news.PublishedAt, news.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fc, err)
@@ -349,4 +364,23 @@ func updateNews(ctx context.Context, db commandExecutor, news *models.News) erro
 	}
 
 	return nil
+}
+
+// videoValues maps an optional video onto its nullable kind and URL columns.
+func videoValues(video *models.Video) (*string, string) {
+	if video == nil {
+		return nil, ""
+	}
+	kind := string(video.Kind)
+
+	return &kind, video.URL
+}
+
+// imageValues maps the image list onto the NOT NULL array column; nil becomes empty.
+func imageValues(urls []string) []string {
+	if urls == nil {
+		return []string{}
+	}
+
+	return urls
 }

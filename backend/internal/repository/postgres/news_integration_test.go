@@ -1412,3 +1412,397 @@ func TestFeaturedRotationStaysGlobal(t *testing.T) {
 
 	requireSinglePublishedFeatured(t, repo, second.ID)
 }
+
+func TestNewsRepo_Video_CreateGetBySlug_RoundTrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		slug  string
+		video *models.Video
+	}{
+		{
+			name: "file",
+			slug: "video-file-round-trip",
+			video: &models.Video{
+				Kind: models.VideoKindFile,
+				URL:  "https://example.com/videos/article.mp4",
+			},
+		},
+		{
+			name: "embed",
+			slug: "video-embed-round-trip",
+			video: &models.Video{
+				Kind: models.VideoKindEmbed,
+				URL:  "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+			},
+		},
+		{
+			name:  "nil",
+			slug:  "video-nil-round-trip",
+			video: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+
+			news := draftNews(tt.slug)
+			news.Video = tt.video
+			require.NoError(t, repo.Create(ctx, news))
+
+			got, err := repo.GetBySlug(ctx, tt.slug)
+			require.NoError(t, err)
+			if tt.video == nil {
+				assert.Nil(t, got.Video, "nil Video must stay nil after Create/GetBySlug")
+				return
+			}
+
+			require.NotNil(t, got.Video, "Video must survive Create/GetBySlug")
+			assert.Equal(t, tt.video.Kind, got.Video.Kind)
+			assert.Equal(t, tt.video.URL, got.Video.URL)
+		})
+	}
+}
+
+func TestNewsRepo_Video_Update_SetsReplacesClears(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	news := draftNews("video-update-flow")
+	require.NoError(t, repo.Create(ctx, news))
+
+	got, err := repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Nil(t, got.Video, "fresh article must have no video")
+
+	news.Video = &models.Video{
+		Kind: models.VideoKindFile,
+		URL:  "https://example.com/videos/article.mp4",
+	}
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	require.NotNil(t, got.Video, "update must persist setting a file video")
+	assert.Equal(t, models.VideoKindFile, got.Video.Kind)
+	assert.Equal(t, "https://example.com/videos/article.mp4", got.Video.URL)
+
+	news.Video = &models.Video{
+		Kind: models.VideoKindEmbed,
+		URL:  "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+	}
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	require.NotNil(t, got.Video, "update must persist replacing the video with an embed")
+	assert.Equal(t, models.VideoKindEmbed, got.Video.Kind)
+	assert.Equal(t, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ", got.Video.URL)
+
+	news.Video = nil
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Nil(t, got.Video, "update must persist clearing the video")
+}
+
+func TestNewsRepo_Video_ListAndListPublishedCarryVideo(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 23, 12, 0, 0, 0, time.UTC)
+
+	fileNews := publishedNews("video-list-file", base)
+	fileNews.Video = &models.Video{
+		Kind: models.VideoKindFile,
+		URL:  "https://example.com/videos/list-file.mp4",
+	}
+	embedNews := publishedNews("video-list-embed", base.Add(time.Hour))
+	embedNews.Video = &models.Video{
+		Kind: models.VideoKindEmbed,
+		URL:  "https://player.vimeo.com/video/123456789",
+	}
+	plain := newsFixture("video-list-plain", models.StatusDraft, base.Add(2*time.Hour))
+
+	require.NoError(t, repo.Create(ctx, fileNews))
+	require.NoError(t, repo.Create(ctx, embedNews))
+	require.NoError(t, repo.Create(ctx, plain))
+
+	bySlug := func(items []*models.News) map[string]*models.News {
+		mapped := make(map[string]*models.News, len(items))
+		for _, item := range items {
+			mapped[item.Slug] = item
+		}
+		return mapped
+	}
+
+	items, err := repo.List(ctx, models.ListFilter{Limit: 20})
+	require.NoError(t, err)
+	listed := bySlug(items)
+	require.Contains(t, listed, fileNews.Slug)
+	require.Contains(t, listed, embedNews.Slug)
+	require.Contains(t, listed, plain.Slug)
+	require.NotNil(t, listed[fileNews.Slug].Video, "List must carry the file video")
+	assert.Equal(t, models.VideoKindFile, listed[fileNews.Slug].Video.Kind)
+	assert.Equal(t, "https://example.com/videos/list-file.mp4", listed[fileNews.Slug].Video.URL)
+	require.NotNil(t, listed[embedNews.Slug].Video, "List must carry the embed video")
+	assert.Equal(t, models.VideoKindEmbed, listed[embedNews.Slug].Video.Kind)
+	assert.Equal(t, "https://player.vimeo.com/video/123456789", listed[embedNews.Slug].Video.URL)
+	assert.Nil(t, listed[plain.Slug].Video, "List must keep nil video nil")
+
+	published, err := repo.ListPublished(ctx, models.ListFilter{Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, published, 2, "drafts must not appear in the public list")
+	publishedBySlug := bySlug(published)
+	require.Contains(t, publishedBySlug, fileNews.Slug)
+	require.Contains(t, publishedBySlug, embedNews.Slug)
+	require.NotNil(t, publishedBySlug[fileNews.Slug].Video, "ListPublished must carry the file video")
+	assert.Equal(t, models.VideoKindFile, publishedBySlug[fileNews.Slug].Video.Kind)
+	assert.Equal(t, "https://example.com/videos/list-file.mp4", publishedBySlug[fileNews.Slug].Video.URL)
+	require.NotNil(t, publishedBySlug[embedNews.Slug].Video, "ListPublished must carry the embed video")
+	assert.Equal(t, models.VideoKindEmbed, publishedBySlug[embedNews.Slug].Video.Kind)
+	assert.Equal(t, "https://player.vimeo.com/video/123456789", publishedBySlug[embedNews.Slug].Video.URL)
+}
+
+func TestNewsRepo_Video_CheckConstraintRejectsKindWithoutURL(t *testing.T) {
+	const constraint = "news_video_consistent"
+
+	t.Run("insert", func(t *testing.T) {
+		pool := setupPool(t)
+		ctx := context.Background()
+
+		_, err := pool.Exec(ctx, `INSERT INTO news
+			(id, slug, category, title, status, video_kind, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, 'file', now(), now())`,
+			uuid.New(), "video-check-insert", models.CategoryNews, "Video check", models.StatusDraft,
+		)
+		require.Error(t, err, "video_kind without video_url must violate the consistency check")
+
+		var pgErr *pgconn.PgError
+		require.True(t, errors.As(err, &pgErr), "expected a PostgreSQL error, got %v", err)
+		assert.Equal(t, pgCheckViolationCode, pgErr.Code)
+		assert.Equal(t, constraint, pgErr.ConstraintName)
+
+		_, err = newsrepo.NewNewsRepo(pool).GetBySlug(ctx, "video-check-insert")
+		assert.True(t, errors.Is(err, errs.ErrNewsNotFound),
+			"the rejected insert must not leave a row behind, got %v", err)
+	})
+
+	t.Run("update", func(t *testing.T) {
+		pool := setupPool(t)
+		ctx := context.Background()
+		repo := newsrepo.NewNewsRepo(pool)
+
+		news := draftNews("video-check-update")
+		require.NoError(t, repo.Create(ctx, news))
+
+		_, err := pool.Exec(ctx, `UPDATE news SET video_kind = 'file' WHERE id = $1`, news.ID)
+		require.Error(t, err, "setting video_kind without video_url must violate the consistency check")
+
+		var pgErr *pgconn.PgError
+		require.True(t, errors.As(err, &pgErr), "expected a PostgreSQL error, got %v", err)
+		assert.Equal(t, pgCheckViolationCode, pgErr.Code)
+		assert.Equal(t, constraint, pgErr.ConstraintName)
+
+		got, err := repo.GetBySlug(ctx, news.Slug)
+		require.NoError(t, err)
+		assert.Nil(t, got.Video, "the rejected update must not change the video")
+	})
+}
+
+func TestNewsRepo_ImageURLs_CreateGetBySlug_RoundTrip(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	want := []string{
+		"https://example.com/images/01.jpg",
+		"https://example.com/images/02.jpg",
+		"https://example.com/images/03.jpg",
+	}
+	news := draftNews("images-round-trip")
+	news.ImageURLs = want
+	require.NoError(t, repo.Create(ctx, news))
+
+	bySlug, err := repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Equal(t, want, bySlug.ImageURLs, "Create/GetBySlug must round-trip image URLs in order")
+
+	byID, err := repo.GetByID(ctx, news.ID)
+	require.NoError(t, err)
+	assert.Equal(t, want, byID.ImageURLs, "Create/GetByID must round-trip image URLs in order")
+}
+
+func TestNewsRepo_ImageURLs_EmptyReadsBackEmpty(t *testing.T) {
+	tests := []struct {
+		name   string
+		slug   string
+		images []string
+	}{
+		{"nil", "images-empty-nil", nil},
+		{"empty", "images-empty-slice", []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupRepo(t)
+			ctx := context.Background()
+
+			news := draftNews(tt.slug)
+			news.ImageURLs = tt.images
+			require.NoError(t, repo.Create(ctx, news))
+
+			got, err := repo.GetBySlug(ctx, tt.slug)
+			require.NoError(t, err)
+			assert.Empty(t, got.ImageURLs, "no images must read back as empty")
+			assert.Len(t, got.ImageURLs, 0, "no images must read back as a len-0 slice")
+		})
+	}
+}
+
+func TestNewsRepo_ImageURLs_Update_ReplacesList(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	first := "https://example.com/images/01.jpg"
+	second := "https://example.com/images/02.jpg"
+	third := "https://example.com/images/03.jpg"
+
+	news := draftNews("images-update-flow")
+	news.ImageURLs = []string{first, second, third}
+	require.NoError(t, repo.Create(ctx, news))
+
+	news.ImageURLs = []string{third, first, second}
+	require.NoError(t, repo.Update(ctx, news))
+	got, err := repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Equal(t, []string{third, first, second}, got.ImageURLs,
+		"update must persist the reordered image list")
+
+	news.ImageURLs = []string{second}
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Equal(t, []string{second}, got.ImageURLs,
+		"update must persist shrinking the image list to one")
+
+	news.ImageURLs = nil
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Empty(t, got.ImageURLs, "update must persist clearing the image list")
+	assert.Len(t, got.ImageURLs, 0)
+}
+
+func TestNewsRepo_ImageURLs_ListAndListPublishedCarryImageURLs(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+	base := time.Date(2026, time.November, 23, 12, 0, 0, 0, time.UTC)
+
+	withImages := publishedNews("images-list-with", base)
+	withImages.ImageURLs = []string{
+		"https://example.com/images/01.jpg",
+		"https://example.com/images/02.jpg",
+	}
+	otherImages := publishedNews("images-list-other", base.Add(time.Hour))
+	otherImages.ImageURLs = []string{"https://example.com/images/09.jpg"}
+	plain := newsFixture("images-list-plain", models.StatusDraft, base.Add(2*time.Hour))
+
+	require.NoError(t, repo.Create(ctx, withImages))
+	require.NoError(t, repo.Create(ctx, otherImages))
+	require.NoError(t, repo.Create(ctx, plain))
+
+	bySlug := func(items []*models.News) map[string]*models.News {
+		mapped := make(map[string]*models.News, len(items))
+		for _, item := range items {
+			mapped[item.Slug] = item
+		}
+		return mapped
+	}
+
+	items, err := repo.List(ctx, models.ListFilter{Limit: 20})
+	require.NoError(t, err)
+	listed := bySlug(items)
+	require.Contains(t, listed, withImages.Slug)
+	require.Contains(t, listed, otherImages.Slug)
+	require.Contains(t, listed, plain.Slug)
+	assert.Equal(t, withImages.ImageURLs, listed[withImages.Slug].ImageURLs,
+		"List must carry image URLs in order")
+	assert.Equal(t, otherImages.ImageURLs, listed[otherImages.Slug].ImageURLs,
+		"List must carry image URLs in order")
+	assert.Empty(t, listed[plain.Slug].ImageURLs, "List must keep missing images empty")
+
+	published, err := repo.ListPublished(ctx, models.ListFilter{Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, published, 2, "drafts must not appear in the public list")
+	publishedBySlug := bySlug(published)
+	require.Contains(t, publishedBySlug, withImages.Slug)
+	require.Contains(t, publishedBySlug, otherImages.Slug)
+	assert.Equal(t, withImages.ImageURLs, publishedBySlug[withImages.Slug].ImageURLs,
+		"ListPublished must carry image URLs in order")
+	assert.Equal(t, otherImages.ImageURLs, publishedBySlug[otherImages.Slug].ImageURLs,
+		"ListPublished must carry image URLs in order")
+}
+
+func TestNewsRepo_ImageURLs_CreateElevenRejectsMaxCheck(t *testing.T) {
+	const constraint = "news_image_urls_max"
+
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	news := draftNews("images-eleven-rejected")
+	for i := 1; i <= 11; i++ {
+		news.ImageURLs = append(news.ImageURLs, fmt.Sprintf("https://example.com/images/%02d.jpg", i))
+	}
+
+	err := repo.Create(ctx, news)
+	require.Error(t, err, "the max-10 check must reject 11 image URLs")
+
+	var pgErr *pgconn.PgError
+	require.True(t, errors.As(err, &pgErr), "expected a PostgreSQL error, got %v", err)
+	assert.Equal(t, pgCheckViolationCode, pgErr.Code)
+	assert.Equal(t, constraint, pgErr.ConstraintName,
+		"11 images must be rejected by news_image_urls_max")
+
+	_, err = repo.GetBySlug(ctx, news.Slug)
+	assert.True(t, errors.Is(err, errs.ErrNewsNotFound),
+		"the rejected insert must not leave a row behind, got %v", err)
+}
+
+func TestNewsRepo_ImageURLs_VideoAndImagesCoexist(t *testing.T) {
+	repo := setupRepo(t)
+	ctx := context.Background()
+
+	images := []string{
+		"https://example.com/images/01.jpg",
+		"https://example.com/images/02.jpg",
+	}
+	news := draftNews("images-video-coexist")
+	news.Video = &models.Video{
+		Kind: models.VideoKindFile,
+		URL:  "https://example.com/videos/article.mp4",
+	}
+	news.ImageURLs = images
+	require.NoError(t, repo.Create(ctx, news))
+
+	got, err := repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	require.NotNil(t, got.Video, "video must survive alongside images")
+	assert.Equal(t, models.VideoKindFile, got.Video.Kind)
+	assert.Equal(t, "https://example.com/videos/article.mp4", got.Video.URL)
+	assert.Equal(t, images, got.ImageURLs, "images must survive alongside video")
+
+	news.ImageURLs = []string{images[1]}
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	require.NotNil(t, got.Video, "updating images must keep the video")
+	assert.Equal(t, models.VideoKindFile, got.Video.Kind)
+	assert.Equal(t, "https://example.com/videos/article.mp4", got.Video.URL)
+	assert.Equal(t, []string{images[1]}, got.ImageURLs)
+
+	news.Video = nil
+	require.NoError(t, repo.Update(ctx, news))
+	got, err = repo.GetBySlug(ctx, news.Slug)
+	require.NoError(t, err)
+	assert.Nil(t, got.Video, "clearing the video must be possible with images present")
+	assert.Equal(t, []string{images[1]}, got.ImageURLs,
+		"clearing the video must keep the images")
+}

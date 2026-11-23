@@ -37,6 +37,17 @@ Secrets come from `.env` (git-ignored) through the environment:
 | `DB_PASSWORD` | yes | PostgreSQL password (never put it in the yaml); Compose reads it from `.env` |
 | `REDIS_PASSWORD` | no | Only for deployments running the app directly against a password-protected Redis; the local Compose stack has none and does not forward it |
 
+### Video and image uploads (Cloudflare R2)
+
+Browsers upload videos and images straight to R2, so the bucket needs two settings in Cloudflare:
+
+- **CORS**: allow `PUT` from the admin site origin with the `Content-Type` header, e.g.
+  `[{"AllowedOrigins":["https://<admin-origin>"],"AllowedMethods":["PUT"],"AllowedHeaders":["content-type"],"MaxAgeSeconds":3600}]`.
+- **Lifecycle rule**: delete objects with prefix `pending/` after 1 day (abandoned video and image uploads).
+
+If the site sets a Content-Security-Policy, allow `frame-src https://www.youtube-nocookie.com
+https://player.vimeo.com` and `media-src` for the R2 public base URL.
+
 ## Authentication
 
 Staff accounts are provisioned only through SQL. Store a bcrypt hash (cost 12 or
@@ -85,11 +96,38 @@ moderator session cookie. Cross-origin frontend requests must include credential
 | `GET` | `/api/admin/news/:slug` | Get one article |
 | `PUT` | `/api/admin/news/:slug` | Update an article (the slug never changes) |
 | `DELETE` | `/api/admin/news/:slug` | Delete an article (`200 OK`, empty body) |
+| `POST` | `/api/admin/news/video-uploads` | Presign a direct video upload: `{ "content_type", "size" }` → `{ "key", "upload_url", "expires_at" }` |
+| `POST` | `/api/admin/news/image-uploads` | Presign a direct image upload (same body and response) |
 
 `page` starts at 1, `limit` defaults to 20 and is capped at 100. List responses
 are `{ "items", "page", "limit", "has_more" }`; `has_more` is true when a next page exists.
 Cover uploads are checked by content before anything is written (the extension must
 match the image bytes, max 10 MB) and stored as `covers/<slug>-<random>.<ext>`.
+Each article has at most one video (`video: { "kind": "file" | "embed", "url" } | null` in
+responses):
+
+- **File** (mp4/webm, max 500 MB): presign an upload, `PUT` the file to `upload_url` with the
+  same `Content-Type` within 15 minutes, then send the returned `key` as `video_key` with the
+  article. The server checks size and content bytes, copies the object to
+  `videos/<slug>-<random>.<ext>` and deletes the pending one.
+- **Embed**: `video_url` with a YouTube or Vimeo link; it is stored as the canonical player URL
+  (`www.youtube-nocookie.com/embed/<id>`, `player.vimeo.com/video/<id>`).
+- Update is full-replace: sending the current `video.url` keeps the video, empty `video_key` and
+  `video_url` remove it. Replaced and deleted video files are removed from storage.
+- The public site shows the video in the middle of the article text.
+
+Each article has up to 10 extra images besides the cover (`images: string[]` in admin and public
+detail responses, always an array). The request field `images` is the ordered list; each item is
+one of:
+
+- a pending key from `image-uploads` (jpg/png/webp/gif, max 10 MB): checked by content, copied to
+  `images/<slug>-<random>.<ext>`, the pending object deleted;
+- one of the article's current image URLs: kept;
+- another image link: downloaded like a pasted cover and stored in R2.
+
+A missing `images` field keeps the current images; `[]` removes them. Duplicates, more than 10
+items and foreign storage URLs are rejected. Removed images are deleted from storage after the save.
+
 `status` accepts `draft` or `published`. `category` accepts `Новини`,
 `Міжнародні новини`, `Спорт`, `Інтерв'ю`, `Економіка`, `Політика`, or
 `Регіональні новини`; an unknown value returns `400 Invalid input`.

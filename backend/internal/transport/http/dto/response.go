@@ -10,23 +10,25 @@ import (
 
 // NewsResponse is a news article as returned by the API.
 type NewsResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	Slug        string     `json:"slug"`
-	Category    string     `json:"category"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Text        string     `json:"text"`
-	Language    string     `json:"language"`
-	Status      string     `json:"status"`
-	Views       int64      `json:"views"`
-	Featured    bool       `json:"featured"`
-	MainEvent   bool       `json:"main_event"`
-	ImageURL    string     `json:"image_url"`
-	Source      string     `json:"source"`
-	SourceURL   string     `json:"source_url"`
-	PublishedAt *time.Time `json:"published_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          uuid.UUID      `json:"id"`
+	Slug        string         `json:"slug"`
+	Category    string         `json:"category"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Text        string         `json:"text"`
+	Language    string         `json:"language"`
+	Status      string         `json:"status"`
+	Views       int64          `json:"views"`
+	Featured    bool           `json:"featured"`
+	MainEvent   bool           `json:"main_event"`
+	ImageURL    string         `json:"image_url"`
+	Source      string         `json:"source"`
+	SourceURL   string         `json:"source_url"`
+	Video       *VideoResponse `json:"video"`
+	Images      []string       `json:"images"`
+	PublishedAt *time.Time     `json:"published_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 // ListResponse is a page of news articles.
@@ -60,18 +62,20 @@ type PublicNewsListResponse struct {
 
 // PublicNewsDetailResponse is a published article returned by the public API.
 type PublicNewsDetailResponse struct {
-	Slug        string     `json:"slug"`
-	Category    string     `json:"category"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Text        string     `json:"text"`
-	ImageURL    string     `json:"image_url"`
-	Featured    bool       `json:"featured"`
-	MainEvent   bool       `json:"main_event"`
-	Source      string     `json:"source"`
-	SourceURL   string     `json:"source_url"`
-	Views       int64      `json:"views"`
-	PublishedAt *time.Time `json:"published_at"`
+	Slug        string         `json:"slug"`
+	Category    string         `json:"category"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Text        string         `json:"text"`
+	ImageURL    string         `json:"image_url"`
+	Featured    bool           `json:"featured"`
+	MainEvent   bool           `json:"main_event"`
+	Source      string         `json:"source"`
+	SourceURL   string         `json:"source_url"`
+	Video       *VideoResponse `json:"video"`
+	Images      []string       `json:"images"`
+	Views       int64          `json:"views"`
+	PublishedAt *time.Time     `json:"published_at"`
 }
 
 // HealthResponse is the successful response of a health probe.
@@ -190,6 +194,8 @@ func NewsToPublicDetailResponse(news *models.News) *PublicNewsDetailResponse {
 		MainEvent:   news.MainEvent,
 		Source:      news.Source,
 		SourceURL:   news.SourceURL,
+		Video:       VideoToResponse(news.Video),
+		Images:      ImagesToResponse(news.ImageURLs),
 		Views:       news.Views,
 		PublishedAt: news.PublishedAt,
 	}
@@ -216,6 +222,8 @@ func NewsToResponse(news *models.News) *NewsResponse {
 		ImageURL:    news.ImageURL,
 		Source:      news.Source,
 		SourceURL:   news.SourceURL,
+		Video:       VideoToResponse(news.Video),
+		Images:      ImagesToResponse(news.ImageURLs),
 		PublishedAt: news.PublishedAt,
 		CreatedAt:   news.CreatedAt,
 		UpdatedAt:   news.UpdatedAt,

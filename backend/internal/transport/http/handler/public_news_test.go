@@ -340,7 +340,7 @@ const publishedDetailBody = `{"category":"Міжнародні новини","ti
 // publicDetailFields is the exact field set of a public detail payload.
 var publicDetailFields = []string{
 	"slug", "category", "title", "description", "image_url",
-	"featured", "main_event", "source", "source_url", "views", "published_at", "text",
+	"featured", "main_event", "source", "source_url", "video", "images", "views", "published_at", "text",
 }
 
 func decodePublicDetail(t *testing.T, body []byte) map[string]any {
@@ -371,6 +371,8 @@ func TestPublicDetail_ReturnsPublishedArticle(t *testing.T) {
 	assert.NotEmpty(t, detail["published_at"])
 	assert.Equal(t, "Перший абзац.\nДругий абзац.", detail["text"],
 		"multiline text must survive the response unchanged")
+	require.Contains(t, detail, "video", "an article without a video must expose a null video")
+	assert.Nil(t, detail["video"])
 
 	require.Len(t, detail, len(publicDetailFields), "unexpected fields in %v", detail)
 	for _, field := range publicDetailFields {

@@ -20,6 +20,10 @@ type NewsRequest struct {
 	ImageURL    string `json:"image_url"`
 	Source      string `json:"source"`
 	SourceURL   string `json:"source_url"`
+	VideoKey    string `json:"video_key"`
+	VideoURL    string `json:"video_url"`
+	// Images is the ordered image list; a missing key (nil) keeps the current images.
+	Images []string `json:"images"`
 }
 
 // ToInput maps the request body onto the service input.
@@ -36,5 +40,8 @@ func (r NewsRequest) ToInput() service.NewsInput {
 		ImageURL:    r.ImageURL,
 		Source:      r.Source,
 		SourceURL:   r.SourceURL,
+		VideoKey:    r.VideoKey,
+		VideoURL:    r.VideoURL,
+		Images:      r.Images,
 	}
 }

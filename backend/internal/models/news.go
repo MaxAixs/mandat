@@ -44,6 +44,27 @@ func (c Category) Valid() bool {
 	return false
 }
 
+// VideoKind tells how an article video is delivered.
+type VideoKind string
+
+const (
+	// VideoKindFile is a file stored in our object storage.
+	VideoKindFile VideoKind = "file"
+	// VideoKindEmbed is a canonical YouTube or Vimeo player URL.
+	VideoKindEmbed VideoKind = "embed"
+)
+
+// Valid reports whether k is a known video kind.
+func (k VideoKind) Valid() bool {
+	return k == VideoKindFile || k == VideoKindEmbed
+}
+
+// Video is the single video attached to an article.
+type Video struct {
+	Kind VideoKind
+	URL  string
+}
+
 // News is a news article. Views and timestamps are system-owned:
 // clients never set them through the API.
 type News struct {
@@ -61,6 +82,10 @@ type News struct {
 	ImageURL    string
 	Source      string
 	SourceURL   string
+	// Video is nil when the article has no video.
+	Video *Video
+	// ImageURLs are the extra images in display order; empty means none.
+	ImageURLs   []string
 	PublishedAt *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
