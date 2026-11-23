@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-admin-contacts-section-tests"
+  },
+  "include": [
+    "../admin-contacts-section.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/pages/Admin.tsx",
+    "../../src/components/admin/ContactsPanel.tsx"
+  ]
+}

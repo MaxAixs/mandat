@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 
 import { listAdFormats } from '@/api/adFormats'
 
@@ -11,15 +12,17 @@ import {
   ADVERTISING_AUDIENCE,
   ADVERTISING_AUDIENCE_TITLE,
   ADVERTISING_CTA_TITLE,
-  ADVERTISING_EMAIL,
   ADVERTISING_FORMATS_LEAD,
   ADVERTISING_FORMATS_TITLE,
   ADVERTISING_LEAD,
   ADVERTISING_ORDER_LABEL,
-  ADVERTISING_ORDER_SUBJECT,
   ADVERTISING_TITLE,
 } from '@/constants/advertising'
 import { BANNER_ADS_FORMAT_TITLE, BANNER_ADS_PATH } from '@/constants/banner-ads'
+import { CLIENT_PROJECTS_FORMAT_TITLE, CLIENT_PROJECTS_PATH } from '@/constants/client-projects'
+import { CONTACTS_PATH } from '@/constants/contacts'
+import { LONGREADS_FORMAT_TITLE, LONGREADS_PATH } from '@/constants/longreads'
+import { PARTNER_MATERIALS_FORMAT_TITLE, PARTNER_MATERIALS_PATH } from '@/constants/partner-materials'
 import { cn } from '@/lib/utils'
 import Footer from '@/sections/Footer'
 import Header from '@/sections/Header'
@@ -29,7 +32,14 @@ import type { AdFormat } from '@/types'
 const MARQUEE_ITEMS = 12
 const MARQUEE_SECONDS = 60
 
-const orderHref = `mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(ADVERTISING_ORDER_SUBJECT)}`
+// Cards with their own page of rules (by card title); other cards lead to the contacts page.
+const FORMAT_PAGES: Record<string, string> = {
+  [BANNER_ADS_FORMAT_TITLE]: BANNER_ADS_PATH,
+  [LONGREADS_FORMAT_TITLE]: LONGREADS_PATH,
+  [PARTNER_MATERIALS_FORMAT_TITLE]: PARTNER_MATERIALS_PATH,
+  [CLIENT_PROJECTS_FORMAT_TITLE]: CLIENT_PROJECTS_PATH,
+}
+
 const orderButtonClassName =
   'inline-flex h-12 items-center justify-center px-7 text-[15px] font-medium no-underline transition-colors'
 
@@ -63,9 +73,9 @@ export default function Advertising() {
         <p className="mt-6 max-w-[680px] text-[16px] leading-relaxed text-mandat-muted md:text-[18px]">
           {ADVERTISING_LEAD}
         </p>
-        <a href={orderHref} className={cn(orderButtonClassName, 'mt-8 bg-mandat-red-bright text-white hover:bg-mandat-red')}>
+        <Link to={CONTACTS_PATH} className={cn(orderButtonClassName, 'mt-8 bg-mandat-red-bright text-white hover:bg-mandat-red')}>
           {ADVERTISING_ORDER_LABEL}
-        </a>
+        </Link>
       </section>
 
       <div className="overflow-hidden bg-mandat-red py-6 md:py-8" aria-hidden="true">
@@ -115,14 +125,12 @@ export default function Advertising() {
         </p>
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {formats.map((format) => {
-            // Banner ads have their own page with the placement rules; other cards open an order email.
-            const pagePath = format.title.trim() === BANNER_ADS_FORMAT_TITLE ? BANNER_ADS_PATH : undefined
+            const pagePath = FORMAT_PAGES[format.title.trim()]
             return (
               <AdvertisingFormatCard
                 key={format.id}
                 format={format}
-                to={pagePath}
-                href={`mailto:${ADVERTISING_EMAIL}?subject=${encodeURIComponent(`${ADVERTISING_ORDER_SUBJECT}: ${format.title}`)}`}
+                to={pagePath ?? CONTACTS_PATH}
                 ariaLabel={pagePath ? format.title : `${ADVERTISING_ORDER_LABEL}: ${format.title}`}
               />
             )
@@ -135,9 +143,9 @@ export default function Advertising() {
           <MandatLogo className="h-8 self-start md:h-10 md:self-auto" barClassName="fill-white" />
           <div className="md:text-right">
             <p className="text-[28px] font-bold leading-tight text-white md:text-[36px]">{ADVERTISING_CTA_TITLE}</p>
-            <a href={orderHref} className={cn(orderButtonClassName, 'mt-6 bg-white text-mandat-bg hover:bg-white/90')}>
+            <Link to={CONTACTS_PATH} className={cn(orderButtonClassName, 'mt-6 bg-white text-mandat-bg hover:bg-white/90')}>
               {ADVERTISING_ORDER_LABEL}
-            </a>
+            </Link>
           </div>
         </div>
       </section>

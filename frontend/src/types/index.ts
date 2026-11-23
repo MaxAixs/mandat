@@ -110,6 +110,14 @@ export interface AdFormat {
   position: number
 }
 
+/** A variant of an ad format, listed on that format's own page. */
+export interface AdFormatItem {
+  title: string
+  /** Clarifies a title shared by several variants. */
+  subtitle?: string
+  text: string
+}
+
 /** Editable fields of an ad format card. A new `image` replaces the current one. */
 export interface AdFormatFormValues {
   title: string
@@ -119,3 +127,29 @@ export interface AdFormatFormValues {
 }
 
 export type AdFormatMoveDirection = 'up' | 'down'
+
+/** Kind of a contact; picks its icon, and the server validates the value and builds the link. */
+export type ContactType = 'email' | 'telegram' | 'instagram' | 'threads' | 'facebook' | 'phone' | 'website'
+
+/** A contact of the /contacts page, managed from the admin panel. */
+export interface Contact {
+  id: string
+  type: ContactType
+  /** Normalized value: the address, the bare handle, the phone or the URL. */
+  value: string
+  /** Optional caption shown instead of the type name; empty when unset. */
+  label: string
+  /** Server-built text shown on the page, e.g. `@mandat`. */
+  display: string
+  /** Server-built link, e.g. `https://t.me/mandat`. */
+  href: string
+  position: number
+}
+
+export interface ContactFormValues {
+  type: ContactType
+  value: string
+  label: string
+}
+
+export type ContactMoveDirection = 'up' | 'down'

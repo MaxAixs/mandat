@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-contact-list-tests"
+  },
+  "include": [
+    "../contact-list.test.tsx",
+    "assets.d.ts",
+    "lucide-react.d.ts",
+    "../../src/components/ContactList.tsx",
+    "../../src/pages/Contacts.tsx"
+  ]
+}

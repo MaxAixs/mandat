@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   LogOut,
   MapPin,
+  ContactRound,
   Megaphone,
   Mic,
   Newspaper,
@@ -33,9 +34,11 @@ import {
   updateNews,
 } from '@/api/news'
 import AdFormatsPanel from '@/components/admin/AdFormatsPanel'
+import ContactsPanel from '@/components/admin/ContactsPanel'
 import NewsEditorDialog from '@/components/admin/NewsEditorDialog'
 import { CATEGORIES } from '@/constants'
 import { ADVERTISING_ADMIN_SECTION } from '@/constants/advertising'
+import { CONTACTS_ADMIN_SECTION } from '@/constants/contacts'
 import useAuth from '@/hooks/use-auth'
 import {
   AlertDialog,
@@ -68,11 +71,12 @@ import type { AdminNews, Category, NewsFormValues } from '@/types'
 
 const PAGE_SIZE = 20
 
-type AdminSection = 'news' | 'ads'
+type AdminSection = 'news' | 'ads' | 'contacts'
 
 const ADMIN_SECTIONS: { id: AdminSection; label: string; icon: LucideIcon }[] = [
   { id: 'news', label: 'Керування новинами', icon: Newspaper },
   { id: 'ads', label: 'Формати реклами', icon: Megaphone },
+  { id: 'contacts', label: CONTACTS_ADMIN_SECTION, icon: ContactRound },
 ]
 
 const dateFormatter = new Intl.DateTimeFormat('uk-UA', {
@@ -166,7 +170,7 @@ export default function Admin() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const requestId = useRef(0)
 
-  const showingAds = section === 'ads'
+  const showingNews = section === 'news'
 
   const loadNews = useCallback(async () => {
     const currentRequest = ++requestId.current
@@ -192,10 +196,10 @@ export default function Admin() {
     }
   }, [page, category])
 
-  // The news list is not fetched while the ad formats section is open; switching back reloads it.
+  // The news list is not fetched while another section is open; switching back reloads it.
   useEffect(() => {
-    if (!showingAds) void loadNews()
-  }, [loadNews, showingAds])
+    if (showingNews) void loadNews()
+  }, [loadNews, showingNews])
 
   const visibleArticles = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('uk')
@@ -326,7 +330,7 @@ export default function Admin() {
               <LayoutDashboard className="size-4" />
               <span>Адмінпанель</span>
               <span className="text-mandat-line">/</span>
-              <span className="text-mandat-text">{showingAds ? ADVERTISING_ADMIN_SECTION : 'Новини'}</span>
+              <span className="text-mandat-text">{section === 'ads' ? ADVERTISING_ADMIN_SECTION : section === 'contacts' ? CONTACTS_ADMIN_SECTION : 'Новини'}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
@@ -355,10 +359,12 @@ export default function Admin() {
             <AdminSectionNav
               active={section}
               onSelect={setSection}
-              className="mb-6 grid grid-cols-2 border border-mandat-line bg-mandat-surface lg:hidden"
+              className="mb-6 grid grid-cols-3 border border-mandat-line bg-mandat-surface lg:hidden"
             />
-            {showingAds ? (
+            {section === 'ads' ? (
               <AdFormatsPanel />
+            ) : section === 'contacts' ? (
+              <ContactsPanel />
             ) : (
               <>
               <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

@@ -12,6 +12,10 @@ import Feed from './pages/Feed'
 import Rules from './pages/Rules'
 import Advertising from './pages/Advertising'
 import BannerAds from './pages/BannerAds'
+import Longreads from './pages/Longreads'
+import PartnerMaterials from './pages/PartnerMaterials'
+import ClientProjects from './pages/ClientProjects'
+import Contacts from './pages/Contacts'
 
 export default function App() {
   return (
@@ -28,6 +32,10 @@ export default function App() {
         <Route path="/rules" element={<Rules />} />
         <Route path="/advertising" element={<Advertising />} />
         <Route path="/advertising/banners" element={<BannerAds />} />
+        <Route path="/advertising/longreads" element={<Longreads />} />
+        <Route path="/advertising/partner-materials" element={<PartnerMaterials />} />
+        <Route path="/advertising/client-projects" element={<ClientProjects />} />
+        <Route path="/contacts" element={<Contacts />} />
         <Route path="/news/:slug" element={<Article />} />
         <Route path="/admin/login" element={<Login />} />
         <Route

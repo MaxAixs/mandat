@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-contacts-api-tests"
+  },
+  "include": ["../contacts-api.test.ts"]
+}

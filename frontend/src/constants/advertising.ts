@@ -1,16 +1,17 @@
-/** Content of the /advertising page: audience, ad formats and contacts. */
+/** Content of the /advertising page: audience and ad formats. */
 
 import { TELEGRAM_CHANNEL } from '@/constants'
 
 export const ADVERTISING_TITLE = 'Реклама на «Мандаті»'
+export const ADVERTISING_PATH = '/advertising'
+/** Back link label on the pages of individual ad formats. */
+export const ADVERTISING_BACK_LABEL = 'Усі формати реклами'
 
 export const ADVERTISING_LEAD =
   'Говоримо з аудиторією, яка ухвалює рішення: про владу, гроші та вплив. Допоможемо розповісти про ваш бренд чесно, без шуму й у форматі, що поважає читача.'
 
-/** Placeholder address until the sales mailbox is confirmed. */
-export const ADVERTISING_EMAIL = 'ads@mandat.ua'
+/** Label of the buttons that lead to the contacts page. */
 export const ADVERTISING_ORDER_LABEL = 'Замовити рекламу'
-export const ADVERTISING_ORDER_SUBJECT = 'Замовлення реклами на «Мандаті»'
 
 export const ADVERTISING_AUDIENCE_TITLE = 'Соціальні мережі'
 

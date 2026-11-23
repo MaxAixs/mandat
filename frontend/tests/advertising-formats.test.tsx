@@ -4,6 +4,7 @@ import Module from 'node:module'
 import path from 'node:path'
 
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter } from 'react-router'
 import type { ComponentType } from 'react'
 
 import type { AdFormat } from '../src/types'
@@ -61,22 +62,26 @@ function makeFormat(overrides: Partial<AdFormat> = {}): AdFormat {
   }
 }
 
-type FormatCardProps = { format: AdFormat; href: string; ariaLabel: string }
+type FormatCardProps = { format: AdFormat; to: string; ariaLabel: string }
+
+const cardTo = '/advertising/longreads'
 
 function renderCard(format: AdFormat): string {
   const Card = AdvertisingFormatCard as unknown as ComponentType<FormatCardProps>
 
   return renderToStaticMarkup(
-    <Card
-      format={format}
-      href="mailto:ads@mandat.ua?subject=order"
-      ariaLabel={`Замовити рекламу: ${format.title}`}
-    />,
+    <MemoryRouter>
+      <Card format={format} to={cardTo} ariaLabel={`Замовити рекламу: ${format.title}`} />
+    </MemoryRouter>,
   )
 }
 
 function imageTags(html: string): string[] {
   return Array.from(html.matchAll(/<img\b[^>]*>/g), (match) => match[0])
+}
+
+function anchorTags(html: string): string[] {
+  return Array.from(html.matchAll(/<a\b[^>]*>/g), (match) => match[0])
 }
 
 function attribute(tag: string, name: string): string | undefined {
@@ -113,7 +118,14 @@ test('AdvertisingFormatCard shows the image only when image_url is set', () => {
   for (const { name, format, expectedImages } of cases) {
     const html = renderCard(format)
     const images = imageTags(html)
+    const anchors = anchorTags(html)
 
+    assert.equal(anchors.length, 1, `${name}: expected the card to render a single link in:\n${html}`)
+    assert.equal(
+      attribute(anchors[0] ?? '', 'href'),
+      cardTo,
+      `${name}: expected the card link to point at ${cardTo} in:\n${html}`,
+    )
     assert.equal(images.length, expectedImages, `${name}: expected ${expectedImages} image(s) in:\n${html}`)
     if (expectedImages > 0) {
       assert.equal(
@@ -130,7 +142,13 @@ test('AdvertisingFormatCard renders the title and description', () => {
 
   for (const format of cases) {
     const html = renderCard(format)
+    const anchors = anchorTags(html)
 
+    assert.equal(
+      attribute(anchors[0] ?? '', 'href'),
+      cardTo,
+      `expected the card link to point at ${cardTo} in:\n${html}`,
+    )
     assert.ok(html.includes(format.title), `expected the card title in:\n${html}`)
     assert.ok(html.includes(format.description), `expected the card description in:\n${html}`)
   }
