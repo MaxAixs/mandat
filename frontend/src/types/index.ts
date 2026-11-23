@@ -24,9 +24,22 @@ export interface Article {
   imageUrl?: string
 }
 
+/** How an article video is delivered: a stored file or a YouTube/Vimeo player. */
+export type VideoKind = 'file' | 'embed'
+
+/** The single video attached to an article. */
+export interface NewsVideo {
+  kind: VideoKind
+  url: string
+}
+
 /** A complete news article with its plain-text body. */
 export interface ArticleDetail extends Article {
   text: string
+  /** Rendered in the middle of the text. */
+  video?: NewsVideo
+  /** Extra images spread through the text, in display order. */
+  images?: string[]
   /** Source outlet name shown as «Джерело: …» at the end of the article. */
   source?: string
   /** Optional hyperlink attached to the source name. */
@@ -88,11 +101,21 @@ export interface NewsFormValues {
   image_url: string
   source?: string
   source_url?: string
+  /** Key of a finished direct upload; wins over video_url. */
+  video_key?: string
+  /** YouTube/Vimeo link or the current video file URL; empty removes the video. */
+  video_url?: string
+  /** Ordered image list: pending upload keys, current image URLs or image links. */
+  images?: string[]
 }
 
 /** News article displayed in the administration panel. */
 export interface AdminNews extends NewsFormValues {
   id: string
+  /** Always sent by the backend; null when the article has no video. */
+  video?: NewsVideo | null
+  /** Saved image URLs in display order. */
+  images?: string[]
   slug: string
   views: number
   published_at: string | null

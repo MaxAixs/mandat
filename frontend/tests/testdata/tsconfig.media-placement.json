@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-media-placement-tests"
+  },
+  "include": ["../media-placement.test.ts", "../../src/lib/*.ts"]
+}

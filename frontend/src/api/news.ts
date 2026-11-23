@@ -1,10 +1,24 @@
-import type { AdminNews, Category, NewsFormValues, NewsStatus } from '@/types'
+import type { AdminNews, Category, NewsFormValues, NewsStatus, NewsVideo } from '@/types'
 
 const NEWS_API_URL = '/api/admin/news'
 const PUBLIC_NEWS_API_URL = '/api/news'
 
 // DEFAULT_SEARCH_LIMIT is the suggestion count used by the header search box.
 export const DEFAULT_SEARCH_LIMIT = 7
+
+// MAX_VIDEO_BYTES mirrors the backend cap on one uploaded video (500 MB).
+export const MAX_VIDEO_BYTES = 500 * 1024 * 1024
+// VIDEO_TYPES are the accepted video file types.
+export const VIDEO_TYPES = ['video/mp4', 'video/webm']
+
+// MAX_IMAGES mirrors the backend cap on extra images per article.
+export const MAX_IMAGES = 10
+// MAX_IMAGE_BYTES mirrors the backend cap on one image (10 MB).
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+// IMAGE_TYPES are the accepted image file types.
+export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+const UPLOAD_CANCELLED = 'Завантаження скасовано.'
 
 export interface NewsListResponse {
   items: AdminNews[]
@@ -28,6 +42,15 @@ export interface PublicNewsDetail extends PublicNews {
   text: string
   source?: string
   source_url?: string
+  video: NewsVideo | null
+  images: string[]
+}
+
+/** A presigned direct upload: PUT the file to upload_url, then send key with the article. */
+export interface VideoUpload {
+  key: string
+  upload_url: string
+  expires_at: string
 }
 
 export interface PublicNewsListResponse {
@@ -136,6 +159,67 @@ export function createNews(payload: NewsFormValues): Promise<AdminNews> {
 
 export function updateNews(slug: string, payload: NewsFormValues): Promise<AdminNews> {
   return request<AdminNews>(NEWS_API_URL, `/${encodeURIComponent(slug)}`, jsonRequest('PUT', payload))
+}
+
+// requestVideoUpload asks the backend for a presigned URL to upload file directly to storage.
+export function requestVideoUpload(file: { type: string; size: number }): Promise<VideoUpload> {
+  return request<VideoUpload>(NEWS_API_URL, '/video-uploads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content_type: file.type, size: file.size }),
+  })
+}
+
+// requestImageUpload asks the backend for a presigned URL to upload a image directly to storage.
+export function requestImageUpload(file: { type: string; size: number }): Promise<VideoUpload> {
+  return request<VideoUpload>(NEWS_API_URL, '/image-uploads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content_type: file.type, size: file.size }),
+  })
+}
+
+// uploadFile PUTs file to a presigned URL, reporting progress as a 0..1 fraction.
+// XHR is used because fetch cannot report upload progress.
+export function uploadFile(
+  uploadUrl: string,
+  file: Blob,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(UPLOAD_CANCELLED))
+      return
+    }
+
+    const xhr = new XMLHttpRequest()
+    const onAbort = () => xhr.abort()
+
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total)
+    })
+    xhr.addEventListener('load', () => {
+      signal?.removeEventListener('abort', onAbort)
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        reject(new Error(`Не вдалося завантажити файл (${xhr.status}).`))
+      }
+    })
+    xhr.addEventListener('error', () => {
+      signal?.removeEventListener('abort', onAbort)
+      reject(new Error('Не вдалося завантажити файл: помилка мережі.'))
+    })
+    xhr.addEventListener('abort', () => {
+      signal?.removeEventListener('abort', onAbort)
+      reject(new Error(UPLOAD_CANCELLED))
+    })
+    signal?.addEventListener('abort', onAbort)
+    xhr.send(file)
+  })
 }
 
 export function deleteNews(slug: string): Promise<void> {

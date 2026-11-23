@@ -86,6 +86,8 @@ export async function getPublicNewsArticle(slug: string): Promise<ArticleDetail>
   const article: ArticleDetail = { ...toArticle(news), text: news.text }
   if (news.source) article.source = news.source
   if (news.source_url) article.sourceUrl = news.source_url
+  if (news.video) article.video = news.video
+  if (news.images?.length) article.images = news.images
 
   return article
 }

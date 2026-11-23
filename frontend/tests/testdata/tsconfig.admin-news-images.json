@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-admin-news-images-tests"
+  },
+  "include": [
+    "../admin-news-images.test.tsx",
+    "../../src/components/admin/NewsImagesField.tsx",
+    "../../src/components/admin/NewsEditorDialog.tsx",
+    "../../src/hooks/use-image-uploads.ts"
+  ]
+}

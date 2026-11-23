@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { CalendarDays, Image, LoaderCircle, Star } from 'lucide-react'
 
+import NewsImagesField from '@/components/admin/NewsImagesField'
+import NewsVideoField from '@/components/admin/NewsVideoField'
 import { Button } from '@/components/ui/button'
 import { CATEGORIES } from '@/constants'
 import {
@@ -22,6 +24,8 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import useImageUploads from '@/hooks/use-image-uploads'
+import useVideoUpload from '@/hooks/use-video-upload'
 import { validateNewsPayload, type NewsValidationErrors } from '@/lib/news-validation'
 import type { AdminNews, Category, NewsFormValues } from '@/types'
 
@@ -37,6 +41,8 @@ const emptyNews: NewsFormValues = {
   image_url: '',
   source: '',
   source_url: '',
+  video_key: '',
+  video_url: '',
 }
 
 const inputClassName =
@@ -65,11 +71,27 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
           image_url: article.image_url,
           source: article.source ?? '',
           source_url: article.source_url ?? '',
+          video_key: '',
+          video_url: article.video?.url ?? '',
         }
       : emptyNews,
   )
 
   const [errors, setErrors] = useState<NewsValidationErrors>({})
+
+  const setVideo = useCallback((videoKey: string, videoUrl: string) => {
+    setValues((current) => ({ ...current, video_key: videoKey, video_url: videoUrl }))
+    setErrors((current) => {
+      const next = { ...current }
+      delete next.video_url
+      return next
+    })
+  }, [])
+
+  const onVideoUploaded = useCallback((key: string) => setVideo(key, ''), [setVideo])
+  const videoUpload = useVideoUpload(onVideoUploaded)
+  const imageUploads = useImageUploads(article?.images ?? [])
+  const uploading = videoUpload.state.status === 'uploading' || imageUploads.uploading
 
   const update = <K extends keyof NewsFormValues>(key: K, value: NewsFormValues[K]) => {
     setValues((current) => ({ ...current, [key]: value }))
@@ -80,15 +102,21 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
     })
   }
 
+  const removeVideo = () => {
+    videoUpload.cancel()
+    setVideo('', '')
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (uploading) return
     const nextErrors = validateNewsPayload(values)
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       return
     }
 
-    onSave(values)
+    onSave({ ...values, images: imageUploads.values })
   }
 
   return (
@@ -189,6 +217,33 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
               {errors.image_url && <p className="text-xs text-mandat-red-bright">{errors.image_url}</p>}
             </div>
 
+            <div className="space-y-2 md:col-span-2">
+              <div className="text-xs tracking-wide text-mandat-muted">ВІДЕО</div>
+              <NewsVideoField
+                videoKey={values.video_key ?? ''}
+                videoUrl={values.video_url ?? ''}
+                currentVideo={article?.video ?? null}
+                upload={videoUpload.state}
+                error={errors.video_url}
+                onSelectFile={(file) => void videoUpload.start(file)}
+                onCancelUpload={videoUpload.cancel}
+                onLinkChange={(url) => setVideo('', url)}
+                onRemove={removeVideo}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="text-xs tracking-wide text-mandat-muted">ФОТО</div>
+              <NewsImagesField
+                items={imageUploads.items}
+                error={imageUploads.notice ?? errors.images}
+                onAddFiles={imageUploads.addFiles}
+                onAddLink={imageUploads.addLink}
+                onMove={imageUploads.move}
+                onRemove={imageUploads.remove}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="news-source" className="text-xs tracking-wide text-mandat-muted">
                 ДЖЕРЕЛО
@@ -278,7 +333,7 @@ export default function NewsEditorDialog({ article, busy = false, error, onClose
             </Button>
             <Button
               type="submit"
-              disabled={busy}
+              disabled={busy || uploading}
               className="rounded-none bg-mandat-red px-6 text-white hover:bg-mandat-red-bright"
             >
               {busy && <LoaderCircle className="size-4 animate-spin" />}

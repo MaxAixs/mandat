@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-news-images-validation-tests"
+  },
+  "include": ["../news-images-validation.test.ts", "../../src/lib/news-validation.ts"]
+}

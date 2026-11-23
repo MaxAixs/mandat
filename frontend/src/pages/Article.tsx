@@ -2,12 +2,20 @@ import { useEffect } from 'react'
 import { CalendarDays, Eye, LoaderCircle, RefreshCw } from 'lucide-react'
 import { useParams } from 'react-router'
 
+import ArticleImage from '@/components/ArticleImage'
+import ArticleVideo from '@/components/ArticleVideo'
 import usePublicArticle from '@/hooks/use-public-article'
+import { placeMedia } from '@/lib/media-placement'
 import Footer from '@/sections/Footer'
 import Header from '@/sections/Header'
 import type { ArticleDetail } from '@/types'
 
+const textClassName = 'whitespace-pre-line text-[17px] leading-8 text-mandat-text'
+
 export function ArticleContent({ article }: { article: ArticleDetail }) {
+  const images = article.images ?? []
+  const segments = placeMedia(article.text, { hasVideo: Boolean(article.video), imageCount: images.length })
+
   return (
     <article className="w-full pb-8 md:pb-12">
       <div className="mx-auto w-full max-w-[900px] px-6">
@@ -70,9 +78,28 @@ export function ArticleContent({ article }: { article: ArticleDetail }) {
             </span>
           </div>
         </div>
-        <div className="mt-8 whitespace-pre-line text-[17px] leading-8 text-mandat-text">
-          {article.text}
-        </div>
+        {article.video || images.length > 0 ? (
+          <div className="mt-8 space-y-8">
+            {segments.map((segment, position) => {
+              switch (segment.type) {
+                case 'text':
+                  return (
+                    <div key={`text-${position}`} className={textClassName}>
+                      {segment.text}
+                    </div>
+                  )
+                case 'video':
+                  return article.video ? (
+                    <ArticleVideo key="video" video={article.video} title={article.title} poster={article.imageUrl} />
+                  ) : null
+                case 'image':
+                  return <ArticleImage key={`image-${segment.index}`} src={images[segment.index]} alt={article.title} />
+              }
+            })}
+          </div>
+        ) : (
+          <div className={`mt-8 ${textClassName}`}>{article.text}</div>
+        )}
       </div>
     </article>
   )

@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "/tmp/opencode/mandat-admin-news-video-tests"
+  },
+  "include": [
+    "../admin-news-video.test.tsx",
+    "../../src/components/admin/NewsVideoField.tsx",
+    "../../src/components/admin/NewsEditorDialog.tsx",
+    "../../src/hooks/use-video-upload.ts"
+  ]
+}

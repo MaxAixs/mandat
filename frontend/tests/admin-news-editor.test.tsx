@@ -84,6 +84,7 @@ function makeArticle(overrides: Partial<AdminNewsWithMainEvent> = {}): AdminNews
     status: 'published',
     featured: false,
     image_url: '',
+    video: null,
     views: 10,
     published_at: '2026-10-25T11:35:00Z',
     created_at: '2026-10-24T09:00:00Z',
